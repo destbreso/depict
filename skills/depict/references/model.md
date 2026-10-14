@@ -25,8 +25,9 @@ A region is one idea: a part, a stage, a reason. On a canvas it is one shot of t
 |---|---|
 | `id` | Lowercase letters, digits and dashes. A beat draws the region's title by its id. |
 | `title` | Two to four words, written underlined in the accent above the region's items. Optional, but a tour reads better with them. |
-| `layout` | How its items sit: `"row"` (default), `"column"`, or `"grid"` (each item gives `at: [column, row]`; the default when any item has `at`). |
-| `items` | One to four things, at most six. |
+| `layout` | How its items sit: `"row"` (default), `"column"`, `"grid"` (each item gives `at: [column, row]`; the default when any item has `at`), `"cells"` (adjacent cells of one size, edge to edge: an array, a row of a table) or `"stack"` (the same, top to bottom: a stack, a list of slots). Cells hold a label inside and a note under them (beside them in a stack): an index, a value. They take no icon. |
+| `at` | `[column, row]` when the board's `flow` is `"grid"`: where the region sits among the others. Every region needs one, and no two may share it. |
+| `items` | One to four things, at most six (a `cells` or `stack` region may hold more: they are one thing, drawn as a row of slots). |
 
 ## Items
 
@@ -63,7 +64,13 @@ A link is drawn after both its items; in the same beat it may come first, pointi
 | `mark` | Emphasis on things already drawn: `{ circle: "id" }` (round an item's words), `{ underline: "id" }`, `{ highlight: "id" }`, `{ box: "id" }`, `{ cross: "id" }`. |
 | `open` | An item with a `figure`: the page opens it as the beat starts and waits until the reader closes it. |
 
-Everything on the board is drawn exactly once, in some beat, and marked only after it is drawn. A beat that draws and marks nothing is merged into the one before it.
+Everything on the board is drawn exactly once, in some beat, and marked only after it is drawn. A beat that draws, marks and opens nothing is refused: say that sentence while something is drawn, or merge it into the beat before.
+
+A link between items of two regions makes its beat's shot cover both regions, so everything drawn in that beat is shot smaller. Draw such a link in a beat of its own, after both its ends (a short label then reads fine), or keep items that link inside one region.
+
+## Words the hand can write
+
+The board's words (titles, labels, notes, an arrow's label) are written by a single-stroke font that covers Latin-1: accents, ñ, ¿, ¡, ×, ÷, €, °. Typographic marks an agent tends to produce are written the plain way: curly quotes as straight ones, … as ..., → as ->, ≈ as ~, ≤ and ≥ as <= and >=. Anything else the hand cannot write fails the build, naming the item and the character. Captions (a beat's `say`) are shown in the page's own type and take any character.
 
 ## What the kit decides
 

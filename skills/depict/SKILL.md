@@ -13,11 +13,12 @@ metadata:
 
 This skill explains an idea the way a good whiteboard explainer does: a pen draws while a voice explains, one sentence at a time, and the drawing grows into a picture of the whole idea. You write a board script, which says what the idea is made of (regions, the items in them, the links between items) and the order to tell it (beats: one sentence each, and what is drawn or marked while it is said). It holds no coordinates. The kit lays the board out, draws every shape and writes every word in the order a hand would, times each stroke, and moves the camera so every shot is readable. The page plays like a video, and when it ends it does not go blank: the reader can zoom and drag the board, and tap any part to go back to the sentence that explained it.
 
-Examples ship with the skill. Open the closest one before you start. Build any of them with `node scripts/build.mjs examples/<name>/board.mjs --audit`, which writes a page next to it.
+Examples ship with the skill, built. Open the closest one before you start: read its `board.mjs`, and open its page (`examples/<name>/<name>.html`) in a browser or run `node scripts/check.mjs examples/<name>/<name>.html --out <a folder of yours>` to picture it. Never build into the skill's own folder; give `--out` a path of your own.
 
 - `examples/cpu-cache/` is the quality bar for a canvas tour: how a CPU cache works, in three regions (where data lives, hit or miss, why it pays off) and eight beats. Each region is a shot; the tour ends on the whole board as a map.
 - `examples/ddos/` explains how a site survives a DDoS attack (the attack, the layers at the edge, autoscaling behind it), and its last item opens the running Dissect figure of the same system, where every layer has a switch.
 - `examples/compound-interest/` is slides: one idea per sheet, a deck that ends laid out on the table.
+- `examples/hash-table/` is a data structure: an array drawn as adjacent cells (`layout: "cells"`), a key hashed to an index, a collision and its chain.
 
 ## The one idea that matters
 
@@ -41,7 +42,7 @@ Two ways this fails, both common:
 ## Workflow
 
 1. **Find the one sentence.** What should the viewer understand after a minute? Say it in one sentence, and say who the viewer is. Everything on the board serves that sentence.
-2. **Plan the final board first.** Split the idea into two to five regions in the order you will tell them. Give each region one to four items (an icon, a two or three word label, a short note) and decide the links. Name the parts before the process: a region that shows how things work needs the things drawn first. Pick each region's `layout` (`row`, `column`, or `grid` with `at: [column, row]`) from its shape; references/craft.md maps shapes of argument to layouts.
+2. **Plan the final board first.** Split the idea into two to five regions in the order you will tell them. Give each region one to four items (an icon, a two or three word label, a short note) and decide the links. Name the parts before the process: a region that shows how things work needs the things drawn first. Pick each region's `layout` from its shape (`row`, `column`, `grid` with `at: [column, row]`, or `cells` and `stack` for an array, a table row or a stack drawn as adjacent slots); references/craft.md maps shapes of argument to layouts. Keep items that are linked in one region: an arrow between regions makes its beat's shot wide and its text small.
 3. **Write the beats.** One sentence each, under about 90 characters, spoken to the viewer ("your CPU", "you"). Each beat draws the one or two things its sentence names, and draws nothing its sentence does not need. Open with a picture within about five seconds, not a long title. Close on the take-away: a banner item, a mark on the key part, or a live part to try.
 4. **Choose the mode.** `canvas` is one board the camera tours region by region, ending on the whole picture as a map: for systems, structures and ideas with parts that relate. `slides` gives every region its own sheet, one idea at a time, and ends on the deck laid out: for sequences, steps and before-and-after.
 5. **Build with the audit:** `node scripts/build.mjs board.mjs --audit`. It fails on problems (unreadable text, overlaps, things outside their slide) and warns about the craft (long captions, labels of many words, a slow opening, too much at once). Fix every problem; read every warning and fix the ones that are right.

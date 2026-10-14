@@ -121,3 +121,61 @@ for (const name of examples) {
     assert.deepEqual(problems, []);
   });
 }
+
+test("cells sit edge to edge, and an item hangs under its cell", () => {
+  const s = {
+    title: "Cells",
+    regions: [{ id: "arr", title: "An array", layout: "cells", items: [{ id: "c0", label: "0" }, { id: "c1", label: "1" }, { id: "c2", label: "2" }, { id: "v", label: "Ana", shape: "box", under: "c1" }] }],
+    beats: [{ say: "An array of three, and a value under the middle one.", draw: ["title", "arr", "c0", "c1", "c2", "v"] }],
+  };
+  const { comp } = build(s);
+  const [a, b, c] = ["c0", "c1", "c2"].map((id) => comp.elements.get(id).box);
+  assert.ok(Math.abs(a.x + a.w - b.x) < 12 && Math.abs(b.x + b.w - c.x) < 12, "cells share their edges");
+  const v = comp.elements.get("v").box;
+  assert.ok(v.y > b.y + b.h && Math.abs(v.x + v.w / 2 - (b.x + b.w / 2)) < 2, "the value hangs centered under its cell");
+  const bad = normalize({ ...s, regions: [{ ...s.regions[0], items: [{ id: "c0", label: "0", icon: "cpu" }, { id: "v", label: "x", under: "nope" }] }] }).errors.join("\n");
+  assert.match(bad, /not an icon/);
+  assert.match(bad, /under "nope" is not a cell/);
+});
+
+test("typographic marks are written the plain way, and a character no hand has is refused", () => {
+  const { board, errors } = normalize({ ...tiny(), title: "Key → index…", regions: [{ id: "r", title: "It’s here", items: [{ id: "a", label: "one 中" }, { id: "b", label: "two" }] }] });
+  assert.equal(board.title, "Key -> index...");
+  assert.equal(board.regions[0].title, "It's here");
+  assert.match(errors.join("\n"), /cannot write "中" \(U\+4E2D\)/);
+});
+
+test("a circle holds every corner of what it circles", async () => {
+  const ink = await import("../skills/depict/kit/ink.mjs");
+  const { splitmix32 } = await import("../skills/depict/kit/rng.mjs");
+  for (const [w, h] of [[300, 60], [180, 90], [90, 90], [500, 40]]) {
+    const b = { x: 100, y: 100, w, h };
+    const [pts] = ink.circleAround(ink.pen(splitmix32(w * 7 + h)), b, 12);
+    // every corner lies inside the drawn loop: the loop's radius toward each corner is longer than the corner's
+    for (const [cx, cy] of [[b.x, b.y], [b.x + w, b.y], [b.x, b.y + h], [b.x + w, b.y + h]]) {
+      const ang = Math.atan2(cy - (b.y + h / 2), cx - (b.x + w / 2));
+      let best = null;
+      for (let i = 0; i < pts.length; i += 2) {
+        const a = Math.atan2(pts[i + 1] - (b.y + h / 2), pts[i] - (b.x + w / 2));
+        const d = Math.abs(Math.atan2(Math.sin(a - ang), Math.cos(a - ang)));
+        if (!best || d < best.d) best = { d, r: Math.hypot(pts[i] - (b.x + w / 2), pts[i + 1] - (b.y + h / 2)) };
+      }
+      assert.ok(best.r > Math.hypot(cx - (b.x + w / 2), cy - (b.y + h / 2)), `the corner of a ${w} x ${h} box is inside the circle`);
+    }
+  }
+});
+
+test("a note low in its region stays clear of the caption: the shot makes room for it", () => {
+  const s = tiny();
+  s.beats[1].draw.push({ note: "a note that sits low on purpose", near: "b", side: "below" });
+  const { board, comp, tl } = build(s);
+  const findings = audit(board, comp, tl);
+  assert.ok(!findings.some((f) => f.rule === "safe"), "the shot keeps the note clear of the caption");
+});
+
+test("regions on a grid need a place each, and two cannot share one", () => {
+  const s = { ...tiny(), flow: "grid", regions: [{ ...tiny().regions[0], at: [0, 0] }] };
+  assert.deepEqual(normalize(s).errors, []);
+  delete s.regions[0].at;
+  assert.match(normalize(s).errors.join("\n"), /give the region at/);
+});

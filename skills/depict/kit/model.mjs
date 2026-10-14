@@ -4,12 +4,17 @@
 // is said). It holds no coordinates: the kit lays the board out, times every
 // stroke and moves the camera.
 import { hasIcon, nearIcons } from "./icons.mjs";
+import { hand } from "./fonts.mjs";
+
+/** Typographic marks a hand writes the plain way; anything else outside its glyphs is a problem. */
+const PLAIN = { "\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u2192": "->", "\u2190": "<-", "\u2248": "~", "\u2260": "!=", "\u2264": "<=", "\u2265": ">=", "\u2014": ", ", "\u2013": "-", "\u2022": "\u00b7", "\u00a0": " " };
+const plain = (s) => s.replace(/[\u2019\u2018\u201c\u201d\u2026\u2192\u2190\u2248\u2260\u2264\u2265\u2014\u2013\u2022\u00a0]/g, (c) => PLAIN[c]);
 
 const SHAPES = ["none", "box", "ellipse", "circle", "cloud", "bubble", "banner"];
 const LINK_STYLES = ["solid", "dashed", "double"];
 const MARKS = ["circle", "underline", "highlight", "box", "cross"];
 const FLOWS = ["path", "row", "column", "grid"];
-const LAYOUTS = ["row", "column", "grid"];
+const LAYOUTS = ["row", "column", "grid", "cells", "stack"];
 
 /**
  * Validates and fills in a board script. Returns { board, errors }; the
@@ -55,12 +60,28 @@ export function normalize(input) {
       if (item.icon && !hasIcon(item.icon)) err(`${w}: no icon named "${item.icon}" (icons are Lucide names); close ones: ${nearIcons(item.icon).join(", ") || "none"}`);
       if (!item.icon && !item.label) err(`${w} has neither an icon nor a label`);
       if (region.layout === "grid" && !Array.isArray(item.at)) err(`${w}: region ${r.id} lays its items on a grid, so give it at: [column, row]`);
+      const celled = region.layout === "cells" || region.layout === "stack";
+      if (it.under != null) {
+        // an item hanging under a cell: a chain in a bucket, a value under a slot
+        if (region.layout !== "cells") err(`${w}: under works in a region whose layout is "cells"`);
+        else if (!(r.items ?? []).some((x) => x.id === it.under && x.under == null)) err(`${w}: under "${it.under}" is not a cell of region ${r.id}`);
+      } else if (celled && item.icon) err(`${w}: region ${r.id} draws its items as ${region.layout === "cells" ? "adjacent cells" : "a stack"}, which hold a label and a note, not an icon (an item with under: "cell" can have one)`);
+      else if (celled && !item.label) err(`${w}: a ${region.layout === "cells" ? "cell" : "stack entry"} needs a label`);
       if (it.figure != null && (typeof it.figure !== "string" || !it.figure.trim())) err(`${w}: figure should be the path or URL of a Dissect page`);
       return item;
     });
     return region;
   });
   if (!b.regions.length) err("the board has no regions: one region per idea, each with its items");
+  if (b.flow === "grid") {
+    const taken = new Map();
+    for (const r of b.regions) {
+      const ok = Array.isArray(r.at) && r.at.length === 2 && r.at.every((v) => Number.isInteger(v) && v >= 0);
+      if (!ok) err(`region ${r.id}: the board's flow is "grid", so give the region at: [column, row]`);
+      else if (taken.has(String(r.at))) err(`regions ${taken.get(String(r.at))} and ${r.id} are both at [${r.at}]`);
+      else taken.set(String(r.at), r.id);
+    }
+  }
 
   b.links = (b.links ?? []).map((l, li) => {
     const where = `link ${l.id ?? li + 1}`;
@@ -125,6 +146,34 @@ export function normalize(input) {
       for (const end of [link.from, link.to]) if ((drawnAt.get(end) ?? Infinity) > i) err(`beat ${i + 1} draws link "${l}" before "${end}"`);
     }
   });
+  // every word on the board must be in the hand's glyphs: a missing one would be drawn as "?"
+  if (["print", "marker"].includes(b.hand)) {
+    const font = hand(b.hand);
+    const check = (where, text) => {
+      const missing = [...new Set([...text].filter((c) => !/\s/.test(c) && !font.glyphs[c] && !font.glyphs[c.normalize("NFD")[0]]))];
+      if (missing.length) err(`${where}: the ${b.hand} hand cannot write ${missing.map((c) => `"${c}" (U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")})`).join(", ")}; write it another way`);
+    };
+    b.title = plain(b.title);
+    check("the title", b.title);
+    for (const r of b.regions) {
+      r.title = plain(r.title);
+      check(`region ${r.id}'s title`, r.title);
+      for (const it of r.items) {
+        it.label = plain(it.label);
+        it.note = plain(it.note);
+        check(`item ${it.id}`, it.label + it.note);
+      }
+    }
+    for (const l of b.links) {
+      l.label = plain(l.label);
+      check(`link ${l.id}`, l.label);
+    }
+    b.beats.forEach((bt, i) => bt.notes.forEach((n) => {
+      n.text = plain(n.text);
+      check(`beat ${i + 1}'s note`, n.text);
+    }));
+  }
+
   b.drawnAt = drawnAt;
   b.kindOf = ids;
   return { board: b, errors };

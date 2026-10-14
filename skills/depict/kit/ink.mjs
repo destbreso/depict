@@ -100,12 +100,13 @@ export function box(p, x, y, w, h, { corner = 0 } = {}) {
  * pen goes round, so where it closes the line passes a little outside its
  * start instead of folding over it.
  */
-export function ellipse(p, cx, cy, rx, ry, { overshoot = 0.1 } = {}) {
+export function ellipse(p, cx, cy, rx, ry, { overshoot = 0.1, outward = false } = {}) {
   const steps = Math.max(12, Math.round(Math.sqrt((rx + ry) / 2) * 2.6));
   const start = p.r(0, TAU);
   const span = TAU * (1 + overshoot * p.r(0.6, 1.2));
   // the pen ends a little outside or inside its start, clearly apart from it (at least a line and a half)
-  const drift = Math.max(p.r(0.06, 0.1), (1.6 * p.width) / Math.min(rx, ry)) * (p.rng() < 0.5 ? -1 : 1);
+  // (outward only, when it circles something it must not cut)
+  const drift = Math.max(p.r(0.06, 0.1), (1.6 * p.width) / Math.min(rx, ry)) * (outward || p.rng() < 0.5 ? 1 : -1);
   const wob = [p.off(0.02), p.off(0.02), p.r(0, TAU)];
   const pts = [];
   const n = Math.ceil(steps * (span / TAU));
@@ -160,12 +161,14 @@ export function underline(p, x, y, w) {
 
 /**
  * Circling something: an ellipse that clears the box's corners with room to
- * spare (a box w by h fits inside rx, ry when (w/2rx)^2 + (h/2ry)^2 < 1).
+ * spare. A box of half-sides a and b fits inside radii rx and ry when
+ * (a/rx)^2 + (b/ry)^2 <= 1; rx = a*sqrt(2), ry = b*sqrt(2) is the smallest
+ * ellipse of the box's shape that does, and the margin goes on top.
  */
 export function circleAround(p, b, margin = 14) {
-  const rx = (b.w / 2) * 1.16 + margin;
-  const ry = (b.h / 2) * 1.5 + margin * 0.8;
-  return ellipse(p, b.x + b.w / 2, b.y + b.h / 2, rx, ry, { overshoot: 0.16 });
+  const rx = (b.w / 2) * Math.SQRT2 * 1.04 + margin;
+  const ry = (b.h / 2) * Math.SQRT2 * 1.04 + margin * 0.8;
+  return ellipse(p, b.x + b.w / 2, b.y + b.h / 2, rx, ry, { overshoot: 0.16, outward: true });
 }
 
 /** A highlighter pass: back and forth across the box, as one wide stroke. */

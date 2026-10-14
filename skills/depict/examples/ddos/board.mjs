@@ -12,11 +12,10 @@ export default {
     {
       id: "attack",
       title: "The attack",
-      layout: "grid",
       items: [
-        { id: "crowd", icon: "users", label: "People", note: "a few hundred requests a second", at: [0, 0] },
-        { id: "botnet", icon: "bot", label: "Botnet", note: "machines all over the world", at: [0, 1] },
-        { id: "site", icon: "server", label: "The site", note: "a few servers", shape: "box", at: [1, 0] },
+        { id: "crowd", icon: "users", label: "People", note: "a few hundred requests a second" },
+        { id: "site", icon: "server", label: "The site", note: "a few servers", shape: "box" },
+        { id: "botnet", icon: "bot", label: "Botnet", note: "machines all over the world" },
       ],
     },
     {

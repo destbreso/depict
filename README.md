@@ -64,10 +64,12 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
     <td><b>Compound interest.</b> Slides: one idea per sheet, every number checked.</td>
   </tr>
   <tr>
-    <td width="50%"><a href="skills/depict/examples/ddos/ddos.html"><img src="assets/ddos.png" alt="How a site survives a DDoS attack: the attack (people and a botnet sending to the site), the layers at the edge (rules, rate limit, challenge, cache), and behind the edge autoscaling and a Try it bubble with a play mark."></a></td>
-    <td>
-      <b>How a site survives a DDoS attack.</b> The board explains the attack and the layers that stop it; its last item opens the running Dissect figure of the same system, where every layer has a switch.
-    </td>
+    <td width="50%"><a href="skills/depict/examples/ddos/ddos.html"><img src="assets/ddos.png" alt="How a site survives a DDoS attack: the attack (people, the site and a botnet), the layers at the edge (rules, rate limit, challenge, cache), and behind the edge autoscaling and a Try it bubble with a play mark."></a></td>
+    <td width="50%"><a href="skills/depict/examples/hash-table/hash-table.html"><img src="assets/hash-table.png" alt="How a hash table works: by number or by name, a key hashed to an index (2,615 % 4 = 3), four buckets drawn as adjacent cells with Ana and then Ben chained under bucket 3, and why it is fast."></a></td>
+  </tr>
+  <tr>
+    <td><b>How a site survives a DDoS attack.</b> The last item opens the running Dissect figure of the same system, where every layer has a switch.</td>
+    <td><b>How a hash table works.</b> A data structure: the buckets are adjacent cells, and a collision's chain hangs under bucket 3.</td>
   </tr>
 </table>
 
@@ -100,8 +102,9 @@ Ask in your own words; the skill triggers on explaining, teaching, sketching out
 | [`cpu-cache`](skills/depict/examples/cpu-cache/board.mjs) | **How a CPU cache works.** Where data lives, hit or miss, why it pays off. A canvas tour in eight beats. |
 | [`compound-interest`](skills/depict/examples/compound-interest/board.mjs) | **Compound interest.** Simple against compound interest on $1,000 at 10%, the gap after 10 and 30 years, the rule of 72. Slides. |
 | [`ddos`](skills/depict/examples/ddos/board.mjs) | **How a site survives a DDoS attack.** The attack, the layers at the edge, autoscaling, and a live part that opens Dissect's running figure. |
+| [`hash-table`](skills/depict/examples/hash-table/board.mjs) | **How a hash table works.** For someone who just learned arrays: a key hashed to an index, buckets as adjacent cells, a collision and its chain, why lookups stay fast. |
 
-Build any of them: `node skills/depict/scripts/build.mjs skills/depict/examples/<name>/board.mjs --audit`.
+Rebuild any of them: `node skills/depict/scripts/build.mjs skills/depict/examples/<name>/board.mjs --out <your folder>/<name>.html --audit`.
 
 ## How it works
 

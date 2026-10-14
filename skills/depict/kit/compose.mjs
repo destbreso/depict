@@ -8,6 +8,7 @@ import * as ink from "./ink.mjs";
 import { write } from "./hand.mjs";
 import { icon } from "./icons.mjs";
 import { bounds, pad, union } from "./geom.mjs";
+import { CAPTION_BAND } from "./camera.mjs";
 
 export const INK = "#1b1b19";
 export const GREY = "#55554f";
@@ -88,12 +89,57 @@ const move = (parts, dx, dy) =>
   parts.map((p) => ({ ...p, strokes: p.strokes.map((pts) => pts.map((v, i) => v + (i % 2 ? dy : dx))) }));
 const moveBox = (b, dx, dy) => b && { ...b, x: b.x + dx, y: b.y + dy };
 
-/** Lays out one region's items (row, column or grid) with the region's top-left at (0, 0). The first region also carries the board's title, as its top line. */
-function layoutRegion(board, font, region, S, first) {
-  const cards = region.items.map((it) => {
-    const { parts, labelBox, wordsBox } = itemParts(board, font, it, S);
-    return { it, parts, labelBox, wordsBox, box: bounds(parts.flatMap((p) => p.strokes)) };
+/**
+ * Adjacent cells (an array, a row of a table) or a stack: every cell one
+ * size, each sharing its edge with the one before, so the first is a whole
+ * box and the others add three sides. The label sits inside; the note under a
+ * cell, or beside an entry of a stack (an index, a value).
+ */
+function cellCards(board, font, region, S) {
+  const across = region.layout === "cells";
+  const cellItems = region.items.filter((it) => it.under == null);
+  const labels = cellItems.map((it) => write(font, it.label, { x: 0, y: 0, size: SIZE.label, align: "center", maxWidth: SIZE.cardWidth, rng: S(`${it.id}.label`) }));
+  const cw = Math.max(...labels.map((t) => t.box.w)) + 64;
+  const ch = Math.max(...labels.map((t) => t.box.h)) + 46;
+  const cells = cellItems.map((it, i) => {
+    const x = across ? i * cw : 0;
+    const y = across ? 0 : i * ch;
+    const p = ink.pen(S(`${it.id}.shape`), { width: W.line });
+    const cell = i === 0 ? ink.box(p, x, y, cw, ch, { corner: 3 }) : across ? ink.polyline(p, [x, y, x + cw, y, x + cw, y + ch, x, y + ch]) : ink.polyline(p, [x + cw, y, x + cw, y + ch, x, y + ch, x, y]);
+    const t = labels[i];
+    const parts = [part("shape", cell, { width: W.line }), ...move([part("label", t.strokes, { width: W.label, write: true, size: SIZE.label })], x + cw / 2 - (t.box.x + t.box.w / 2), y + ch / 2 - (t.box.y + t.box.h / 2))];
+    if (it.note) {
+      const n = write(font, it.note, { x: 0, y: 0, size: SIZE.note, align: across ? "center" : "left", maxWidth: across ? cw : SIZE.cardWidth, rng: S(`${it.id}.note`) });
+      const [nx, ny] = across ? [x + cw / 2 - (n.box.x + n.box.w / 2), y + ch + 14 - n.box.y] : [x + cw + 22 - n.box.x, y + ch / 2 - (n.box.y + n.box.h / 2)];
+      parts.push(...move([part("note", n.strokes, { width: W.note, color: GREY, write: true, size: SIZE.note })], nx, ny));
+    }
+    const words = bounds(parts.filter((q) => q.role !== "shape").flatMap((q) => q.strokes));
+    return { it, parts, labelBox: moveBox(t.box, x + cw / 2 - (t.box.x + t.box.w / 2), y + ch / 2 - (t.box.y + t.box.h / 2)), wordsBox: words, box: bounds(parts.flatMap((q) => q.strokes)) };
   });
+  // items that hang under a cell, one below the other, with room for an arrow between
+  const hung = [];
+  const depth = new Map(cells.map((c) => [c.it.id, c.box.y + c.box.h]));
+  for (const it of region.items.filter((x) => x.under != null)) {
+    const { parts, labelBox, wordsBox } = itemParts(board, font, it, S);
+    const box = bounds(parts.flatMap((q) => q.strokes));
+    const cell = cells.find((c) => c.it.id === it.under);
+    const dx = cell.box.x + cell.box.w / 2 - (box.x + box.w / 2);
+    const dy = depth.get(it.under) + 84 - box.y;
+    depth.set(it.under, box.y + dy + box.h);
+    hung.push({ it, parts: move(parts, dx, dy), labelBox: moveBox(labelBox, dx, dy), wordsBox: moveBox(wordsBox, dx, dy), box: moveBox(box, dx, dy) });
+  }
+  return [...cells, ...hung];
+}
+
+/** Lays out one region's items (row, column, grid, cells or stack) with the region's top-left at (0, 0). The first region also carries the board's title, as its top line. */
+function layoutRegion(board, font, region, S, first) {
+  const celled = region.layout === "cells" || region.layout === "stack";
+  const cards = celled
+    ? cellCards(board, font, region, S)
+    : region.items.map((it) => {
+        const { parts, labelBox, wordsBox } = itemParts(board, font, it, S);
+        return { it, parts, labelBox, wordsBox, box: bounds(parts.flatMap((p) => p.strokes)) };
+      });
   const place = (c, x, y) => {
     // the card's box is placed with its top-left at (x, y)
     const dx = x - c.box.x;
@@ -103,7 +149,9 @@ function layoutRegion(board, font, region, S, first) {
     c.wordsBox = moveBox(c.wordsBox, dx, dy);
     c.box = moveBox(c.box, dx, dy);
   };
-  if (region.layout === "row" || region.layout === "column") {
+  if (celled) {
+    // already in place, edge to edge
+  } else if (region.layout === "row" || region.layout === "column") {
     let x = 0;
     let y = 0;
     const tallest = Math.max(...cards.map((c) => c.box.h));
@@ -137,7 +185,8 @@ function layoutRegion(board, font, region, S, first) {
   let top = 0;
   let boardTitle = null;
   if (first) {
-    const t = write(font, board.title, { x: content.x, y: 0, size: SIZE.boardTitle, rng: S("title") });
+    // a long title goes on two lines, as on a whiteboard, when it would otherwise widen the first shot by more than a third
+    const t = write(font, board.title, { x: content.x, y: 0, size: SIZE.boardTitle, maxWidth: Math.max(content.w * 1.35, 1250), lineHeight: 1.55, rng: S("title") });
     const under = ink.underline(ink.pen(S("title.under"), { width: W.mark * 1.2 }), t.box.x, t.box.y + t.box.h + 10, t.box.w);
     boardTitle = { parts: [part("text", t.strokes, { width: W.title, write: true, size: SIZE.boardTitle }), part("underline", under, { width: W.mark * 1.2, color: board.accent })], box: t.box };
     top = t.box.h + 70;
@@ -227,8 +276,9 @@ function placeRegions(board, laid) {
   return laid.map((r, i) => {
     const [c, row] = cell[i];
     const frame = { x: x0[c] + rowShift[row] + (colW[c] - frames[i].w) / 2, y: y0[row] + (rowH[row] - frames[i].h) / 2, w: frames[i].w, h: frames[i].h };
-    // the content is centered in its frame
-    return { ...r, frame, dx: frame.x + (frame.w - r.box.w) / 2 - r.box.x, dy: frame.y + (frame.h - r.box.h) / 2 - r.box.y };
+    // the content is centered in its frame; on a slide, in the part of the sheet above the caption's band
+    const usable = board.mode === "slides" ? frame.h * (1 - CAPTION_BAND) : frame.h;
+    return { ...r, frame, dx: frame.x + (frame.w - r.box.w) / 2 - r.box.x, dy: frame.y + (usable - r.box.h) / 2 - r.box.y };
   });
 }
 
@@ -266,6 +316,7 @@ export function compose(board, font) {
       e.region = r.region.id;
       e.labelBox = moveBox(c.labelBox, r.dx, r.dy);
       e.wordsBox = moveBox(c.wordsBox, r.dx, r.dy);
+      e.framed = c.it.shape !== "none" || ((r.region.layout === "cells" || r.region.layout === "stack") && c.it.under == null);
       elements.set(c.it.id, e);
     }
   }
@@ -334,7 +385,8 @@ export function compose(board, font) {
       const tb = m.target === "title" || target.kind !== "item" ? target.box : target.labelBox ?? target.box;
       const p = ink.pen(S(id), { width: W.mark });
       const strokes = {
-        circle: () => ink.circleAround(p, target.kind === "item" ? target.wordsBox ?? target.box : tb, 12),
+        // an item's words are circled; an item in a frame of its own is circled round the frame
+        circle: () => ink.circleAround(p, target.kind === "item" && !target.framed ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb, 12),
         underline: () => ink.underline(p, tb.x, tb.y + tb.h + 8, tb.w),
         box: () => ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32),
         cross: () => ink.crossOut(p, tb),

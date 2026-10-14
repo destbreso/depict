@@ -10,4 +10,8 @@
 - The board stays live when the explanation ends: zoom it, drag it, tap a part to go back to its sentence.
 - Live parts: an item with a Dissect figure opens into it, running, grown from its place on the board.
 - An audit (readable text in every shot, overlaps, captions, labels, pace, the opening, the closing map), a browser check that pictures every beat, and a video export ready for social sites.
-- Examples: how a CPU cache works (canvas), compound interest (slides), how a site survives a DDoS attack (with a live Dissect figure).
+- Data structures: `cells` and `stack` layouts draw adjacent slots of one size (an array, a table row, a stack), and an item can hang `under` a cell (a chain in a bucket, a value under a slot).
+- Shots keep the caption's band clear, and the audit fails anything drawn under it or outside its shot.
+- Every word on the board is checked against the hand's glyphs: typographic marks are written the plain way, and a character the hand lacks fails the build instead of turning into "?".
+- A long title goes on two lines rather than widening the first shot.
+- Examples: how a CPU cache works (canvas), compound interest (slides), how a site survives a DDoS attack (with a live Dissect figure), how a hash table works (cells and a chain).

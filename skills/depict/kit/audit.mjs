@@ -4,6 +4,7 @@
 // the build; warnings are worth a look.
 import { overlaps, pad } from "./geom.mjs";
 import { SIZE } from "./compose.mjs";
+import { safeArea } from "./camera.mjs";
 
 const VW = 1920; // a shot fills this many pixels across in the video
 
@@ -18,13 +19,34 @@ export function audit(board, comp, tl) {
   const capOf = (e) => ({ title: SIZE.boardTitle, region: SIZE.regionTitle, item: e.parts.some((p) => p.role === "label") ? SIZE.label : SIZE.note, note: SIZE.note, link: SIZE.linkLabel, mark: Infinity })[e.kind] ?? SIZE.note;
   tl.beats.forEach((b, i) => {
     const k = VW / b.shot[2];
+    // a beat whose things sit in more than one region is shot wide enough for all of them, and everything in it shrinks
+    const spans = new Set();
+    const joiner = board.beats[i].draw.map((id) => els.get(id)).find((e) => e?.joins && e.joins[0] !== e.joins[1]);
     for (const id of board.beats[i].draw) {
       const e = els.get(id);
+      (e.joins ?? [e.region]).forEach((r) => spans.add(r));
+    }
+    const why = spans.size > 1 ? `; the shot spans regions ${[...spans].join(" and ")}${joiner ? ` because link "${joiner.id}" joins them` : ""}, so everything in it is drawn smaller: draw a link between regions in a beat of its own, after both its ends, or keep linked items in one region` : "; split the region or shorten what it holds";
+    for (const id of board.beats[i].draw) {
+      const e = els.get(id);
+      if (e.kind === "link" && !e.parts.some((p) => p.role === "label")) continue; // an arrow with no words has nothing to read
       const cap = Math.min(capOf(e), e.parts.some((p) => p.role === "note") ? SIZE.note : Infinity);
       if (!Number.isFinite(cap)) continue;
-      const px = cap * k;
-      if (px < 14) problem("readable", `beat ${i + 1}: "${id}" is drawn with letters ${px.toFixed(0)} px tall on screen, too small to read; split the region or shorten what it holds`);
-      else if (px < 18) warn("readable", `beat ${i + 1}: "${id}" has letters ${px.toFixed(0)} px tall on screen; 18 px or more reads comfortably`);
+      const px = Math.round(cap * k * 10) / 10; // compared as it is shown
+      if (px < 14) problem("readable", `beat ${i + 1}: "${id}" is drawn with letters ${px.toFixed(1)} px tall on screen, too small to read${why}`);
+      else if (px < 18) warn("readable", `beat ${i + 1}: "${id}" has letters ${px.toFixed(1)} px tall on screen; 18 px or more reads comfortably${spans.size > 1 ? why : ""}`);
+    }
+  });
+
+  // nothing drawn lands outside its beat's shot, or under the caption
+  tl.beats.forEach((b, i) => {
+    const safe = safeArea(b.shot);
+    for (const id of board.beats[i].draw) {
+      const e = els.get(id);
+      const bb = e.box;
+      if (bb.x < safe.x || bb.y < safe.y || bb.x + bb.w > safe.x + safe.w || bb.y + bb.h > safe.y + safe.h) {
+        problem("safe", `beat ${i + 1}: "${id}" reaches ${bb.y + bb.h > safe.y + safe.h ? "under the caption" : "outside the shot"}; move it (a note to another side) or give its region less to hold`);
+      }
     }
   });
 
@@ -96,9 +118,19 @@ export function audit(board, comp, tl) {
     if (r.items.length > 6) warn("load", `region "${r.id}" holds ${r.items.length} items; four read best and six is the most, so split it`);
   }
 
-  // a few new things at a time
+  // a few new things at a time (the cells of one array drawn together count once)
+  const celled = new Set(board.regions.filter((r) => r.layout === "cells" || r.layout === "stack").map((r) => r.id));
   board.beats.forEach((bt, i) => {
-    const fresh = bt.draw.filter((id) => !id.startsWith("mark-")).length;
+    const groups = new Set();
+    const fresh = bt.draw.filter((id) => {
+      if (id.startsWith("mark-")) return false;
+      const e = els.get(id);
+      if (e.kind === "item" && celled.has(e.region)) {
+        if (groups.has(e.region)) return false;
+        groups.add(e.region);
+      }
+      return true;
+    }).length;
     if (fresh > 4) warn("load", `beat ${i + 1} draws ${fresh} things at once; four is about what a viewer takes in before a pause`);
   });
 

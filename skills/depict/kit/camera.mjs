@@ -15,6 +15,25 @@ export function shotOf(f, aspect = 16 / 9) {
   return [f.x + f.w / 2, f.y + f.h / 2, w];
 }
 
+/** The share of a shot's height at the bottom that the caption can cover. */
+export const CAPTION_BAND = 0.15;
+
+/**
+ * A shot that shows a frame above the caption's band: the frame fits the
+ * shot's upper part, centered in it, so nothing drawn lands under a caption.
+ */
+export function shotSafe(f, aspect = 16 / 9) {
+  const h = Math.max(f.h / (1 - CAPTION_BAND), f.w / aspect);
+  return [f.x + f.w / 2, f.y + f.h / 2 + (CAPTION_BAND / 2) * h, h * aspect];
+}
+
+/** The part of a shot nothing should be drawn outside of: the shot, less the caption's band. */
+export function safeArea(shot, aspect = 16 / 9) {
+  const [cx, cy, w] = shot;
+  const h = w / aspect;
+  return { x: cx - w / 2, y: cy - h / 2, w, h: h * (1 - CAPTION_BAND) };
+}
+
 /** The path from shot a to shot b: a function of u in [0, 1], and the path's length (in the zoom metric). */
 export function flight(a, b) {
   const [ux0, uy0, w0] = a;

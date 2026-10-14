@@ -4,7 +4,7 @@
 // short lifts a hand makes between strokes), and then holds at least as long
 // as its sentence takes to read. The board ends on a held overview.
 import { cumulative, union, pad } from "./geom.mjs";
-import { flight, flightTime, pan, shotOf } from "./camera.mjs";
+import { flight, flightTime, pan, shotOf, shotSafe } from "./camera.mjs";
 
 /** The pen, in board units per second, and its pauses, in seconds. */
 export const PACE = {
@@ -67,7 +67,7 @@ export function time(board, comp) {
     const slides = board.mode === "slides";
     // a slide is shot whole and still; on the canvas the shot takes the beat's regions, with air
     const frame = slides ? sheetOf(comp, beat, board) : frameOf(board, comp, beat);
-    const next = shotOf(slides ? frame : pad(frame, 40));
+    const next = slides ? shotOf(frame) : shotSafe(pad(frame, 40));
     const start = t;
     if (!shot) shot = next;
     else if (Math.hypot(next[0] - shot[0], next[1] - shot[1]) > 1 || Math.abs(next[2] - shot[2]) > 1) {
