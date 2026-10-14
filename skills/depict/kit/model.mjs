@@ -93,6 +93,12 @@ export function normalize(input) {
         const paths = (Array.isArray(it.sketch) ? it.sketch : [it.sketch]).map((e) => (typeof e === "string" ? { d: e } : { ...e }));
         item.sketch = paths;
         for (const e of paths) {
+          if (e.text != null) {
+            // words inside the drawing: { text, at: [x, y], size } in the box's units
+            if (!Array.isArray(e.at) || e.at.length !== 2 || e.at.some((v) => !Number.isFinite(v) || v < -20 || v > 120)) err(`${w}: a sketch's text "${e.text}" needs at: [x, y] inside its 100 x 100 box`);
+            if (e.size != null && !(e.size > 0)) err(`${w}: a sketch's text "${e.text}" has a size that is not a positive number`);
+            continue;
+          }
           const d = String(e.d ?? "");
           if (e.fill != null && !FILLS.includes(e.fill)) err(`${w}: a sketch's fill "${e.fill}": use ${FILLS.join(", ")}`);
           try {
@@ -227,6 +233,10 @@ export function normalize(input) {
         it.note = plain(it.note);
         if (it.says) it.says = plain(it.says);
         check(`item ${it.id}`, it.label + it.note + (it.says ?? ""));
+        for (const e of it.sketch ?? []) if (e.text != null) {
+          e.text = plain(String(e.text));
+          check(`item ${it.id}'s sketch`, e.text);
+        }
       }
     }
     for (const l of b.links) {

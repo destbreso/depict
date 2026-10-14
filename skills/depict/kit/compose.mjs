@@ -59,19 +59,30 @@ const fillColor = (board, name) => ({ ...TINTS, accent: board.accent, yellow: HI
  * lines, with a broad nib, under them. Returns the parts: the lines, then
  * each fill.
  */
-function sketchParts(board, p, paths, x, y, size, width) {
+function sketchParts(board, font, S, id, p, paths, x, y, size, width) {
   const k = size / 100;
   const lines = [];
+  const thin = []; // details drawn with a finer nib (a grid inside a block, a label's ring)
   const fills = [];
-  for (const e of paths) {
+  const words = [];
+  paths.forEach((e, n) => {
+    if (e.text != null) {
+      // words inside the drawing (a clock's numbers, a coin's value), in the board's hand, centered on their place
+      const t = write(font, String(e.text), { x: 0, y: 0, size: (e.size ?? 10) * k, align: "center", rng: S(`${id}.text.${n}`) });
+      const [cx, cy] = [x + e.at[0] * k, y + e.at[1] * k];
+      const dx = cx - (t.box.x + t.box.w / 2);
+      const dy = cy - (t.box.y + t.box.h / 2);
+      words.push(...move([part("text", t.strokes, { width: Math.max(1.6, (e.size ?? 10) * k * 0.13), color: e.color === "grey" ? GREY : e.color === "paper" ? PAPER : INK, write: true, size: (e.size ?? 10) * k, group: "figure" })], dx, dy));
+      return;
+    }
     const polys = flattenPath(e.d, 0.8).map((pts) => pts.map((v, i) => (i % 2 ? y + v * k : x + v * k)));
-    for (const pts of polys) lines.push(ink.wobble(p, pts, { amp: Math.min(1.4, 0.32 * p.width) }));
+    for (const pts of polys) (e.fine ? thin : lines).push(ink.wobble(p, pts, { amp: Math.min(e.fine ? 0.6 : 1.4, 0.32 * p.width) }));
     if (e.fill) {
       const f = ink.fill(p, polys[0], { nib: Math.max(7, size * 0.07), angle: -35 });
       fills.push(part("fill", f.strokes, { width: f.width, color: fillColor(board, e.fill), layer: "under", opacity: e.fill === "ink" ? 0.95 : 0.88, group: "figure" }));
     }
-  }
-  return [part("sketch", lines, { width, group: "figure" }), ...fills];
+  });
+  return [part("sketch", lines, { width, group: "figure" }), ...(thin.length ? [part("sketch", thin, { width: Math.max(1.6, width * 0.42), group: "figure" })] : []), ...fills, ...words];
 }
 
 /**
@@ -98,7 +109,7 @@ function itemParts(board, font, it, S) {
       // a sketch or a character is a picture of several parts (lines, then color), drawn as one gesture
       const drawn =
         kind === "sketch"
-          ? sketchParts(board, p, it.sketch, -size / 2, y, size, width)
+          ? sketchParts(board, font, S, it.id, p, it.sketch, -size / 2, y, size, width)
           : person(p, 0, y, size, { ...it.character, shirt: it.character.shirt ?? SHIRTS[hash32(it.id) % SHIRTS.length], accent: board.accent }).map((q) => part(q.role, q.strokes, { width: q.width, color: q.color, layer: q.layer, opacity: q.opacity, group: "figure" }));
       parts.push(...drawn);
       strokes = drawn.filter((q) => q.layer === "ink").flatMap((q) => q.strokes);
