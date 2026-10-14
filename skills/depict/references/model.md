@@ -14,6 +14,7 @@ A board is a JavaScript module whose default export is the script. It says what 
 | `guide` | `true` | The guide: the animated marker who presents the board. `false` leaves it out. |
 | `story` | `true` | The story road (or, in a plain flow, the story arrows). `false` leaves it out; then link regions yourself, or the audit warns about islands. |
 | `outro` | `true` | The standard ending: the camera comes in on the guide, who waves and winks as a circle closes on it, then the title on the dark. `false` ends on the held overview. |
+| `audience` | `"adult"` | `"child"` for a young viewer: captions larger and held longer (about nine letters a second), longer pauses between things, and the audit holds a sentence to about 64 characters. |
 | `seed` | `1` | The wobble of every line and the guide's blinking. The same seed draws the same board; change it to redraw by hand. |
 | `lang` | `"en"` | The page's language. |
 | `regions` | required | The ideas, in the order you tell them. |
@@ -72,7 +73,7 @@ A link is drawn after both its items; in the same beat it may come first, pointi
 |---|---|
 | `say` | One sentence, under about 90 characters: the caption, and what a narrator would say. |
 | `draw` | What the pen draws while it is said, in order: `"title"`, a region id (its title), an item id, a link id, or a note `{ note: "a few words", near: "item", side: "below" \| "above" \| "left" \| "right", arrow: true }`. |
-| `mark` | Emphasis on things already drawn: `{ circle: "id" }` (round an item's words, or round its frame), `{ underline: "id" }`, `{ highlight: "id" }`, `{ box: "id" }`, `{ cross: "id" }`. The guide is surprised by a mark. |
+| `mark` | Emphasis on things already drawn: `{ circle: "id" }` (round an item's words, or round its frame), `{ underline: "id" }`, `{ highlight: "id" }`, `{ box: "id" }`, `{ cross: "id" }`. A list of ids marks them as one, side by side: `{ highlight: ["c1", "c2", "c3"] }` is a window over three cells. The guide is surprised by a mark. |
 | `feel` | How the guide feels during this beat: `happy` (its default), `excited`, `surprised`, `worried`, `thinking`, `proud`, `sad`. Its brows, eyes and mouth change, and it keeps reacting by itself. |
 | `act` | What the guide does in this beat instead of pointing at each new thing: `point`, `wave`, `cheer`, `shrug`, `scratch` (its head, puzzled), `present`, `rest`. |
 | `open` | An item with a `figure`: the page opens it as the beat starts and waits until the reader closes it. |

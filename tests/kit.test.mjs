@@ -277,3 +277,22 @@ test("every board ends on the outro: the guide waves, the circle closes on it, t
   assert.equal(actorAt(guide, o.iris.close - 0.1).feel, "wink");
   assert.ok(!normalize({ ...tiny(), outro: false }).board.outro === true);
 });
+
+test("a mark can span several things, and a child's board reads more slowly", () => {
+  const s = {
+    title: "Cells",
+    regions: [{ id: "arr", title: "An array", layout: "cells", items: [{ id: "c0", label: "4" }, { id: "c1", label: "1" }, { id: "c2", label: "7" }, { id: "c3", label: "2" }] }],
+    beats: [
+      { say: "An array of four numbers.", draw: ["title", "arr", "c0", "c1", "c2", "c3"] },
+      { say: "A window over the middle three.", mark: [{ highlight: ["c1", "c2", "c3"] }] },
+    ],
+  };
+  const { comp, tl } = build(s);
+  const mark = [...comp.elements.values()].find((e) => e.kind === "mark");
+  for (const id of ["c1", "c2", "c3"]) {
+    const b = comp.elements.get(id).box;
+    assert.ok(mark.box.x <= b.x + 8 && mark.box.x + mark.box.w >= b.x + b.w - 8, `the window spans ${id}`);
+  }
+  const kid = build({ ...s, audience: "child" }).tl;
+  assert.ok(kid.beats[1].t1 - kid.beats[1].t0 > tl.beats[1].t1 - tl.beats[1].t0, "a child's beat is held longer");
+});

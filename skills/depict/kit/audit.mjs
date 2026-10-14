@@ -91,7 +91,7 @@ export function audit(board, comp, tl) {
   for (const m of els.values()) {
     if (m.kind !== "mark") continue;
     for (const e of solid) {
-      if (e.id === m.target || e.kind === "link") continue;
+      if ((m.targets ?? [m.target]).includes(e.id) || e.kind === "link") continue;
       const b = boxOf(e);
       if (b && overlaps(pad(m.box, -8), pad(b, -8))) warn("overlap", `a mark on "${m.target}" runs into "${e.id}"`);
     }
@@ -107,13 +107,15 @@ export function audit(board, comp, tl) {
     }
   }
 
-  // captions: two lines of about 42 characters, read at no more than 20 characters a second
+  // captions: two lines of about 42 characters, read at no more than 20 characters a second (for a child, shorter and slower)
+  const child = board.audience === "child";
+  const cap = child ? { problem: 80, warn: 64, rate: 10 } : { problem: 110, warn: 90, rate: 20 };
   tl.beats.forEach((b, i) => {
     const n = b.say.length;
-    if (n > 110) problem("caption", `beat ${i + 1} says ${n} characters; keep a sentence under about 90 so it fits two caption lines`);
-    else if (n > 90) warn("caption", `beat ${i + 1} says ${n} characters; under about 90 fits two caption lines`);
+    if (n > cap.problem) problem("caption", `beat ${i + 1} says ${n} characters; keep a sentence under about ${cap.warn} so it fits two caption lines${child ? " a child can read" : ""}`);
+    else if (n > cap.warn) warn("caption", `beat ${i + 1} says ${n} characters; under about ${cap.warn} fits two caption lines${child ? " a child can read" : ""}`);
     const rate = n / (b.t1 - b.t0);
-    if (rate > 20) warn("pace", `beat ${i + 1} asks for ${rate.toFixed(0)} characters a second of reading; 20 is the most`);
+    if (rate > cap.rate) warn("pace", `beat ${i + 1} asks for ${rate.toFixed(0)} characters a second of reading; ${cap.rate} is the most`);
   });
 
   // labels of two or three words, notes short

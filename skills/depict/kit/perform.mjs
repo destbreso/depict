@@ -104,7 +104,7 @@ export function perform(board, comp, tl, appear) {
       const e = els.get(id);
       const sp = span.get(id);
       if (!e || !sp || e.kind === "story") continue;
-      const [cx, cy] = center(e.kind === "mark" ? els.get(e.target).box : e.box);
+      const [cx, cy] = center(e.kind === "mark" ? e.targetBox ?? els.get(e.target).box : e.box);
       const at = whereAt(sp[0]);
       // it turns to face what is drawn behind it
       const side = Math.sign(cx - at.x);

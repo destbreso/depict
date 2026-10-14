@@ -807,12 +807,15 @@ export function compose(board, font) {
     bt.mark.forEach((m, mi) => {
       const id = `mark-${bi + 1}-${mi + 1}`;
       const target = elements.get(m.target);
-      const tb = m.target === "title" || target.kind !== "item" ? target.box : target.labelBox ?? target.box;
+      // several targets side by side are marked as one: the box round all of them
+      const many = m.targets.length > 1 ? m.targets.map((id) => elements.get(id)) : null;
+      const span = many && many.reduce((b, e) => union(b, e.kind === "item" && !e.framed ? e.wordsBox ?? e.box : e.box), null);
+      const tb = span ?? (m.target === "title" || target.kind !== "item" ? target.box : target.labelBox ?? target.box);
       const z = zoomOf.get(target.region) ?? 1;
       const p = ink.pen(S(id), { width: W.mark * Math.pow(z, 0.6) });
       const strokes = {
         // an item's words are circled; an item in a frame of its own is circled round the frame
-        circle: () => ink.circleAround(p, target.kind === "item" && !target.framed ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb, 12),
+        circle: () => ink.circleAround(p, span ?? (target.kind === "item" && !target.framed ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb), 12),
         underline: () => ink.underline(p, tb.x, tb.y + tb.h + 8, tb.w),
         box: () => ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32),
         cross: () => ink.crossOut(p, tb),
@@ -822,6 +825,8 @@ export function compose(board, font) {
       const e = element(id, "mark", [part("mark", strokes, { width: hl ? Math.max(18, tb.h * 0.5) : W.mark * Math.pow(z, 0.6), color: hl ? HIGHLIGHTER : board.accent, layer: hl ? "under" : "ink", opacity: hl ? 0.6 : 1 })]);
       e.region = target.region;
       e.target = m.target;
+      e.targets = m.targets;
+      e.targetBox = tb;
       elements.set(id, e);
       bt.draw.push(id);
     });

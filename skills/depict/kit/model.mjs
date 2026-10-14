@@ -43,6 +43,9 @@ export function normalize(input) {
   b.guide = b.guide ?? true;
   b.story = b.story ?? true;
   b.outro = b.outro ?? true; // the standard ending: a goodbye from the guide and the title
+  // who it is for: a child reads slowly, so the captions are larger, shorter and held longer
+  b.audience = b.audience ?? "adult";
+  if (!["adult", "child"].includes(b.audience)) err(`audience "${b.audience}": use "adult" or "child"`);
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
 
   const ids = new Map(); // id -> kind
@@ -162,8 +165,13 @@ export function normalize(input) {
     for (const m of bt.mark ?? []) {
       const kind = MARKS.find((k) => k in m);
       if (!kind) err(`${where} marks ${JSON.stringify(m)}: use one of ${MARKS.join(", ")}, e.g. { circle: "cache" }`);
-      else if (!ids.has(m[kind]) && m[kind] !== "title") err(`${where} marks "${m[kind]}", which is not on the board`);
-      else beat.mark.push({ kind, target: m[kind] });
+      else {
+        // a mark on one thing, or on several side by side (a window of cells, a run of items)
+        const targets = Array.isArray(m[kind]) ? m[kind] : [m[kind]];
+        const missing = targets.filter((id) => !ids.has(id) && id !== "title");
+        if (!targets.length || missing.length) err(`${where} marks "${missing.join('", "') || "nothing"}", which is not on the board`);
+        else beat.mark.push({ kind, target: targets[0], targets });
+      }
     }
     // how the guide feels in this beat, and what it does
     if (bt.feel != null && !(bt.feel in FEELINGS)) err(`${where}: feel "${bt.feel}": use ${Object.keys(FEELINGS).join(", ")}`);
@@ -191,8 +199,10 @@ export function normalize(input) {
   for (const l of b.links) if (!drawnAt.has(l.id)) err(`link "${l.id}" is never drawn: add it to a beat's draw`);
   b.beats.forEach((bt, i) => {
     for (const m of bt.mark) {
-      const at = m.target === "title" ? drawnAt.get("title") : drawnAt.get(m.target);
-      if (at == null || at > i) err(`beat ${i + 1} marks "${m.target}" before it is drawn`);
+      for (const id of m.targets) {
+        const at = drawnAt.get(id);
+        if (at == null || at > i) err(`beat ${i + 1} marks "${id}" before it is drawn`);
+      }
     }
     for (const l of bt.draw.filter((d) => ids.get(d) === "link")) {
       const link = b.links.find((x) => x.id === l);

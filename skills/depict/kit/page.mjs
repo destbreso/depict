@@ -95,6 +95,7 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .dp-hover{fill:rgba(242,201,76,.16);stroke:rgba(196,63,10,.35);stroke-width:2;stroke-dasharray:8 6;pointer-events:none}
 .dp-caption{position:absolute;left:50%;bottom:4.2%;transform:translateX(-50%);max-width:78%;padding:.45em .9em;border-radius:12px;background:rgba(27,27,25,.82);color:#fbfaf7;font-size:clamp(13px,2.15vw,30px);line-height:1.3;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;text-wrap:balance}
 .dp-caption.on{opacity:1}
+.child .dp-caption{font-size:clamp(16px,2.9vw,40px);max-width:70%;padding:.5em 1em;line-height:1.35}
 .dp-start{position:absolute;top:3.5%;right:2.5%;display:none;pointer-events:none}
 .dp.fresh .dp-start{display:flex}
 .dp-start button{pointer-events:auto;display:flex;align-items:center;gap:.6em;padding:.7em 1.2em .7em 1em;border:0;border-radius:999px;background:var(--dp-ink);color:var(--dp-paper);font:600 clamp(13px,1.35vw,19px)/1 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.22);cursor:pointer}
@@ -141,7 +142,7 @@ export function page(board, scene) {
 <script>if(new URLSearchParams(location.search).has("capture"))document.documentElement.classList.add("capture")</script>
 </head>
 <body>
-<div class="dp" tabindex="0">
+<div class="dp${board.audience === "child" ? " child" : ""}" tabindex="0">
   <div class="dp-frame">
     <div class="dp-board"></div>
     <div class="dp-caption" aria-live="polite"></div>

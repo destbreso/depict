@@ -31,6 +31,9 @@ export const PACE = {
   overviewHold: 2.8, // the whole board, held, before the outro
 };
 
+/** The pace for a child's board: about nine letters a second of caption, and longer pauses. */
+export const CHILD = { readBase: 1.3, readRate: 9, hold: 1.0, regionHold: 1.0, element: 0.42, overviewHold: 3.4 };
+
 /**
  * The shot an element is drawn in. The camera follows what is being drawn:
  * an item, a title or a note is shot in its own region (in slides, its own
@@ -92,6 +95,8 @@ const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1 && Math.abs(a[2]
  * drawn in, for the audit.
  */
 export function time(board, comp) {
+  // a child reads more slowly than an adult: longer holds, more time per caption, a little more between things
+  const P = board.audience === "child" ? { ...PACE, ...CHILD } : PACE;
   const strokes = [];
   const beats = [];
   const camera = [];
@@ -118,7 +123,7 @@ export function time(board, comp) {
   const visited = new Set();
   const drawn = new Set();
   /** Draws all of an element's strokes between t0 and t1, each for a time in proportion to its length (fills count for less: a broad nib moves fast). */
-  const drawWithin = (e, bi, t0, t1, lift = PACE.lift) => {
+  const drawWithin = (e, bi, t0, t1, lift = P.lift) => {
     const all = e.parts.flatMap((part) => part.strokes.map((pts) => ({ part, pts, len: cumulative(pts).at(-1) * (part.layer === "ink" ? 1 : 0.3) })));
     const total = all.reduce((a, x) => a + x.len, 0) || 1;
     // the pen lifts between the parts of a thing; within a part (a dashed line, a fill) it barely leaves the paper
@@ -147,7 +152,7 @@ export function time(board, comp) {
     beat.draw.forEach((id, ei) => {
       const e = comp.elements.get(id);
       const next = shotFor(board, comp, e);
-      if (ei > 0) t += PACE.element; // a pause between things, then the camera moves if the next one is elsewhere
+      if (ei > 0) t += P.element; // a pause between things, then the camera moves if the next one is elsewhere
       const due = e.joins ? [] : stories.filter((st) => !drawn.has(st.id) && (st.id === "story-0" ? e.kind !== "title" && e.kind !== "guide" : !visited.has(e.region) && st.joins.includes(e.region) && st.joins.some((r) => r !== e.region && visited.has(r))));
       const keys = camera.length;
       toward = e.joins ? null : e.region;
@@ -158,7 +163,7 @@ export function time(board, comp) {
           // drawn while the camera flies there: the pen leads the way to the next idea
           const k = camera[camera.length - 1];
           t = Math.max(t, drawWithin(st, bi, k.t0 + (k.t1 - k.t0) * 0.08, k.t1 - (k.t1 - k.t0) * 0.06, 0.02));
-        } else t = drawWithin(st, bi, t, t + 1.1, 0.02) + PACE.part;
+        } else t = drawWithin(st, bi, t, t + 1.1, 0.02) + P.part;
       }
       if (!e.joins) visited.add(e.region);
       e.shot = next;
@@ -166,7 +171,7 @@ export function time(board, comp) {
       e.beat = bi;
       if (e.kind === "guide") {
         // the guide is drawn in one go, quickly, stroke by stroke: the same hello on every board
-        appear = drawGuide(comp.guide.rig, t, t + PACE.guideMax);
+        appear = drawGuide(comp.guide.rig, t, t + P.guideMax);
         t = appear[1];
         return;
       }
@@ -178,33 +183,33 @@ export function time(board, comp) {
           const run = [];
           for (let j = pi; j < e.parts.length && e.parts[j].group === "figure"; j++) run.push(e.parts[j]);
           run.forEach((q) => gestures.add(q));
-          if (pi > 0) t += PACE.part;
-          const natural = run.reduce((a, q) => a + q.strokes.reduce((b, pts) => b + cumulative(pts).at(-1), 0) / (q.layer === "ink" ? PACE.icon : PACE.fill), 0);
-          t = drawWithin({ id, parts: run }, bi, t, t + Math.min(PACE.figureMax, natural + 0.3), 0.02);
+          if (pi > 0) t += P.part;
+          const natural = run.reduce((a, q) => a + q.strokes.reduce((b, pts) => b + cumulative(pts).at(-1), 0) / (q.layer === "ink" ? P.icon : P.fill), 0);
+          t = drawWithin({ id, parts: run }, bi, t, t + Math.min(P.figureMax, natural + 0.3), 0.02);
           return;
         }
-        if (pi > 0) t += PACE.part;
+        if (pi > 0) t += P.part;
         // handwriting keeps the same pace per letter at any size: bigger letters, a faster pen;
         // secondary text (notes, an arrow's label) goes faster, so it never holds up the sentence
         const secondary = part.write && part.size < 30 && !(e.bridge && part.role === "label") ? 1.3 : 1;
         const speed =
-          part.role === "fill" || part.role === "shadow" || part.role === "swash" ? PACE.fill
-          : part.layer === "under" ? PACE.highlight
-          : part.write ? PACE.write * (part.size / 32) * secondary
-          : part.role === "underline" ? PACE.flick
-          : part.role === "mark" ? PACE.mark
-          : part.role === "icon" || part.role === "character" || part.role === "sketch" ? PACE.icon
-          : PACE.line * (e.scale ?? 1);
+          part.role === "fill" || part.role === "shadow" || part.role === "swash" ? P.fill
+          : part.layer === "under" ? P.highlight
+          : part.write ? P.write * (part.size / 32) * secondary
+          : part.role === "underline" ? P.flick
+          : part.role === "mark" ? P.mark
+          : part.role === "icon" || part.role === "character" || part.role === "sketch" ? P.icon
+          : P.line * (e.scale ?? 1);
         const lens = part.strokes.map((pts) => cumulative(pts));
         const total = lens.reduce((a, c) => a + c[c.length - 1], 0);
         // a picture is drawn faster when it would otherwise take too long (the lifts between its strokes count)
-        const most = e.kind === "guide" ? PACE.guideMax : part.role === "icon" ? PACE.iconMax : PACE.figureMax;
-        const lifts = PACE.lift * (part.strokes.length - 1);
+        const most = e.kind === "guide" ? P.guideMax : part.role === "icon" ? P.iconMax : P.figureMax;
+        const lifts = P.lift * (part.strokes.length - 1);
         const picture = ["icon", "character", "sketch"].includes(part.role);
         const coloring = part.role === "fill" || part.role === "shadow" || part.role === "swash";
-        const k = picture && total / speed + lifts > most ? total / speed / Math.max(0.4, most - lifts) : coloring && total / speed > PACE.fillMax ? total / speed / PACE.fillMax : 1;
+        const k = picture && total / speed + lifts > most ? total / speed / Math.max(0.4, most - lifts) : coloring && total / speed > P.fillMax ? total / speed / P.fillMax : 1;
         part.strokes.forEach((pts, si) => {
-          if (si > 0) t += PACE.lift;
+          if (si > 0) t += P.lift;
           const len = lens[si][lens[si].length - 1];
           const d = Math.max(0.03, len / speed / k);
           strokes.push({ el: id, role: part.role, pts, t0: t, t1: t + d, width: part.width, color: part.color, layer: part.layer, opacity: part.opacity, beat: bi });
@@ -214,11 +219,11 @@ export function time(board, comp) {
     });
     drawStart ??= t;
     const drawEnd = t;
-    const read = PACE.readBase + beat.say.length / PACE.readRate;
+    const read = P.readBase + beat.say.length / P.readRate;
     // more of a pause when the next sentence takes the camera somewhere else
     const nextBeat = board.beats[bi + 1];
     const moves = nextBeat?.draw.length && !same(shot, shotFor(board, comp, comp.elements.get(nextBeat.draw[0])));
-    t = Math.max(drawEnd + PACE.hold, drawStart + read) + (moves ? PACE.regionHold : 0);
+    t = Math.max(drawEnd + P.hold, drawStart + read) + (moves ? P.regionHold : 0);
     beats.push({ say: beat.say, t0: start, draw0: drawStart, draw1: drawEnd, t1: t, shot });
   });
   // the overview: the whole board, held; the road reaches its end as the camera pulls back to it
@@ -233,7 +238,7 @@ export function time(board, comp) {
     beats.at(-1).t1 = Math.max(t + dur, done);
   }
   const explore = t + dur; // the board complete: where the page rests when the film is over
-  t = explore + PACE.overviewHold;
+  t = explore + P.overviewHold;
   const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [], explore };
   if (appear) result.actors.push(perform(board, comp, result, appear));
   if (board.outro) outro(comp, result);
