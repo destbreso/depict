@@ -131,7 +131,9 @@ export function audit(board, comp, tl) {
 
   // a region holds a few things: four reads best, six at most
   for (const r of board.regions) {
-    if (r.items.length > 6) warn("load", `region "${r.id}" holds ${r.items.length} items; four read best and six is the most, so split it`);
+    // the cells of an array are one thing; what hangs under them counts on its own
+    const n = r.layout === "cells" || r.layout === "stack" ? 1 + r.items.filter((it) => it.under != null).length : r.items.length;
+    if (n > 6) warn("load", `region "${r.id}" holds ${n} items; four read best and six is the most, so split it`);
   }
 
   // a few new things at a time (the cells of one array drawn together count once)

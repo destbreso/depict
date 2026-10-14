@@ -97,6 +97,8 @@ const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1 && Math.abs(a[2]
 export function time(board, comp) {
   // a child reads more slowly than an adult: longer holds, more time per caption, a little more between things
   const P = board.audience === "child" ? { ...PACE, ...CHILD } : PACE;
+  const cellsOf = new Map(board.regions.filter((r) => r.layout === "cells" || r.layout === "stack").flatMap((r) => r.items.filter((it) => it.under == null).map((it) => [it.id, r.id])));
+  const sameCells = (a, b) => cellsOf.has(a) && cellsOf.get(a) === cellsOf.get(b);
   const strokes = [];
   const beats = [];
   const camera = [];
@@ -152,7 +154,8 @@ export function time(board, comp) {
     beat.draw.forEach((id, ei) => {
       const e = comp.elements.get(id);
       const next = shotFor(board, comp, e);
-      if (ei > 0) t += P.element; // a pause between things, then the camera moves if the next one is elsewhere
+      // a pause between things (the cells of one array follow each other quickly), then the camera moves if the next one is elsewhere
+      if (ei > 0) t += sameCells(beat.draw[ei - 1], id) ? 0.06 : P.element;
       const due = e.joins ? [] : stories.filter((st) => !drawn.has(st.id) && (st.id === "story-0" ? e.kind !== "title" && e.kind !== "guide" : !visited.has(e.region) && st.joins.includes(e.region) && st.joins.some((r) => r !== e.region && visited.has(r))));
       const keys = camera.length;
       toward = e.joins ? null : e.region;
