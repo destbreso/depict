@@ -1,0 +1,19 @@
+{
+  "name": "depict",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An Agent Skill that explains a concept by drawing it: a hand-drawn board that builds stroke by stroke and stays explorable.",
+  "type": "module",
+  "license": "MIT",
+  "author": "David Estévez",
+  "repository": "github:destbreso/depict",
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "examples": "for b in skills/depict/examples/*/board.mjs; do node skills/depict/scripts/build.mjs \"$b\" --out \"${b%board.mjs}$(basename \"$(dirname \"$b\")\").html\" --audit || exit 1; done",
+    "fonts": "node tools/fonts.mjs",
+    "icons": "node tools/icons.mjs"
+  }
+}

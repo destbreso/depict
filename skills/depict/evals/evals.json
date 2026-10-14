@@ -1,0 +1,29 @@
+{
+  "skill_name": "depict",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/depict how a hash table works, for someone who just learned arrays",
+      "expected_output": "A board script and its page. The board names the parts before the process (an array of buckets, a key, a hash function) and then shows a lookup and a collision, in two to four regions told in order; labels are two or three words, sentences are spoken to the viewer and under about 90 characters, the first beat shows a picture within a few seconds. The build passes --audit; check.mjs ran and its pictures were read; the answer gives the page's path, its length and what is on the board.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Make me a short sketch-style explainer of why the sky is blue, as slides, I want to post it as a video on LinkedIn",
+      "expected_output": "A board in slides mode, one idea per sheet (sunlight is all colors, air scatters short wavelengths more, so scattered blue reaches the eye from every direction, and sunsets are red for the same reason), physically correct and with no number stated that is not standard. The audit passes, the pictures were read, and video.mjs produced a 1920 x 1080 MP4 with the captions burned in; the answer gives both paths and the video's length.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Can you whiteboard the CAP theorem for my team? Keep it under a minute.",
+      "expected_output": "A canvas board under about a minute: consistency, availability and partition tolerance as the three items of one region, a partition drawn between two nodes, and the trade-off made concrete (during a partition, answer with possibly stale data or refuse). Takes a mark to emphasize the choice; ends on the overview as a map. Audit passes and the pictures were read.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "/depict how a site survives a DDoS attack, and let people try the defenses themselves",
+      "expected_output": "A board that explains the concept (the attack, the layers at the edge, autoscaling) and has a live part: an item whose figure is a Dissect page of the same system (built with the dissect skill when it is installed, or the ddos example), opened by a beat with open, so the reader can switch each layer off. The build resolves the figure's path; the check passes; the answer says the figure opens from the board and that the video shows its play mark instead.",
+      "files": []
+    }
+  ]
+}
