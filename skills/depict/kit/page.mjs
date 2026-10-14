@@ -5,8 +5,9 @@ import fs from "node:fs";
 
 const read = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8");
 
-/** The camera functions, inlined as plain functions. */
+/** The camera functions and the guide's performance, inlined as plain functions. */
 const cameraSource = () => read("./camera.mjs").replace(/^export /gm, "");
+const actSource = () => read("./act.mjs").replace(/^export /gm, "");
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -25,7 +26,7 @@ export function sceneOf(board, comp, tl) {
   const elIds = [...comp.elements.keys()];
   const elIndex = new Map(elIds.map((id, i) => [id, i]));
   const strokes = tl.strokes.map((s) => {
-    const a = [Math.round(s.t0 * 1000), Math.round(s.t1 * 1000), Math.round(s.width * 10), color(s.color), s.layer === "under" ? 1 : 0, Math.round(s.opacity * 100), elIndex.get(s.el)];
+    const a = [Math.round(s.t0 * 1000), Math.round(s.t1 * 1000), Math.round(s.width * 10), color(s.color), { under: 1, shadow: 2 }[s.layer] ?? 0, Math.round(s.opacity * 100), elIndex.get(s.el)];
     let px = 0;
     let py = 0;
     for (let i = 0; i < s.pts.length; i += 2) {
@@ -55,6 +56,27 @@ export function sceneOf(board, comp, tl) {
     camera: tl.camera.map((k) => ({ t0: r(k.t0 * 100) / 100, t1: r(k.t1 * 100) / 100, from: k.from.map(r), to: k.to.map(r), ...(k.pan ? { pan: 1 } : {}) })),
     overview: tl.overview.map(r),
     sheets: board.mode === "slides" ? [...comp.sheets.values()].map((f) => [r(f.x), r(f.y), r(f.w), r(f.h)]) : [],
+    actors: (tl.actors ?? []).map((a) => actorOf(a, color)),
+  };
+}
+
+/** An actor as the page carries it: its rig's strokes in its own frame (with when each is drawn as it first appears), its gloves, and its track. */
+function actorOf(a, color) {
+  const q = (v) => Math.round(v * 10) / 10;
+  const pts = (list) => list.map(q);
+  const rg = a.rig;
+  return {
+    h: a.h,
+    eyes: rg.eyes.map((e) => e.map(q)),
+    shoulders: { front: rg.shoulders.front.map(q), back: rg.shoulders.back.map(q) },
+    poses: a.poses,
+    feelings: a.feelings,
+    track: a.track,
+    strokes: rg.strokes.map((s) => ({ part: s.part, t0: Math.round(s.t0 * 1000) / 1000, t1: Math.round(s.t1 * 1000) / 1000, w: q(s.w), c: color(s.c), l: { under: 1, shadow: 2 }[s.l] ?? 0, o: s.o, pts: pts(s.pts) })),
+    arm: { width: q(rg.arm.width), hose: rg.arm.hose.map(q) },
+    gloves: Object.fromEntries(Object.entries(rg.gloves).map(([k, g]) => [k, { lines: g.lines.map(pts), fill: g.fill.map(pts), fillWidth: q(g.fillWidth) }])),
+    gloveWidth: q(rg.gloveWidth),
+    reveal: rg.reveal,
   };
 }
 
@@ -138,6 +160,7 @@ export function page(board, scene) {
 <script>
 const SCENE = ${JSON.stringify(scene)};
 ${cameraSource()}
+${actSource()}
 ${read("./player.js")}
 document.querySelector(".dp-go").addEventListener("click", () => { document.querySelector(".dp").classList.remove("fresh"); depict.seek(0); depict.play(); });
 </script>

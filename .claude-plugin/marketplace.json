@@ -10,7 +10,7 @@
       "name": "depict",
       "source": "./",
       "description": "Explain a concept by drawing it: a hand-drawn board, written in pen order, with a computed camera, that stays explorable when it ends.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }

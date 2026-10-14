@@ -17,6 +17,32 @@ The rules here come from the people who make whiteboard explainers and from rese
 - **Choose the picture from the question** ([Dan Roam](https://readingraphics.com/book-summary-the-back-of-the-napkin/)): who or what is a portrait (an icon and a label), how much is a chart or a number, where is a map, when is a timeline, how is a flow of arrows, why is several things side by side.
 - **Name the parts before the process** (pre-training: [Mayer & Pilegard 2014](https://www.cambridge.org/core/books/cambridge-handbook-of-multimedia-learning/principles-for-managing-essential-processing-in-multimedia-learning-segmenting-pretraining-and-modality-principles/DD24C2F48B9B1277CE59F78276110258), 13 of 16 tests, median d = 0.75). Draw and label the things first; then show what happens between them.
 
+## Draw the thing itself
+
+- **Show what the idea is about, drawn as it is.** A chip with its pins, memory sticks, a server rack, two names in one bucket, bars for a growth, a line and a curve for a gap. A picture of the real thing needs no translating back; an icon from a UI set reads as a button, not as the thing. Draw the focal thing of every region as a `sketch`, and keep icons for small secondary things.
+- **Color carries meaning, not decoration.** Fill the shapes that matter (the row that was found, the gap between two curves, the new server) and leave the rest as line. The yellow of a highlighter marks what to look at; the accent is for the road and for emphasis.
+- **How much is a chart, drawn to scale** ([Dan Roam](https://readingraphics.com/book-summary-the-back-of-the-napkin/)): compute the bars or the curve's points from the real numbers and say in the board's comment how.
+- **Characters are the people in the idea.** A visitor, a user, you searching a list: drawn with a pose and a face that shows how they feel, and a bubble when what they say adds something. Not a stand-in for something that is not a person.
+
+## Analogies, sparingly
+
+- **An analogy has to map one to one, or it misleads.** Learners carry over the parts of a comparison that do not fit, and the misconception sticks ([Spiro, Feltovich, Coulson and Anderson 1989](https://doi.org/10.1017/CBO9780511529863.023)); an analogy helps when its structure maps cleanly onto the target's ([Gentner 1983](https://doi.org/10.1207/s15516709cog0702_3)). A forced one (a chef for a CPU, a library for memory) costs the viewer a translation and explains less than the real picture.
+- **So explain the mechanism with the real things first.** Reach for an analogy only when the viewer already knows it well and it maps exactly; even then keep it as an aside, not as the board's structure.
+
+## Composition: a road and its stops
+
+- **One layout that scales: the path.** Sketchnoters lay a sequence along a path that winds through the page ([Rohde, The Sketchnote Handbook](https://rohdesign.com/handbook/), the "path" layout). Depict puts every idea on a road that turns back row after row, each idea on the other side of the road from the one before, so the ideas interlock instead of lining up in a grid, and the number of rows is the one that brings the board closest to 16:9. Three ideas or twenty, the closing picture is one poster.
+- **Proximity groups, distance separates** (the Gestalt laws of grouping, [Wertheimer 1923](https://psychclassics.yorku.ca/Wertheimer/Forms/forms.htm)): items of one idea sit close; ideas sit apart along the road; a link with `far` sets two things apart when their distance is the point.
+- **One focal point per region, and visual weight in balance** ([Arnheim, Art and Visual Perception](https://www.ucpress.edu/book/9780520243835/art-and-visual-perception)): the thing a region is about is large, framed or marked; a region much larger or smaller than its neighbors unbalances the poster.
+- **Things stand on a ground line.** Pictures in a row share the line their feet are on, the labels line up under them, and a figure casts a small shadow on the floor; nothing floats.
+
+## The guide
+
+- **An on-screen agent helps when it behaves like a person explaining.** Learners did better with an animated agent that gestured, looked at what it was talking about and showed expression than with one that stood still ([Mayer and DaPra 2012](https://doi.org/10.1037/a0027401), the embodiment principle); an image of a speaker alone does little. So the guide points at each new thing as it is drawn, its eyes follow the pen, and its face changes with the sentence; it stands aside on the road and never covers the drawing.
+- **Cueing.** Its pointing and its surprise at a mark direct attention to what matters now (signaling: [Mayer and Fiorella 2014](https://www.cambridge.org/core/books/cambridge-handbook-of-multimedia-learning/principles-for-reducing-extraneous-processing-in-multimedia-learning-coherence-signaling-redundancy-spatial-contiguity-and-temporal-contiguity-principles/CD5B7AE1279A9AB81F8EEBB53DBEC86E)).
+- **Animated by the principles of character animation** ([Thomas and Johnston, The Illusion of Life, 1981](https://archive.org/details/illusionoflifedi00thom)): squash and stretch when it lands, anticipation (a crouch) before it jumps, arcs in its hops, follow-through in its arms, secondary action (blinking, breathing), and appeal (a simple shape, big eyes, one color).
+- **The same character on every board** is the house style: its cap takes the board's accent, so it belongs to each board and is still recognizably the same.
+
 ## One sentence, one drawing
 
 - **Each beat draws what its sentence names, while it is said** (temporal contiguity, 9 of 9 tests, median d = 1.22: [Mayer & Fiorella 2014](https://www.cambridge.org/core/books/cambridge-handbook-of-multimedia-learning/principles-for-reducing-extraneous-processing-in-multimedia-learning-coherence-signaling-redundancy-spatial-contiguity-and-temporal-contiguity-principles/CD5B7AE1279A9AB81F8EEBB53DBEC86E)). Map images one to one onto the script, but do not illustrate every word.
@@ -35,10 +61,11 @@ The rules here come from the people who make whiteboard explainers and from rese
 
 ## The look
 
-- **Black line art, grey for shading, one accent for emphasis.** Park drew in black and red; more than one accent dilutes it ([TruScribe](https://truscribe.com/blog/whiteboard-video-hits-and-misses-making-the-right-choices-for-your-message/)). Marker kits give yellow to highlighting ([Neuland](https://www.neuland.com/en/products/visual-facilitation-kit)). A board has `accent` for underlines and marks, grey for notes, and a highlighter.
+- **Black line art, grey for shading, one accent for emphasis.** Park drew in black and red; more than one accent dilutes it ([TruScribe](https://truscribe.com/blog/whiteboard-video-hits-and-misses-making-the-right-choices-for-your-message/)). Marker kits give yellow to highlighting ([Neuland](https://www.neuland.com/en/products/visual-facilitation-kit)). A board has `accent` for the road, underlines and marks, grey for notes and shadows, a highlighter, and a few muted tints for colored-in shapes.
+- **Weight and depth with marker techniques.** A grey drop shadow under frames, banners and arrows lifts them off the page; a banner colored in reads as the take-away; a wide filled arrow carries the main move. These are the graphic recorder's basic moves (Neuland's and Rohde's handbooks teach them early), done here by the kit.
 - **Three levels of lettering**: a large title, region titles, labels and notes ([Carter, ISTE](https://cdn.iste.org/www-root/conference_med/excerpts/excerpts-4368.pdf)). Capitals only for a title or a short label; all-caps text loses its word shapes ([Staedtler](https://www.staedtler.com/us/en/discover/visualisation-techniques-for-flipchart-and-whiteboard-graphic-recording-sketchnoting/)).
 - **Containers and arrows carry meaning.** Frames mark what matters (an item's `shape`); arrows set the reading order and say how things relate: solid leads to, dashed is weak or optional, double-headed is mutual (a diagram convention). Lines used erratically suggest connections you did not mean ([Wilson](https://sketchyideas.co/what-makes-a-good-sketchnote/)).
-- **White space between regions** is what lets the closing overview read as a map ([Staedtler](https://www.staedtler.com/us/en/discover/visualisation-techniques-for-flipchart-and-whiteboard-graphic-recording-sketchnoting/)).
+- **White space between regions, not inside them.** The road's gaps let the closing overview read as a map ([Staedtler](https://www.staedtler.com/us/en/discover/visualisation-techniques-for-flipchart-and-whiteboard-graphic-recording-sketchnoting/)); a region with three small things in a big frame reads as unfinished.
 
 ## The camera and the two modes
 
@@ -56,8 +83,11 @@ The rules here come from the people who make whiteboard explainers and from rese
 
 ## Pitfalls
 
+- A grid of boxes: every region the same, in rows, nothing larger than anything else. Compose a picture.
+- A forced analogy, or a character standing in for something that is not a person.
+- UI icons where the thing itself could be drawn.
 - Too much text on the board, or whole sentences written out.
 - Drawing too slowly: the viewer waits for the pen.
-- Clutter: regions too close, items crammed, arrows crossing.
+- Clutter: items crammed, arrows crossing, long lines across the board.
 - Decorative icons that stand for nothing in the sentence.
 - Music or sound effects under the explanation (they hurt learning: [Moreno & Mayer 2000](https://doi.org/10.1037/0022-0663.92.1.117)).

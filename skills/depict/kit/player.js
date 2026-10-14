@@ -46,9 +46,10 @@
   bg.setAttribute("height", VH);
   bg.setAttribute("class", "dp-paper");
   const cam = document.createElementNS(NS, "g");
-  const under = document.createElementNS(NS, "g");
+  const shadow = document.createElementNS(NS, "g"); // shadows, under everything
+  const under = document.createElementNS(NS, "g"); // fills and highlighter, under the ink
   const inkLayer = document.createElementNS(NS, "g");
-  for (const g of [under, inkLayer]) {
+  for (const g of [shadow, under, inkLayer]) {
     g.setAttribute("fill", "none");
     g.setAttribute("stroke-linecap", "round");
     g.setAttribute("stroke-linejoin", "round");
@@ -68,7 +69,11 @@
     sheetLayer.append(r);
   }
   if (S.sheets.length) root.classList.add("slides");
-  cam.append(sheetLayer, hoverBox, under, inkLayer, pen);
+  const actorLayer = document.createElementNS(NS, "g");
+  actorLayer.setAttribute("fill", "none");
+  actorLayer.setAttribute("stroke-linecap", "round");
+  actorLayer.setAttribute("stroke-linejoin", "round");
+  cam.append(sheetLayer, hoverBox, shadow, under, inkLayer, actorLayer, pen);
   svg.append(bg, cam);
   const stage = root.querySelector(".dp-board");
   stage.append(svg);
@@ -122,10 +127,163 @@
       s.node.setAttribute("stroke", s.color);
       s.node.setAttribute("stroke-width", s.w);
       if (s.op < 1) s.node.setAttribute("stroke-opacity", s.op);
-      (s.layer === 1 ? under : inkLayer).append(s.node);
+      (s.layer === 2 ? shadow : s.layer === 1 ? under : inkLayer).append(s.node);
     }
     return s.node;
   };
+
+  // actors: the guide, a rig drawn once and moved every frame, as a pure function of the time
+  const node = (tag, attrs, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.append(n);
+    return n;
+  };
+  const measured = (list) => {
+    const pts = Float64Array.from(list);
+    const n = pts.length / 2;
+    const cum = new Float64Array(n);
+    for (let i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]);
+    return { pts, cum, len: cum[n - 1] || 0 };
+  };
+  const INKC = "#1b1b19";
+  const PAPERC = "#fbfaf7";
+  const actors = (S.actors || []).map((A) => {
+    const floor = node("g", {}, shadow);
+    const root = node("g", {}, actorLayer);
+    const backArm = node("path", { stroke: INKC, "stroke-width": A.arm.width }, root);
+    const backGloveG = node("g", {}, root);
+    const bodyUnder = node("g", {}, root);
+    const bodyInk = node("g", {}, root);
+    const face = node("g", {}, root);
+    const frontArm = node("path", { stroke: INKC, "stroke-width": A.arm.width }, root);
+    const frontGloveG = node("g", {}, root);
+    const groups = new Map();
+    const groupFor = (part) => {
+      if (groups.has(part)) return groups.get(part);
+      let g;
+      const m = /^(eye|pupil|squint)(\d)$/.exec(part);
+      if (m && m[1] !== "squint") {
+        if (!groups.has(`eyes${m[2]}`)) groups.set(`eyes${m[2]}`, node("g", {}, face));
+        g = node("g", {}, groups.get(`eyes${m[2]}`));
+      } else if (part === "floor") g = floor;
+      else g = node("g", {}, face);
+      groups.set(part, g);
+      return g;
+    };
+    const strokes = A.strokes.map((st) => {
+      const parent = st.part === "body" ? (st.l === 1 ? bodyUnder : bodyInk) : groupFor(st.part);
+      const n = node("path", { stroke: S.palette[st.c], "stroke-width": st.w }, parent);
+      if (st.o < 1) n.setAttribute("stroke-opacity", st.o);
+      n.style.display = "none";
+      return Object.assign(measured(st.pts), { t0: st.t0, t1: st.t1, node: n, state: 0 });
+    });
+    const gloveSet = (parent) => {
+      const set = {};
+      for (const kind in A.gloves) {
+        const gl = A.gloves[kind];
+        const g = node("g", {}, parent);
+        for (const f of gl.fill) node("path", { d: pathOf(f, f.length), stroke: PAPERC, "stroke-width": gl.fillWidth }, g);
+        for (const l of gl.lines) node("path", { d: pathOf(l, l.length), stroke: INKC, "stroke-width": A.gloveWidth }, g);
+        g.style.display = "none";
+        set[kind] = g;
+      }
+      return set;
+    };
+    return { A, floor, root, backArm, frontArm, backGloveG, frontGloveG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups };
+  });
+  const revealed = (rv, t) => (!rv ? 1 : t < rv[0] ? 0 : t >= rv[1] ? 1 : (t - rv[0]) / (rv[1] - rv[0]));
+  /** Poses an actor at time t (and, paused, breathes and blinks on the wall clock); returns the pen's tip while it is being drawn. */
+  function renderActor(X, t, wall) {
+    const A = X.A;
+    const st = actorAt(A, t);
+    X.root.style.display = st.shown ? "" : "none";
+    X.floor.style.display = st.shown ? "" : "none";
+    if (!st.shown) return null;
+    if (wall != null) {
+      const b = Math.sin((2 * Math.PI * wall) / 2.7);
+      st.sy = 1 + 0.011 * b;
+      st.sx = 1 - 0.005 * b;
+      const p = wall % 3.9;
+      st.blink = p < 0.16 ? Math.sin((Math.PI * p) / 0.16) : 0;
+      // tapped: a springy hop and a wave
+      const d = X.react == null ? Infinity : wall - X.react;
+      if (d < 1.8) {
+        const sq = Math.exp(-5 * d) * Math.cos(13 * d);
+        st.sy *= 1 - 0.14 * sq;
+        st.sx *= 1 + 0.12 * sq;
+        st.lift = d < 0.5 ? 70 * 4 * (d / 0.5) * (1 - d / 0.5) : 0;
+        st.feel = "excited";
+        const w = Math.sin(2 * Math.PI * 2.4 * d);
+        const P = A.poses.wave.front;
+        const at = ([u, v]) => [u * A.h, (v - 0.99) * A.h];
+        const hand = at(P.hand);
+        const bow = at(P.bow);
+        st.front = { hand: [hand[0] + w * 0.055 * A.h, hand[1]], bow: [bow[0] + w * 0.03 * A.h, bow[1]], glove: "open" };
+      }
+    }
+    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing}) scale(${st.facing * st.sx} ${st.sy})`);
+    X.floor.setAttribute("transform", `translate(${st.x} ${st.y}) scale(${1 - 0.45 * st.air} 1)`);
+    X.floor.setAttribute("opacity", 1 - 0.5 * st.air);
+    let tip = null;
+    for (const s of X.strokes) {
+      const state = t < s.t0 ? 0 : t >= s.t1 ? 2 : 1;
+      if (state === 0) {
+        if (s.state !== 0) s.node.style.display = "none";
+        s.state = 0;
+        continue;
+      }
+      if (s.state === 0) s.node.style.display = "";
+      if (state === 2) {
+        if (s.state !== 2) s.node.setAttribute("d", pathOf(s.pts, s.pts.length));
+      } else {
+        const p = partial(s, s.len * ((t - s.t0) / (s.t1 - s.t0)));
+        s.node.setAttribute("d", p.d);
+        tip = p;
+      }
+      s.state = state;
+    }
+    // the feeling of the moment: its brows, its mouth, its eyes
+    const F = A.feelings[st.feel] || A.feelings.happy;
+    for (const [part, g] of X.groups) {
+      const m = /^(brows|mouth):(\w+)$/.exec(part);
+      if (m) g.style.display = (m[1] === "brows" ? F.brows : F.mouth) === m[2] ? "" : "none";
+      else if (/^squint\d$/.test(part)) g.style.display = F.eyes === "squint" ? "" : "none";
+      else if (/^eyes\d$/.test(part)) g.style.display = F.eyes === "squint" ? "none" : "";
+    }
+    A.eyes.forEach(([cx, cy], i) => {
+      const g = X.groups.get(`eyes${i}`);
+      const wide = F.eyes === "wide" ? 1.12 : 1;
+      if (g) g.setAttribute("transform", `translate(${cx} ${cy}) scale(${wide} ${wide * (1 - 0.92 * st.blink)}) translate(${-cx} ${-cy})`);
+      const pg = X.groups.get(`pupil${i}`);
+      if (pg) pg.setAttribute("transform", `translate(${st.look[0]} ${st.look[1]})`);
+    });
+    // the arms, bent anew to wherever the hands are, and the gloves on them
+    for (const side of ["back", "front"]) {
+      const arm = st[side];
+      const n = side === "back" ? X.backArm : X.frontArm;
+      const frac = revealed(A.reveal && A.reveal[side === "back" ? "armBack" : "armFront"], t);
+      if (frac <= 0) n.style.display = "none";
+      else {
+        n.style.display = "";
+        const m = measured(hosePath(A.shoulders[side], arm.bow, arm.hand, A.arm.hose));
+        if (frac >= 1) n.setAttribute("d", pathOf(m.pts, m.pts.length));
+        else {
+          const p = partial(m, m.len * frac);
+          n.setAttribute("d", p.d);
+          tip = p;
+        }
+      }
+      const gf = revealed(A.reveal && A.reveal[side === "back" ? "gloveBack" : "gloveFront"], t);
+      const gG = side === "back" ? X.backGloveG : X.frontGloveG;
+      const ang = (Math.atan2(arm.hand[1] - arm.bow[1], arm.hand[0] - arm.bow[0]) * 180) / Math.PI;
+      gG.setAttribute("transform", `translate(${arm.hand[0]} ${arm.hand[1]}) rotate(${ang}) scale(1 ${side === "front" ? 1 : -1})`);
+      gG.setAttribute("opacity", Math.min(1, gf * 1.6));
+      for (const kind in X.gloves[side]) X.gloves[side][kind].style.display = kind === arm.glove && gf > 0 ? "" : "none";
+    }
+    if (!tip) return null;
+    return { x: st.x + st.facing * st.sx * tip.x, y: st.y - st.lift + st.sy * tip.y };
+  }
 
   let now = 0;
   /** Draws the board as it is at time t. */
@@ -156,6 +314,10 @@
         tip = p;
       }
       s.state = state;
+    }
+    for (const X of actors) {
+      const at = renderActor(X, now, null);
+      if (at) tip = at;
     }
     // the pen follows the tip of whatever is being drawn, and rests between strokes of a beat
     const b = beatAt(now);
@@ -291,7 +453,7 @@
     const [x, y] = toBoard(ev);
     let best = null;
     for (const e of S.elements) {
-      if (!visible(e)) continue;
+      if (!visible(e) || e.kind === "story") continue;
       const [bx, by, bw, bh] = e.box;
       if (x >= bx - 12 && x <= bx + bw + 12 && y >= by - 12 && y <= by + bh + 12 && (!best || bw * bh < best.box[2] * best.box[3])) best = e;
     }
@@ -347,6 +509,15 @@
     drag = null;
     if (d && d.moved) return;
     if (playing) return pause();
+    // the guide answers a tap with a hop and a wave
+    const [bx, by] = toBoard(ev);
+    for (const X of actors) {
+      const st = actorAt(X.A, now);
+      if (st.shown && Math.abs(bx - st.x) < 0.36 * X.A.h && by < st.y + 10 && by > st.y - X.A.h) {
+        X.react = performance.now() / 1000;
+        return;
+      }
+    }
     const e = hit(ev);
     if (e && e.figure) openLive(e, false);
     else if (e) {
@@ -423,6 +594,15 @@
       if (playing && b && b.open != null) setTimeout(() => openLive(S.elements[b.open], true), 900);
     }
   };
+
+  // paused or ended, the guide stays alive: it breathes and blinks while the reader looks round the board
+  if (!capture && actors.length) {
+    const idle = (ms) => {
+      if (!playing && !reduced) for (const X of actors) renderActor(X, now, ms / 1000);
+      requestAnimationFrame(idle);
+    };
+    requestAnimationFrame(idle);
+  }
 
   window.depict = { render, seek, play, pause, duration: T, beats, get time() { return now; } };
   hoverBox.style.display = "none";

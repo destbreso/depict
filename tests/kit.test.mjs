@@ -179,3 +179,86 @@ test("regions on a grid need a place each, and two cannot share one", () => {
   delete s.regions[0].at;
   assert.match(normalize(s).errors.join("\n"), /give the region at/);
 });
+
+test("a marker fill stays inside its shape, even a curved one", async () => {
+  const ink = await import("../skills/depict/kit/ink.mjs");
+  const { splitmix32 } = await import("../skills/depict/kit/rng.mjs");
+  const { cubic } = await import("../skills/depict/kit/geom.mjs");
+  const inside = (poly, x, y) => {
+    let c = false;
+    for (let i = 0, j = poly.length / 2 - 1; i < poly.length / 2; j = i++) {
+      const [xi, yi, xj, yj] = [poly[2 * i], poly[2 * i + 1], poly[2 * j], poly[2 * j + 1]];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  // a box, and a wide arrow bent into an arc: every point of every pass of the fill lies inside the shape
+  const p = ink.pen(splitmix32(3), { width: 5 });
+  const boxPoly = [0, 0, 200, 0, 200, 120, 0, 120];
+  for (const pts of ink.fill(p, boxPoly, { nib: 14 }).strokes) for (let i = 0; i < pts.length; i += 2) assert.ok(inside(boxPoly, pts[i], pts[i + 1]));
+  const arrow = ink.fatArrow(p, cubic(0, 200, 120, 60, 280, 60, 400, 200, 6), { width: 40 });
+  for (const pts of arrow.along(14)) for (let i = 0; i < pts.length; i += 2) assert.ok(inside(arrow.poly, pts[i], pts[i + 1]), `a pass leaves the arrow at ${pts[i].toFixed(0)}, ${pts[i + 1].toFixed(0)}`);
+});
+
+test("the story road runs from the first idea to the last, each stretch drawn while the camera flies there", async () => {
+  const input = await load("cpu-cache");
+  const { board, comp, tl } = build(input);
+  const stories = [...comp.elements.values()].filter((e) => e.kind === "story");
+  // a start, a stretch between each idea and the next, and the end with its arrowhead
+  assert.equal(stories.length, board.regions.length + 1);
+  // the ideas sit on alternate sides of it
+  const sides = comp.regions.map((r) => r.slot.y + r.slot.h / 2 < stories[1].path[1] ? "above" : "below");
+  for (let i = 1; i < sides.length; i++) assert.notEqual(sides[i], sides[i - 1]);
+  for (const st of stories) {
+    const own = tl.strokes.filter((s) => s.el === st.id);
+    assert.ok(own.length, `${st.id} is drawn`);
+    const k = tl.camera.find((c) => c.t0 <= own[0].t0 && own.at(-1).t1 <= c.t1);
+    assert.ok(k, `${st.id} is drawn during a camera flight`);
+  }
+});
+
+test("the guide comes alive, hops to each new idea with the camera, lands in its shot, and is surprised by a mark", async () => {
+  const { actorAt } = await import("../skills/depict/kit/act.mjs");
+  const input = await load("cpu-cache");
+  const { board, comp, tl } = build(input);
+  const [guide] = tl.actors;
+  assert.ok(guide, "the board has its guide");
+  const tr = guide.track;
+  // every trip starts with a camera flight to another region and lands in that region's shot
+  for (const m of tr.moves.filter((m) => m.from[0] !== m.to[0] || m.from[1] !== m.to[1])) {
+    const k = tl.camera.find((c) => Math.abs(c.t0 + 0.08 - m.t0) < 1e-6);
+    assert.ok(k && k.region, "a trip rides a camera flight");
+    const f = comp.regions.find((r) => r.id === k.region).frame;
+    assert.ok(m.to[0] > f.x && m.to[0] < f.x + f.w && m.to[1] > f.y && m.to[1] <= f.y + f.h, "it lands inside the region's shot");
+  }
+  // the same time, the same pose
+  assert.deepEqual(actorAt(guide, 21.3), actorAt(guide, 21.3));
+  // a mark makes it surprised while the mark is drawn
+  const mark = tl.strokes.find((s) => s.el.startsWith("mark-"));
+  assert.equal(actorAt(guide, mark.t0 + 0.3).feel, "surprised");
+  // it is hidden before it appears, and in the air during a trip
+  assert.equal(actorAt(guide, tr.appear[0] - 0.01).shown, false);
+  const trip = tr.moves[0];
+  assert.ok(actorAt(guide, trip.t0 + (trip.t1 - trip.t0) / (2 * trip.hops)).lift > 10);
+});
+
+test("a feeling or an act the guide does not have is refused", () => {
+  const s = tiny();
+  s.beats[0].feel = "giddy";
+  s.beats[1].act = "dance";
+  const text = normalize(s).errors.join("\n");
+  assert.match(text, /feel "giddy"/);
+  assert.match(text, /act "dance"/);
+  assert.match(normalize({ ...tiny(), regions: [{ ...tiny().regions[0], items: [{ id: "story-1", label: "x" }, { id: "b", label: "y" }] }] }).errors.join("\n"), /one the kit uses/);
+});
+
+test("a slide whose content is small is drawn larger to fill its page", async () => {
+  const input = await load("compound-interest");
+  const { comp } = build(input);
+  const zooms = [...comp.elements.values()].filter((e) => e.kind === "item").map((e) => e.zoom ?? 1);
+  assert.ok(Math.max(...zooms) > 1.1, "some slide is drawn larger");
+  for (const r of comp.regions) {
+    const sheet = comp.sheets.get(r.id);
+    for (const e of comp.elements.values()) if (e.region === r.id && !e.joins && e.kind !== "guide") assert.ok(e.box.x >= sheet.x && e.box.x + e.box.w <= sheet.x + sheet.w, `${e.id} stays on its sheet`);
+  }
+});

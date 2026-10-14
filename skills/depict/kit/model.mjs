@@ -5,16 +5,21 @@
 // stroke and moves the camera.
 import { hasIcon, nearIcons } from "./icons.mjs";
 import { hand } from "./fonts.mjs";
+import { POSE_NAMES, FACES, HAIRS, HATS, TINTS } from "./people.mjs";
+import { flattenPath } from "./svgpath.mjs";
+import { ACTS, FEELINGS } from "./rig.mjs";
 
 /** Typographic marks a hand writes the plain way; anything else outside its glyphs is a problem. */
 const PLAIN = { "\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u2192": "->", "\u2190": "<-", "\u2248": "~", "\u2260": "!=", "\u2264": "<=", "\u2265": ">=", "\u2014": ", ", "\u2013": "-", "\u2022": "\u00b7", "\u00a0": " " };
 const plain = (s) => s.replace(/[\u2019\u2018\u201c\u201d\u2026\u2192\u2190\u2248\u2260\u2264\u2265\u2014\u2013\u2022\u00a0]/g, (c) => PLAIN[c]);
 
 const SHAPES = ["none", "box", "ellipse", "circle", "cloud", "bubble", "banner"];
-const LINK_STYLES = ["solid", "dashed", "double"];
+const LINK_STYLES = ["solid", "dashed", "double", "bold"];
 const MARKS = ["circle", "underline", "highlight", "box", "cross"];
 const FLOWS = ["path", "row", "column", "grid"];
-const LAYOUTS = ["row", "column", "grid", "cells", "stack"];
+const LAYOUTS = ["row", "column", "grid", "cells", "stack", "radial"];
+/** What a sketch's shape can be colored in with: the board's accent, the highlighter, solid ink, grey, or a shirt's tint. */
+export const FILLS = ["accent", "yellow", "ink", "grey", "blue", "green", "sand", "pink"];
 
 /**
  * Validates and fills in a board script. Returns { board, errors }; the
@@ -34,12 +39,17 @@ export function normalize(input) {
   b.flow = b.flow ?? "path";
   if (!FLOWS.includes(b.flow)) err(`flow "${b.flow}": use ${FLOWS.join(", ")}`);
   b.accent = b.accent ?? "#c43f0a";
+  // the house style: the guide, the marker who greets the viewer beside the title, and a story arrow from each idea to the next
+  b.guide = b.guide ?? true;
+  b.story = b.story ?? true;
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
 
   const ids = new Map(); // id -> kind
   const claim = (id, kind, where) => {
     if (!id || typeof id !== "string") return err(`${where} needs an id`);
     if (!/^[a-z][a-z0-9-]*$/.test(id)) err(`${where}: id "${id}" should be lowercase letters, digits and dashes`);
+    // the kit names some things itself: the title, the guide, notes, marks and story arrows
+    if (id === "title" || id === "guide" || /^(note|mark|story|guide)-/.test(id)) err(`${where}: id "${id}" is one the kit uses; pick another`);
     if (ids.has(id)) err(`id "${id}" is used twice (${ids.get(id)} and ${kind})`);
     ids.set(id, kind);
   };
@@ -58,7 +68,46 @@ export function normalize(input) {
       item.shape = it.shape ?? "none";
       if (!SHAPES.includes(item.shape)) err(`${w}: shape "${item.shape}": use ${SHAPES.join(", ")}`);
       if (item.icon && !hasIcon(item.icon)) err(`${w}: no icon named "${item.icon}" (icons are Lucide names); close ones: ${nearIcons(item.icon).join(", ") || "none"}`);
-      if (!item.icon && !item.label) err(`${w} has neither an icon nor a label`);
+      // a character: a pose name, or { pose, face, facing, hair, glasses }
+      if (it.character != null) {
+        const c = typeof it.character === "string" ? { pose: it.character } : { ...it.character };
+        c.pose ??= "stand";
+        c.face ??= "happy";
+        c.hair ??= "short";
+        if (!POSE_NAMES.includes(c.pose)) err(`${w}: pose "${c.pose}": use ${POSE_NAMES.join(", ")}`);
+        if (!FACES.includes(c.face)) err(`${w}: face "${c.face}": use ${FACES.join(", ")}`);
+        if (!HAIRS.includes(c.hair)) err(`${w}: hair "${c.hair}": use ${HAIRS.join(", ")}`);
+        c.hat ??= "none";
+        if (!HATS.includes(c.hat)) err(`${w}: hat "${c.hat}": use ${HATS.join(", ")}`);
+        if (c.shirt != null && !(c.shirt in TINTS)) err(`${w}: shirt "${c.shirt}": use ${Object.keys(TINTS).join(", ")}`);
+        // left out, the kit turns it to face into its region
+        if (c.facing != null && !["left", "right"].includes(c.facing)) err(`${w}: facing "${c.facing}": use left or right, or leave it out`);
+        item.character = c;
+      }
+      // a sketch: SVG path data in a 100 x 100 box, drawn in order; each entry a path string, or { d, fill } to color the shape in
+      if (it.sketch != null) {
+        const paths = (Array.isArray(it.sketch) ? it.sketch : [it.sketch]).map((e) => (typeof e === "string" ? { d: e } : { ...e }));
+        item.sketch = paths;
+        for (const e of paths) {
+          const d = String(e.d ?? "");
+          if (e.fill != null && !FILLS.includes(e.fill)) err(`${w}: a sketch's fill "${e.fill}": use ${FILLS.join(", ")}`);
+          try {
+            const lines = flattenPath(d);
+            if (!lines.length) err(`${w}: a sketch path draws nothing: "${d.slice(0, 40)}"`);
+            if (lines.some((l) => l.some((v) => v < -20 || v > 120))) err(`${w}: a sketch path reaches outside its 100 x 100 box: "${d.slice(0, 40)}"`);
+          } catch (x) {
+            err(`${w}: a sketch path does not parse (${x.message})`);
+          }
+        }
+      }
+      if ([item.icon, item.character, item.sketch].filter(Boolean).length > 1) err(`${w}: give it one picture: an icon, a character or a sketch`);
+      if (!item.icon && !item.character && !item.sketch && !item.label) err(`${w} has no picture and no label`);
+      item.size = it.size ?? "normal";
+      if (!["normal", "large"].includes(item.size)) err(`${w}: size "${item.size}": use "normal" or "large"`);
+      if (it.says != null) {
+        if (!item.character) err(`${w}: says needs a character to say it`);
+        item.says = String(it.says);
+      }
       if (region.layout === "grid" && !Array.isArray(item.at)) err(`${w}: region ${r.id} lays its items on a grid, so give it at: [column, row]`);
       const celled = region.layout === "cells" || region.layout === "stack";
       if (it.under != null) {
@@ -86,7 +135,7 @@ export function normalize(input) {
   b.links = (b.links ?? []).map((l, li) => {
     const where = `link ${l.id ?? li + 1}`;
     claim(l.id, "link", where);
-    const link = { ...l, label: l.label != null ? String(l.label) : "", style: l.style ?? "solid", bend: Number.isFinite(l.bend) ? l.bend : null };
+    const link = { ...l, label: l.label != null ? String(l.label) : "", style: l.style ?? "solid", bend: Number.isFinite(l.bend) ? l.bend : null, far: l.far === true };
     if (!LINK_STYLES.includes(link.style)) err(`${where}: style "${link.style}": use ${LINK_STYLES.join(", ")}`);
     for (const end of ["from", "to"]) if (ids.get(l[end]) !== "item") err(`${where}: ${end} "${l[end]}" is not an item`);
     return link;
@@ -115,6 +164,9 @@ export function normalize(input) {
       else if (!ids.has(m[kind]) && m[kind] !== "title") err(`${where} marks "${m[kind]}", which is not on the board`);
       else beat.mark.push({ kind, target: m[kind] });
     }
+    // how the guide feels in this beat, and what it does
+    if (bt.feel != null && !(bt.feel in FEELINGS)) err(`${where}: feel "${bt.feel}": use ${Object.keys(FEELINGS).join(", ")}`);
+    if (bt.act != null && !ACTS.includes(bt.act)) err(`${where}: act "${bt.act}": use ${ACTS.join(", ")}`);
     if (bt.open != null) {
       const it = b.regions.flatMap((r) => r.items).find((x) => x.id === bt.open);
       if (!it) err(`${where} opens "${bt.open}", which is not an item`);
@@ -161,7 +213,8 @@ export function normalize(input) {
       for (const it of r.items) {
         it.label = plain(it.label);
         it.note = plain(it.note);
-        check(`item ${it.id}`, it.label + it.note);
+        if (it.says) it.says = plain(it.says);
+        check(`item ${it.id}`, it.label + it.note + (it.says ?? ""));
       }
     }
     for (const l of b.links) {

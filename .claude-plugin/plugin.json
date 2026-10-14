@@ -1,6 +1,6 @@
 {
   "name": "depict",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Explain a concept by drawing it: a hand-drawn board that builds stroke by stroke, one sentence at a time, and stays explorable when the explanation ends. A canvas tour or sketched slides, from one script.",
   "author": {
     "name": "David Estévez",

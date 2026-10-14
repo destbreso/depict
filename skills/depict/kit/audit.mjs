@@ -15,34 +15,32 @@ export function audit(board, comp, tl) {
   const warn = (rule, text) => out.push({ level: "warning", rule, text });
   const els = comp.elements;
 
-  // text stays readable in every shot (in pixels of a 1920 x 1080 frame)
-  const capOf = (e) => ({ title: SIZE.boardTitle, region: SIZE.regionTitle, item: e.parts.some((p) => p.role === "label") ? SIZE.label : SIZE.note, note: SIZE.note, link: SIZE.linkLabel, mark: Infinity })[e.kind] ?? SIZE.note;
-  tl.beats.forEach((b, i) => {
-    const k = VW / b.shot[2];
-    // a beat whose things sit in more than one region is shot wide enough for all of them, and everything in it shrinks
-    const spans = new Set();
-    const joiner = board.beats[i].draw.map((id) => els.get(id)).find((e) => e?.joins && e.joins[0] !== e.joins[1]);
-    for (const id of board.beats[i].draw) {
+  // text stays readable in the shot it is drawn in (in pixels of a 1920 x 1080 frame)
+  const capOf = (e) => {
+    if (e.kind === "link") return e.parts.some((p) => p.role === "label") ? SIZE.linkLabel * (e.scale ?? 1) : Infinity; // an arrow with no words has nothing to read
+    const z = e.zoom ?? 1; // a slide's content drawn larger to fill its page
+    if (e.kind === "item") return (e.parts.some((p) => p.role === "note") ? SIZE.note : SIZE.label) * z;
+    if (e.kind === "note") return SIZE.note * z;
+    return { title: SIZE.boardTitle, region: SIZE.regionTitle, note: SIZE.note, mark: Infinity, guide: Infinity, story: Infinity }[e.kind] ?? SIZE.note;
+  };
+  board.beats.forEach((bt, i) => {
+    for (const id of bt.draw) {
       const e = els.get(id);
-      (e.joins ?? [e.region]).forEach((r) => spans.add(r));
-    }
-    const why = spans.size > 1 ? `; the shot spans regions ${[...spans].join(" and ")}${joiner ? ` because link "${joiner.id}" joins them` : ""}, so everything in it is drawn smaller: draw a link between regions in a beat of its own, after both its ends, or keep linked items in one region` : "; split the region or shorten what it holds";
-    for (const id of board.beats[i].draw) {
-      const e = els.get(id);
-      if (e.kind === "link" && !e.parts.some((p) => p.role === "label")) continue; // an arrow with no words has nothing to read
-      const cap = Math.min(capOf(e), e.parts.some((p) => p.role === "note") ? SIZE.note : Infinity);
-      if (!Number.isFinite(cap)) continue;
-      const px = Math.round(cap * k * 10) / 10; // compared as it is shown
-      if (px < 14) problem("readable", `beat ${i + 1}: "${id}" is drawn with letters ${px.toFixed(1)} px tall on screen, too small to read${why}`);
-      else if (px < 18) warn("readable", `beat ${i + 1}: "${id}" has letters ${px.toFixed(1)} px tall on screen; 18 px or more reads comfortably${spans.size > 1 ? why : ""}`);
+      const cap = capOf(e);
+      if (!Number.isFinite(cap) || !e.shot) continue;
+      const px = Math.round(cap * (VW / e.shot[2]) * 10) / 10; // compared as it is shown
+      const fix = e.bridge ? "; a bridge's label grows with the distance it spans, so give it fewer words" : "; split the region, give it fewer items, or a layout that fits a wide shot";
+      if (px < 14) problem("readable", `beat ${i + 1}: "${id}" is drawn with letters ${px.toFixed(1)} px tall on screen, too small to read${fix}`);
+      else if (px < 18) warn("readable", `beat ${i + 1}: "${id}" has letters ${px.toFixed(1)} px tall on screen; 18 px or more reads comfortably`);
     }
   });
 
-  // nothing drawn lands outside its beat's shot, or under the caption
-  tl.beats.forEach((b, i) => {
-    const safe = safeArea(b.shot);
-    for (const id of board.beats[i].draw) {
+  // nothing drawn lands outside its shot, or under the caption
+  board.beats.forEach((bt, i) => {
+    for (const id of bt.draw) {
       const e = els.get(id);
+      if (!e.shot || e.kind === "story") continue;
+      const safe = safeArea(e.shot);
       const bb = e.box;
       if (bb.x < safe.x || bb.y < safe.y || bb.x + bb.w > safe.x + safe.w || bb.y + bb.h > safe.y + safe.h) {
         problem("safe", `beat ${i + 1}: "${id}" reaches ${bb.y + bb.h > safe.y + safe.h ? "under the caption" : "outside the shot"}; move it (a note to another side) or give its region less to hold`);
@@ -50,8 +48,24 @@ export function audit(board, comp, tl) {
     }
   });
 
+  // no idea left as an island: every region connects to the rest through some link
+  if (board.regions.length > 1) {
+    const parent = new Map(board.regions.map((r) => [r.id, r.id]));
+    const find = (x) => (parent.get(x) === x ? x : find(parent.get(x)));
+    for (const e of els.values()) if (e.joins) parent.set(find(e.joins[0]), find(e.joins[1]));
+    const groups = new Map();
+    for (const r of board.regions) {
+      const g = find(r.id);
+      groups.set(g, [...(groups.get(g) ?? []), r.id]);
+    }
+    if (groups.size > 1) {
+      const parts = [...groups.values()].map((g) => g.join(" + "));
+      warn("islands", `the board falls apart into ${groups.size} unconnected parts (${parts.join("; ")}); link an item of one region to an item of another, so the map shows how one idea leads to the next`);
+    }
+  }
+
   // nothing lands on top of anything else
-  const solid = [...els.values()].filter((e) => e.kind !== "mark");
+  const solid = [...els.values()].filter((e) => e.kind !== "mark" && e.kind !== "story");
   const boxOf = (e) => {
     if (e.kind !== "link") return e.box;
     // a link's own box spans its ends; what can collide is its label
@@ -123,7 +137,7 @@ export function audit(board, comp, tl) {
   board.beats.forEach((bt, i) => {
     const groups = new Set();
     const fresh = bt.draw.filter((id) => {
-      if (id.startsWith("mark-")) return false;
+      if (id.startsWith("mark-") || id.startsWith("guide")) return false;
       const e = els.get(id);
       if (e.kind === "item" && celled.has(e.region)) {
         if (groups.has(e.region)) return false;
@@ -134,9 +148,46 @@ export function audit(board, comp, tl) {
     if (fresh > 4) warn("load", `beat ${i + 1} draws ${fresh} things at once; four is about what a viewer takes in before a pause`);
   });
 
-  // the opening: a picture soon, not a long piece of writing
+  // composition: lines that cross read as a tangle
+  const lines = [...els.values()].filter((e) => e.path);
+  const crossings = [];
+  for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) if (cross(lines[i].path, lines[j].path)) crossings.push([lines[i].id, lines[j].id]);
+  for (const [a, b] of crossings) warn("tangle", `"${a}" and "${b}" cross; crossing lines read as a tangle: put the item between the other two, link fewer things, or say the connection instead of drawing it`);
+
+  // a bridge between regions that are not side by side runs across the board
+  // two regions are side by side when they face each other along one side and no other region stands between them
+  const slots = comp.regions.map((r) => r.slot);
+  const slotOf = (id) => comp.regions.find((r) => r.id === id).slot;
+  const beside = (a, b) => {
+    const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+    const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    let band = null;
+    if (oy > 0.25 * Math.min(a.h, b.h)) band = { x: Math.min(a.x + a.w, b.x + b.w), y: Math.max(a.y, b.y), w: Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w), h: oy };
+    else if (ox > 0.25 * Math.min(a.w, b.w)) band = { x: Math.max(a.x, b.x), y: Math.min(a.y + a.h, b.y + b.h), w: ox, h: Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h) };
+    return !!band && !slots.some((o) => o !== a && o !== b && overlaps(pad(o, -1), band));
+  };
+  const bridges = [...els.values()].filter((e) => e.kind === "link" && e.bridge);
+  for (const e of bridges) {
+    if (!beside(slotOf(e.joins[0]), slotOf(e.joins[1]))) warn("bridge", `link "${e.id}" runs between regions ${e.joins.join(" and ")}, which are not side by side; ${board.story ? "the story arrows already lead from each idea to the next, so say this connection in a sentence" : "say this connection in a sentence"}, or put both items in one region`);
+  }
+  if (board.story && bridges.length > Math.max(1, board.regions.length - 2)) warn("bridge", `${bridges.length} links run between regions; the story arrows already tie each idea to the next, so keep one or two that say something they do not`);
+
+  // every region has something the eye goes to first, and is not mostly empty paper
+  for (const r of board.regions) {
+    if (r.layout === "cells" || r.layout === "stack") continue;
+    const marked = new Set(board.beats.flatMap((b) => b.mark.map((m) => m.target)));
+    const focal = r.items.some((it) => it.size === "large" || it.character || it.sketch || it.shape !== "none" || marked.has(it.id));
+    if (r.items.length > 1 && !focal) warn("focal", `region "${r.id}" has no focal point: make the item it is about large, a character or a sketch, give it a frame, or mark it`);
+    const frame = comp.regions.find((x) => x.id === r.id).frame;
+    const area = r.items.reduce((a, it) => a + els.get(it.id).box.w * els.get(it.id).box.h, 0);
+    const fill = area / (frame.w * frame.h);
+    if (fill < 0.1) warn("sparse", `region "${r.id}" is mostly empty paper (its items cover ${Math.round(fill * 100)}% of its shot): draw its idea as a scene, a character or a sketch, or make its key item large`);
+  }
+
+  // the opening: a picture soon, not a long piece of writing (the guide's hello is quick, and counts as the picture)
   const first = tl.beats[0];
-  if (first.draw1 - first.draw0 > 7) warn("hook", `the first beat draws for ${(first.draw1 - first.draw0).toFixed(1)} s; open with a picture within about 5 s, and write the rest in the next beat`);
+  const most = 7 + (board.beats[0].draw.includes("guide") ? 3 : 0);
+  if (first.draw1 - first.draw0 > most) warn("hook", `the first beat draws for ${(first.draw1 - first.draw0).toFixed(1)} s; open with a picture within about 5 s, and write the rest in the next beat`);
 
   // length: an explainer runs one to three minutes, a lesson under six
   if (tl.duration > 360) warn("length", `the board runs ${(tl.duration / 60).toFixed(1)} minutes; under six holds attention, or split it into two boards`);
@@ -146,6 +197,26 @@ export function audit(board, comp, tl) {
   const regionPx = SIZE.regionTitle * kOverview;
   if (regionPx < 10) warn("map", `in the closing overview the region titles are ${regionPx.toFixed(0)} px tall; the board is very large for one picture (the page can still be zoomed)`);
   return out;
+}
+
+/** Whether two polylines cross, away from their ends (two arrows from one item may touch where they start). */
+function cross(a, b) {
+  const ends = (pts) => [pts[0], pts[1], pts[pts.length - 2], pts[pts.length - 1]];
+  const [a0x, a0y, a1x, a1y] = ends(a);
+  const [b0x, b0y, b1x, b1y] = ends(b);
+  const nearEnd = (x, y) => [[a0x, a0y], [a1x, a1y], [b0x, b0y], [b1x, b1y]].some(([ex, ey]) => Math.hypot(x - ex, y - ey) < 40);
+  for (let i = 0; i + 3 < a.length; i += 2) {
+    for (let j = 0; j + 3 < b.length; j += 2) {
+      const [px, py, qx, qy] = [a[i], a[i + 1], a[i + 2], a[i + 3]];
+      const [rx, ry, sx, sy] = [b[j], b[j + 1], b[j + 2], b[j + 3]];
+      const d = (qx - px) * (sy - ry) - (qy - py) * (sx - rx);
+      if (!d) continue;
+      const u = ((rx - px) * (sy - ry) - (ry - py) * (sx - rx)) / d;
+      const v = ((rx - px) * (qy - py) - (ry - py) * (qx - px)) / d;
+      if (u >= 0 && u <= 1 && v >= 0 && v <= 1 && !nearEnd(px + u * (qx - px), py + u * (qy - py))) return true;
+    }
+  }
+  return false;
 }
 
 const labelBox = (part) => {

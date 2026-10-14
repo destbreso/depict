@@ -48,6 +48,7 @@ const comp = compose(board, hand(board.hand));
 const tl = time(board, comp);
 const scene = sceneOf(board, comp, tl);
 const html = page(board, scene);
+fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 const findings = audit(board, comp, tl);
 const verdict = report(findings);

@@ -123,7 +123,7 @@ export function ellipse(p, cx, cy, rx, ry, { overshoot = 0.1, outward = false } 
  * An arrow: the shaft, bowed by `bend` (a share of its length, + to the left
  * of travel), then the head as one stroke from wing to tip to wing.
  */
-export function arrow(p, x1, y1, x2, y2, { bend = 0, head = null, double = false } = {}) {
+export function arrow(p, x1, y1, x2, y2, { bend = 0, head = null, double = false, solid = false } = {}) {
   const len = Math.hypot(x2 - x1, y2 - y1) || 1;
   const nx = -(y2 - y1) / len;
   const ny = (x2 - x1) / len;
@@ -144,7 +144,12 @@ export function arrow(p, x1, y1, x2, y2, { bend = 0, head = null, double = false
     const wing = (sign) => [tx - size * (ux * Math.cos(spread) - sign * uy * Math.sin(spread)), ty - size * (uy * Math.cos(spread) + sign * ux * Math.sin(spread))];
     const [lx, ly] = wing(1);
     const [rx, ry] = wing(-1);
-    return polyline(p, [lx, ly, tx, ty, rx, ry])[0];
+    if (!solid) return polyline(p, [lx, ly, tx, ty, rx, ry])[0];
+    // a solid head: the triangle closed and colored in, in one stroke that spirals into it
+    const mx = (lx + rx) / 2;
+    const my = (ly + ry) / 2;
+    const k = 0.45;
+    return [lx, ly, tx, ty, rx, ry, lx, ly, lx + (tx - lx) * k + (mx - lx) * 0.3, ly + (ty - ly) * k + (my - ly) * 0.3, tx - (tx - mx) * 0.3, ty - (ty - my) * 0.3, rx + (tx - rx) * k + (mx - rx) * 0.3, ry + (ty - ry) * k + (my - ry) * 0.3, mx + (tx - mx) * 0.3, my + (ty - my) * 0.3];
   };
   // the head points along the shaft's last stretch
   const n = shaft.length;
@@ -253,19 +258,20 @@ export function cloud(p, b, margin = 18) {
   return [smooth(pts, Math.max(3, p.width))];
 }
 
-/** A speech bubble: a rounded box with a tail from its lower left. */
-export function bubble(p, b) {
+/** A speech bubble: a rounded box with a tail from its lower edge, pointing down to the left (or the right). */
+export function bubble(p, b, { tail = "left" } = {}) {
   const k = Math.min(b.w, b.h) * 0.25;
-  const tailX = b.x + b.w * 0.22;
+  const left = tail === "left";
+  const tailX = left ? b.x + b.w * 0.22 : b.x + b.w * 0.78;
+  const t1 = left ? tailX + 26 : tailX - 26;
+  const tip = left ? tailX - 14 : tailX + 14;
   const pts = [
     b.x + k, b.y,
     b.x + b.w - k, b.y,
     b.x + b.w, b.y + k,
     b.x + b.w, b.y + b.h - k,
     b.x + b.w - k, b.y + b.h,
-    tailX + 26, b.y + b.h,
-    tailX - 14, b.y + b.h + 34,
-    tailX, b.y + b.h,
+    ...(left ? [t1, b.y + b.h, tip, b.y + b.h + 34, tailX, b.y + b.h] : [tailX, b.y + b.h, tip, b.y + b.h + 34, t1, b.y + b.h]),
     b.x + k, b.y + b.h,
     b.x, b.y + b.h - k,
     b.x, b.y + k,
@@ -318,4 +324,311 @@ export function wobble(p, pts, { amp = null, wave = null } = {}) {
     s += len;
   }
   return out.length >= 4 ? out : pts;
+}
+
+/**
+ * A soft closed shape through points (a bean of a body, a blob, a cloud of an
+ * outline): a smooth curve round them in one stroke, closing a little past
+ * where it began, each point nudged by the hand.
+ */
+export function blob(p, pts, { overshoot = 0.08 } = {}) {
+  const n = pts.length / 2;
+  const jig = pts.map((v) => v + p.off(Math.min(2.2, p.width * 0.4)));
+  // closed Catmull-Rom: wrap the points round, then sample
+  const out = [];
+  const P = (i) => [jig[2 * (((i % n) + n) % n)], jig[2 * (((i % n) + n) % n) + 1]];
+  const steps = 10;
+  const total = Math.ceil(n * (1 + overshoot));
+  for (let i = 0; i < total; i++) {
+    const [x0, y0] = P(i - 1);
+    const [x1, y1] = P(i);
+    const [x2, y2] = P(i + 1);
+    const [x3, y3] = P(i + 2);
+    for (let j = i === 0 ? 0 : 1; j <= steps; j++) {
+      const t = j / steps;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      out.push(
+        0.5 * (2 * x1 + (-x0 + x2) * t + (2 * x0 - 5 * x1 + 4 * x2 - x3) * t2 + (-x0 + 3 * x1 - 3 * x2 + x3) * t3),
+        0.5 * (2 * y1 + (-y0 + y2) * t + (2 * y0 - 5 * y1 + 4 * y2 - y3) * t2 + (-y0 + 3 * y1 - 3 * y2 + y3) * t3),
+      );
+    }
+  }
+  return [out];
+}
+
+/** A small closed dot of a loop (a hand, a knot, a bullet): round, no spiral. */
+export function dot(p, cx, cy, r) {
+  const pts = [];
+  const a0 = p.r(0, Math.PI * 2);
+  for (let i = 0; i <= 14; i++) {
+    const a = a0 + (Math.PI * 2 * i) / 13;
+    pts.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  return [pts];
+}
+
+/**
+ * A marker fill inside a polygon: the area colored in with a broad nib, back
+ * and forth, each pass a little irregular and kept just inside the outline.
+ * The passes are scanlines at an angle; consecutive passes that overlap are
+ * one zigzag stroke, so a curved or hollow shape is filled in a few strokes
+ * and no stroke jumps across paper. Returns the strokes and the nib width.
+ */
+export function fill(p, poly, { nib = 16, angle = -38, edge = 0.34 } = {}) {
+  const gap = nib * 0.8;
+  const a = (angle * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const rot = [];
+  for (let i = 0; i < poly.length; i += 2) rot.push(poly[i] * cos + poly[i + 1] * sin, -poly[i] * sin + poly[i + 1] * cos);
+  const n = rot.length / 2;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (let i = 1; i < rot.length; i += 2) {
+    y0 = Math.min(y0, rot[i]);
+    y1 = Math.max(y1, rot[i]);
+  }
+  const back = (x, y) => [x * cos - y * sin, x * sin + y * cos];
+  const strips = []; // { last: [xa, xb], row, pts, flip }
+  let row = 0;
+  for (let y = y0 + gap * 0.5; y < y1 - gap * 0.2; y += gap, row++) {
+    const xs = [];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const [ax, ay, bx, by] = [rot[2 * i], rot[2 * i + 1], rot[2 * j], rot[2 * j + 1]];
+      if ((ay <= y && by > y) || (by <= y && ay > y)) xs.push(ax + ((y - ay) / (by - ay)) * (bx - ax));
+    }
+    xs.sort((m, k) => m - k);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const xa = xs[i] + nib * edge;
+      const xb = xs[i + 1] - nib * edge;
+      if (xb - xa < nib * 0.15) continue;
+      const strip = strips.find((st) => st.row === row - 1 && st.last[0] < xb && xa < st.last[1]);
+      const jy = p.off(gap * 0.06);
+      if (strip) {
+        const [sa, sb] = strip.flip ? [xb, xa] : [xa, xb];
+        strip.pts.push(...back(sa + p.off(1.5), y + jy), ...back(sb + p.off(1.5), y + jy));
+        strip.flip = !strip.flip;
+        strip.last = [xa, xb];
+        strip.row = row;
+      } else strips.push({ last: [xa, xb], row, pts: [...back(xa, y + jy), ...back(xb, y + jy)], flip: true });
+    }
+  }
+  return { strokes: strips.map((st) => st.pts), width: nib };
+}
+
+/** A polygon shrunk toward its centroid by about d (enough for the convex-ish shapes it is used on). */
+export function inset(poly, d) {
+  const n = poly.length / 2;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < n; i++) {
+    cx += poly[2 * i];
+    cy += poly[2 * i + 1];
+  }
+  cx /= n;
+  cy /= n;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const x = poly[2 * i] - cx;
+    const y = poly[2 * i + 1] - cy;
+    const r = Math.hypot(x, y) || 1;
+    const k = Math.max(0, r - d) / r;
+    out.push(cx + x * k, cy + y * k);
+  }
+  return out;
+}
+
+/** A small solid spot (a pupil, a shoe, a blot of ink): one short stroke as wide as the spot, from one end to the other. */
+export function dab(p, x0, y0, x1, y1, width) {
+  const mx = (x0 + x1) / 2 + p.off(width * 0.06);
+  const my = (y0 + y1) / 2 + p.off(width * 0.06);
+  return { strokes: [[x0, y0, mx, my, x1, y1]], width };
+}
+
+/** The points of a polyline moved by (dx, dy). */
+export const shift = (pts, dx, dy) => pts.map((v, i) => v + (i % 2 ? dy : dx));
+
+/**
+ * A wide arrow with an area, the kind a whiteboard artist draws to carry the
+ * story from one scene to the next: a band along a curve that widens into a
+ * head. `path` is the centerline (a polyline from tail to tip); the shaft is
+ * `width` wide at the head and a little narrower at the tail. Returns the
+ * outline as one stroke in pen order (down one side, round the head, back up
+ * the other, across the tail), the polygon it encloses, and `inner`: the same
+ * shape drawn `inside` units in, for the fill.
+ */
+export function fatArrow(p, path, { width = 34, head = null, inside = 7 } = {}) {
+  const n = path.length / 2;
+  const cum = [0];
+  for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(path[2 * i] - path[2 * i - 2], path[2 * i + 1] - path[2 * i - 1]));
+  const L = cum[n - 1];
+  const hl = Math.min(head ?? width * 1.55, L * 0.5);
+  const at = (d) => {
+    let i = 1;
+    while (i < n - 1 && cum[i] < d) i++;
+    const t = (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+    const x = path[2 * i - 2] + (path[2 * i] - path[2 * i - 2]) * t;
+    const y = path[2 * i - 1] + (path[2 * i + 1] - path[2 * i - 1]) * t;
+    const dx = path[2 * i] - path[2 * i - 2];
+    const dy = path[2 * i + 1] - path[2 * i - 1];
+    const l = Math.hypot(dx, dy) || 1;
+    return [x, y, -dy / l, dx / l, dx / l, dy / l];
+  };
+  const shape = (inset) => {
+    const steps = Math.max(6, Math.round((L - hl) / 14));
+    const left = [];
+    const right = [];
+    for (let k = 0; k <= steps; k++) {
+      const d = inset + ((L - hl - inset) * k) / steps;
+      const [x, y, nx, ny] = at(d);
+      const w = Math.max(2, (width / 2) * (0.82 + 0.18 * (d / (L - hl))) - inset);
+      left.push(x + nx * w, y + ny * w);
+      right.push(x - nx * w, y - ny * w);
+    }
+    // the head: wings out from the shaft, and the tip (pulled in along the arrow for an inner outline)
+    const hw = width * 1.05 - inset * 1.6;
+    const [bx, by, bnx, bny, btx, bty] = at(L - hl);
+    const [, , , , tx, ty] = at(L);
+    const tip = [path[2 * n - 2] - tx * inset * 2.2, path[2 * n - 1] - ty * inset * 2.2];
+    const base = [bx + btx * inset * 0.6, by + bty * inset * 0.6];
+    const rightBack = [];
+    for (let k = right.length / 2 - 1; k >= 0; k--) rightBack.push(right[2 * k], right[2 * k + 1]);
+    return [...left, base[0] + bnx * hw, base[1] + bny * hw, ...tip, base[0] - bnx * hw, base[1] - bny * hw, ...rightBack];
+  };
+  const poly = shape(0);
+  const outline = wobble(p, [...poly, poly[0] + p.off(1.5), poly[1] + p.off(1.5), poly[2], poly[3]], { amp: Math.min(1.4, 0.3 * p.width) });
+  /** The fill: passes along the band, tail to head and back, then across the head toward its tip. */
+  const along = (nib) => {
+    const edge = nib * 0.5 + inside * 0.45;
+    const half = (d) => (width / 2) * (0.82 + 0.18 * (d / (L - hl))) - edge;
+    const passes = Math.max(1, Math.ceil((width - 2 * edge) / (nib * 0.78)) + 1);
+    const zig = [];
+    const d0 = edge;
+    const d1 = L - hl + nib * 0.3;
+    const steps = Math.max(4, Math.round((d1 - d0) / 12));
+    for (let k = 0; k < passes; k++) {
+      const q = passes === 1 ? 0 : -1 + (2 * k) / (passes - 1);
+      const run = [];
+      for (let j = 0; j <= steps; j++) {
+        const d = d0 + ((d1 - d0) * j) / steps;
+        const [x, y, nx, ny] = at(d);
+        const o = q * Math.max(0, half(d));
+        run.push(x + nx * o, y + ny * o);
+      }
+      if (k % 2) for (let j = run.length / 2 - 1; j >= 0; j--) zig.push(run[2 * j] + p.off(0.8), run[2 * j + 1] + p.off(0.8));
+      else zig.push(...run.map((v) => v + p.off(0.8)));
+    }
+    const strokes = [zig];
+    // the head, in passes across it that shorten toward the tip
+    const [bx, by, bnx, bny, btx, bty] = at(L - hl);
+    const reach = width * 1.05 - edge * 1.5;
+    const len = hl - edge * 2.2;
+    const across = [];
+    const m = Math.max(2, Math.ceil(len / (nib * 0.72)));
+    for (let j = 0; j <= m; j++) {
+      const s = (len * j) / m;
+      const wj = reach * (1 - s / hl) - nib * 0.15;
+      if (wj < nib * 0.2) break;
+      const cx = bx + btx * (s + edge * 0.4);
+      const cy = by + bty * (s + edge * 0.4);
+      const a = [cx + bnx * wj, cy + bny * wj];
+      const b = [cx - bnx * wj, cy - bny * wj];
+      across.push(...(j % 2 ? [...b, ...a] : [...a, ...b]));
+    }
+    if (across.length >= 4) strokes.push(across);
+    return strokes;
+  };
+  return { outline, poly, inner: shape(inside), along };
+}
+
+/**
+ * A stretch of the story road: a band of even width along a path. Its sides
+ * are drawn as two lines, open at the ends where the stretch meets the next
+ * one, or, with `head`, as one line that runs down one side, round an
+ * arrowhead and back up the other. Returns those lines, the band's polygon,
+ * and its fill: passes along the band, then across the head.
+ */
+export function ribbon(p, path, { width = 46, head = false } = {}) {
+  const n = path.length / 2;
+  const cum = [0];
+  for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(path[2 * i] - path[2 * i - 2], path[2 * i + 1] - path[2 * i - 1]));
+  const L = cum[n - 1];
+  const hl = head ? Math.min(width * 1.45, L * 0.6) : 0;
+  const at = (d) => {
+    let i = 1;
+    while (i < n - 1 && cum[i] < d) i++;
+    const t = Math.max(0, Math.min(1, (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1)));
+    const x = path[2 * i - 2] + (path[2 * i] - path[2 * i - 2]) * t;
+    const y = path[2 * i - 1] + (path[2 * i + 1] - path[2 * i - 1]) * t;
+    const dx = path[2 * i] - path[2 * i - 2];
+    const dy = path[2 * i + 1] - path[2 * i - 1];
+    const l = Math.hypot(dx, dy) || 1;
+    return [x, y, -dy / l, dx / l, dx / l, dy / l];
+  };
+  const side = (sign, inset, d1 = L - hl) => {
+    const out = [];
+    const steps = Math.max(3, Math.round(d1 / 14));
+    for (let k = 0; k <= steps; k++) {
+      const [x, y, nx, ny] = at((d1 * k) / steps);
+      out.push(x + nx * sign * (width / 2 - inset), y + ny * sign * (width / 2 - inset));
+    }
+    return out;
+  };
+  const back = (pts) => {
+    const out = [];
+    for (let k = pts.length / 2 - 1; k >= 0; k--) out.push(pts[2 * k], pts[2 * k + 1]);
+    return out;
+  };
+  const left = side(1, 0);
+  const right = side(-1, 0);
+  const amp = Math.min(1.3, 0.28 * p.width);
+  let lines;
+  let poly;
+  if (head) {
+    const [bx, by, nx, ny] = at(L - hl);
+    const hw = width * 0.98;
+    const tip = [path[2 * n - 2], path[2 * n - 1]];
+    const run = [...left, bx + nx * hw, by + ny * hw, ...tip, bx - nx * hw, by - ny * hw, ...back(right)];
+    lines = [wobble(p, run, { amp })];
+    poly = run;
+  } else {
+    lines = [wobble(p, left, { amp }), wobble(p, right, { amp })];
+    poly = [...left, ...back(right)];
+  }
+  const along = (nib) => {
+    const edge = nib * 0.5 + 3;
+    const passes = Math.max(1, Math.ceil((width - 2 * edge) / (nib * 0.78)) + 1);
+    const zig = [];
+    const d1 = L - hl + (head ? nib * 0.3 : 0);
+    const steps = Math.max(3, Math.round(d1 / 12));
+    for (let k = 0; k < passes; k++) {
+      const q = passes === 1 ? 0 : -1 + (2 * k) / (passes - 1);
+      const run = [];
+      for (let j = 0; j <= steps; j++) {
+        const [x, y, nx, ny] = at((d1 * j) / steps);
+        const o = q * (width / 2 - edge);
+        run.push(x + nx * o + p.off(0.8), y + ny * o + p.off(0.8));
+      }
+      zig.push(...(k % 2 ? back(run) : run));
+    }
+    const strokes = [zig];
+    if (head) {
+      const [bx, by, bnx, bny, btx, bty] = at(L - hl);
+      const across = [];
+      const m = Math.max(2, Math.ceil(hl / (nib * 0.72)));
+      for (let j = 0; j <= m; j++) {
+        const s = ((hl - edge * 2) * j) / m;
+        const wj = (width * 0.98 - edge * 1.4) * (1 - s / hl) - nib * 0.15;
+        if (wj < nib * 0.2) break;
+        const cx = bx + btx * (s + edge * 0.4);
+        const cy = by + bty * (s + edge * 0.4);
+        across.push(...(j % 2 ? [cx - bnx * wj, cy - bny * wj, cx + bnx * wj, cy + bny * wj] : [cx + bnx * wj, cy + bny * wj, cx - bnx * wj, cy - bny * wj]));
+      }
+      if (across.length >= 4) strokes.push(across);
+    }
+    return strokes;
+  };
+  return { lines, poly, along };
 }

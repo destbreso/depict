@@ -17,7 +17,12 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 | label | warning over 4 words | Labels read at a glance (words with letters; a formula counts as none) | Two or three words; the rest goes in the note or the sentence |
 | note | warning over 9 words | Notes are a phrase | Shorten, or say it |
 | load | warning over 4 things | New things in one beat | Split the beat |
-| hook | warning over 7 s | The first beat's drawing time | Open with a picture; move a long title or a second item to the next beat |
+| hook | warning over 7 s (10 s with the guide, whose hello counts as the opening picture) | The first beat's drawing time | Open with a picture; move a long title or a second item to the next beat |
+| focal | warning | A region of two or more items where none is large, a character, a sketch, framed or marked | Draw the thing the region is about as a large sketch, or frame or mark it |
+| sparse | warning under 10% | How much of a region's shot its items cover | Draw the idea as a scene, make the key item large, merge a thin region into another |
+| tangle | warning | Two lines crossing (arrows, the road) | Put the item between the other two, link fewer things, or say the connection in the sentence |
+| bridge | warning | A link between regions that are not side by side, or many links between regions | The road already leads from each idea to the next: say the connection, or put both items in one region |
+| islands | warning | With the road turned off, regions that no link connects | Turn the road back on, or link an item of one region to the next |
 | length | warning over 6 minutes | The whole board | Two boards |
 | map | warning | Region titles in the closing overview under 10 px | A smaller board; the page can still be zoomed |
 
@@ -25,12 +30,13 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 
 `node scripts/check.mjs board.html` opens the page in headless Chrome, pictures the board at the end of every beat (as the video shows it, 1920 x 1080), the closing overview and the page with its controls, and fails on any error the page logs. The pictures land in `shots/` next to the page.
 
-Read them. For each beat's picture, ask:
+Read them as the artist. For each beat's picture, ask:
 
 - Without the caption, can a viewer tell what this frame is about?
 - Is anything cut at an edge, crowded against another thing, or too small?
 - Does the pen's order make sense: the thing named first, then its label, then the arrow to the next?
-- Does the overview read as a map of the whole idea, with the regions in the order they were told?
+- Is there one place the eye goes first?
+- Does the overview read as a poster: the title, the road leading from idea to idea in the order they were told, the guide at the end?
 
 The audit cannot answer these; the pictures can.
 
