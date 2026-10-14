@@ -139,7 +139,8 @@ function itemParts(board, font, it, S) {
   }
   let labelBox = null;
   if (it.label) {
-    const wide = ["banner", "bubble"].includes(it.shape) ? SIZE.cardWidth * 1.6 : SIZE.cardWidth;
+    // a label runs wider than a note before it wraps (a sum like 200 + 40 + 3 reads on one line); a banner or bubble wider still
+    const wide = ["banner", "bubble"].includes(it.shape) ? SIZE.cardWidth * 1.6 : SIZE.cardWidth * 1.4;
     const ls = SIZE.label * (big > 1 ? 1.2 : 1);
     const t = write(font, it.label, { x: 0, y, size: ls, align: "center", maxWidth: wide * (big > 1 ? 1.2 : 1), rng: S(`${it.id}.label`), lineHeight: 1.6 });
     parts.push(part("label", t.strokes, { width: W.label * (big > 1 ? 1.15 : 1), write: true, size: ls }));
