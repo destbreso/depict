@@ -87,7 +87,7 @@ Without a `feel` or an `act`, the guide still performs: it is drawn as the board
 
 ## Words the hand can write
 
-The board's words (titles, labels, notes, an arrow's label, what a character says) are written by a single-stroke font that covers Latin-1: accents, ñ, ¿, ¡, ×, ÷, €, °. Typographic marks an agent tends to produce are written the plain way: curly quotes as straight ones, … as ..., → as ->, ≈ as ~, ≤ and ≥ as <= and >=. Anything else the hand cannot write fails the build, naming the item and the character. Captions (a beat's `say`) are shown in the page's own type and take any character.
+The board's words (titles, labels, notes, an arrow's label, what a character says) are written by a single-stroke font that covers Latin-1: accents, ñ, ¿, ¡, ×, ÷, ¢, €, °. Two more are drawn to match each hand: □, the box a missing number goes in (8 + □ = 13), and the minus sign. A hyphen standing alone between spaces (15 - 7 = 8) is written as a minus, as wide as the equal sign. Typographic marks an agent tends to produce are written the plain way: curly quotes as straight ones, … as ..., → as ->, ≈ as ~, ≤ and ≥ as <= and >=. Anything else the hand cannot write fails the build, naming the item and the character. Captions (a beat's `say`) are shown in the page's own type and take any character.
 
 ## What the kit decides
 

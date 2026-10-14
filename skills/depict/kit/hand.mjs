@@ -16,6 +16,9 @@ function capUnits(font) {
 
 const glyphOf = (font, ch) => font.glyphs[ch] ?? font.glyphs[ch.normalize("NFD")[0]] ?? font.glyphs["?"];
 
+/** A hyphen standing alone between spaces is a minus (15 - 7): it is written as one, as wide as the equal sign. */
+const math = (font, text) => (font.glyphs["\u2212"] ? String(text).replace(/(^|\s)-(?=\s|$)/g, "$1\u2212") : String(text));
+
 /**
  * How far a glyph moves the pen: its advance, or further when its ink runs
  * past it. Some glyphs of the EMS fonts draw beyond their own advance (the
@@ -36,7 +39,7 @@ function advanceOf(font, g) {
 export function measure(font, text, size) {
   const k = size / capUnits(font);
   let w = 0;
-  for (const ch of text) w += advanceOf(font, glyphOf(font, ch)) * k;
+  for (const ch of math(font, text)) w += advanceOf(font, glyphOf(font, ch)) * k;
   return w;
 }
 
@@ -79,7 +82,7 @@ function greedy(font, text, size, maxWidth) {
  */
 export function write(font, text, { x = 0, y = 0, size = 24, lineHeight = 1.9, align = "left", maxWidth = Infinity, rng = Math.random, wobble = 1, step = 2.5 } = {}) {
   const k = size / capUnits(font);
-  const lines = wrap(font, text, size, maxWidth);
+  const lines = wrap(font, math(font, text), size, maxWidth);
   const strokes = [];
   const glyphs = [];
   const placed = [];
