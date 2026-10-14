@@ -32,7 +32,7 @@ export const PACE = {
 };
 
 /** The pace for a child's board: about nine letters a second of caption, and longer pauses. */
-export const CHILD = { readBase: 1.3, readRate: 9, hold: 1.0, regionHold: 1.0, element: 0.42, overviewHold: 3.4 };
+export const CHILD = { readBase: 1.4, readRate: 7.5, hold: 1.0, regionHold: 1.0, element: 0.42, overviewHold: 3.4 };
 
 /**
  * The shot an element is drawn in. The camera follows what is being drawn:
