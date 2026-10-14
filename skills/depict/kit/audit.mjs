@@ -114,7 +114,7 @@ export function audit(board, comp, tl) {
     const n = b.say.length;
     if (n > cap.problem) problem("caption", `beat ${i + 1} says ${n} characters; keep a sentence under about ${cap.warn} so it fits two caption lines${child ? " a child can read" : ""}`);
     else if (n > cap.warn) warn("caption", `beat ${i + 1} says ${n} characters; under about ${cap.warn} fits two caption lines${child ? " a child can read" : ""}`);
-    const rate = n / (b.t1 - b.t0);
+    const rate = n / ((b.t1 - b.t0) / (board.speed ?? 1)); // read at the speed the page plays it
     if (rate > cap.rate) warn("pace", `beat ${i + 1} asks for ${rate.toFixed(0)} characters a second of reading; ${cap.rate} is the most`);
   });
 

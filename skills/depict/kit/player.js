@@ -256,9 +256,14 @@
     const F = A.feelings[st.feel] || A.feelings.happy;
     for (const [part, g] of X.groups) {
       const m = /^(brows|mouth):(\w+)$/.exec(part);
-      if (m) g.style.display = (m[1] === "brows" ? F.brows : F.mouth) === m[2] ? "" : "none";
-      else if (/^squint\d$/.test(part)) g.style.display = F.eyes === "squint" || (F.eyes === "wink" && part === "squint1") ? "" : "none";
-      else if (/^eyes\d$/.test(part)) g.style.display = F.eyes === "squint" || (F.eyes === "wink" && part === "eyes1") ? "none" : "";
+      let on = null;
+      if (m) on = (m[1] === "brows" ? F.brows : F.mouth) === m[2];
+      else if (/^squint\d$/.test(part)) on = F.eyes === "squint" || (F.eyes === "wink" && part === "squint1");
+      else if (/^eyes\d$/.test(part)) on = !(F.eyes === "squint" || (F.eyes === "wink" && part === "eyes1"));
+      if (on != null && g.__on !== on) {
+        g.style.display = on ? "" : "none";
+        g.__on = on;
+      }
     }
     A.eyes.forEach(([cx, cy], i) => {
       const g = X.groups.get(`eyes${i}`);
@@ -400,14 +405,23 @@
 
   // playing
   let playing = false;
-  let speed = 1;
+  let speed = S.speed || 1;
   let last = 0;
+  let failed = false;
   const tick = (ms) => {
     if (!playing) return;
-    const dt = last ? (ms - last) / 1000 : 0;
+    // a frame is never more than a tenth of a second: back from a hidden tab, the film goes on from where it was
+    const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
     last = ms;
-    render(now + dt * speed);
-    watchOpen();
+    try {
+      render(now + dt * speed);
+      watchOpen();
+    } catch (err) {
+      // one bad frame never stops the film
+      if (!failed) console.error("depict: a frame failed to draw", err);
+      failed = true;
+      now = Math.min(T, now + dt * speed);
+    }
     if (now >= T) {
       playing = false;
       ended();
@@ -649,7 +663,7 @@
     requestAnimationFrame(idle);
   }
 
-  window.depict = { render, seek, play, pause, duration: T, explore: S.explore, beats, get time() { return now; } };
+  window.depict = { render, seek, play, pause, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
   hoverBox.style.display = "none";
   const at = q.get("t");
   render(at != null ? Number(at) : capture ? 0 : S.explore ?? T);

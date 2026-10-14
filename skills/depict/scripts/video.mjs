@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// A board's page as a video: node scripts/video.mjs <page.html> [--out board.mp4] [--fps 30]
+// A board's page as a video: node scripts/video.mjs <page.html> [--out board.mp4] [--fps 30] [--speed 1]
 //
 // The page draws itself as a pure function of time, so each frame is
 // depict.render(t) and a screenshot; ffmpeg encodes them. The file is 16:9 at
@@ -19,7 +19,7 @@ const opt = (name, def) => {
   return i >= 0 ? args[i + 1] : def;
 };
 if (!file) {
-  console.error("usage: node scripts/video.mjs <page.html> [--out board.mp4] [--fps 30]");
+  console.error("usage: node scripts/video.mjs <page.html> [--out board.mp4] [--fps 30] [--speed 1]");
   process.exit(2);
 }
 if (spawnSync("ffmpeg", ["-version"]).status !== 0) {
@@ -30,7 +30,9 @@ const fps = Number(opt("fps", 30));
 const out = path.resolve(opt("out", file.replace(/\.html$/, "") + ".mp4"));
 const page = await open(`${path.resolve(file)}`.replace(/^/, "file://") + "?capture", { width: 1920, height: 1080, scale: 1, wait: 400 });
 const duration = await page.evaluate("depict.duration");
-const frames = Math.ceil(duration * fps);
+// a video plays at the board's own speed (a child's board at half speed) unless --speed says otherwise
+const speed = Number(opt("speed", await page.evaluate("depict.speed || 1")));
+const frames = Math.ceil((duration / speed) * fps);
 // prettier-ignore
 const ff = spawn("ffmpeg", [
   "-loglevel", "error", "-y",
@@ -48,7 +50,7 @@ const ff = spawn("ffmpeg", [
 const done = new Promise((resolve) => ff.on("close", resolve));
 const started = Date.now();
 for (let f = 0; f <= frames; f++) {
-  await page.evaluate(`depict.render(${(f / fps).toFixed(4)}); new Promise(r => requestAnimationFrame(() => r()))`);
+  await page.evaluate(`depict.render(${((f / fps) * speed).toFixed(4)}); new Promise(r => requestAnimationFrame(() => r()))`);
   const shot = await page.send("Page.captureScreenshot", { format: "png" });
   if (!ff.stdin.write(Buffer.from(shot.data, "base64"))) await new Promise((r) => ff.stdin.once("drain", r));
   if (f % (fps * 10) === 0) process.stdout.write(`\r${Math.round((100 * f) / frames)}%`);
@@ -61,4 +63,4 @@ if (code !== 0) {
   process.exit(1);
 }
 const mb = (Number(spawnSync("stat", ["-f", "%z", out]).stdout) || 0) / 1e6;
-console.log(`\r${path.relative(process.cwd(), out)}: ${frames} frames at ${fps} fps, ${(duration).toFixed(1)} s, ${mb ? mb.toFixed(1) + " MB, " : ""}made in ${Math.round((Date.now() - started) / 1000)} s`);
+console.log(`\r${path.relative(process.cwd(), out)}: ${frames} frames at ${fps} fps, ${(duration / speed).toFixed(1)} s, ${mb ? mb.toFixed(1) + " MB, " : ""}made in ${Math.round((Date.now() - started) / 1000)} s`);

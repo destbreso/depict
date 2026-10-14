@@ -31,8 +31,6 @@ export const PACE = {
   overviewHold: 2.8, // the whole board, held, before the outro
 };
 
-/** The pace for a child's board: about nine letters a second of caption, and longer pauses. */
-export const CHILD = { readBase: 1.4, readRate: 7.5, hold: 1.0, regionHold: 1.0, element: 0.42, overviewHold: 3.4 };
 
 /**
  * The shot an element is drawn in. The camera follows what is being drawn:
@@ -96,7 +94,7 @@ const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1 && Math.abs(a[2]
  */
 export function time(board, comp) {
   // a child reads more slowly than an adult: longer holds, more time per caption, a little more between things
-  const P = board.audience === "child" ? { ...PACE, ...CHILD } : PACE;
+  const P = PACE;
   const cellsOf = new Map(board.regions.filter((r) => r.layout === "cells" || r.layout === "stack").flatMap((r) => r.items.filter((it) => it.under == null).map((it) => [it.id, r.id])));
   const sameCells = (a, b) => cellsOf.has(a) && cellsOf.get(a) === cellsOf.get(b);
   const strokes = [];

@@ -14,7 +14,8 @@ A board is a JavaScript module whose default export is the script. It says what 
 | `guide` | `true` | The guide: the animated marker who presents the board. `false` leaves it out. |
 | `story` | `true` | The story road (or, in a plain flow, the story arrows). `false` leaves it out; then link regions yourself, or the audit warns about islands. |
 | `outro` | `true` | The standard ending: the camera comes in on the guide, who waves and winks as a circle closes on it, then the title on the dark. `false` ends on the held overview. |
-| `audience` | `"adult"` | `"child"` for a young viewer: captions larger and held longer (about nine letters a second), longer pauses between things, and the audit holds a sentence to about 64 characters. |
+| `audience` | `"adult"` | `"child"` for a young viewer: larger captions, the page starting at half speed (captions read at about eight letters a second, the drawing at a calm pace), and the audit holding a sentence to about 64 characters. |
+| `speed` | `1` (`0.5` for a child) | The speed the page starts at, and a video is made at. The viewer can change it from 0.5 to 2. |
 | `seed` | `1` | The wobble of every line and the guide's blinking. The same seed draws the same board; change it to redraw by hand. |
 | `lang` | `"en"` | The page's language. |
 | `regions` | required | The ideas, in the order you tell them. |

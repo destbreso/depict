@@ -46,6 +46,9 @@ export function normalize(input) {
   // who it is for: a child reads slowly, so the captions are larger, shorter and held longer
   b.audience = b.audience ?? "adult";
   if (!["adult", "child"].includes(b.audience)) err(`audience "${b.audience}": use "adult" or "child"`);
+  // the speed the page starts at (and a video is made at): a child's board plays at half speed
+  b.speed = b.speed ?? (b.audience === "child" ? 0.5 : 1);
+  if (!(b.speed >= 0.25 && b.speed <= 3)) err(`speed ${b.speed}: use a number from 0.25 to 3 (1 is the drawing's own pace)`);
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
 
   const ids = new Map(); // id -> kind

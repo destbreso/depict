@@ -58,6 +58,7 @@ export function sceneOf(board, comp, tl) {
     sheets: board.mode === "slides" ? [...comp.sheets.values()].map((f) => [r(f.x), r(f.y), r(f.w), r(f.h)]) : [],
     actors: (tl.actors ?? []).map((a) => actorOf(a, color)),
     explore: r(tl.explore * 100) / 100,
+    speed: board.speed ?? 1,
     outro: tl.outro ? { iris: Object.fromEntries(Object.entries(tl.outro.iris).map(([k, v]) => [k, r(v * 1000) / 1000])), card: tl.outro.card.map((s) => ({ t0: r(s.t0 * 1000) / 1000, t1: r(s.t1 * 1000) / 1000, w: r(s.width), c: color(s.color), pts: s.pts.map(r) })) } : null,
   };
 }
@@ -156,7 +157,7 @@ export function page(board, scene) {
     <button type="button" class="dp-next" aria-label="Next sentence">&#8250;</button>
     <div class="dp-track"><div class="dp-ticks"></div><input class="dp-scrub" type="range" min="0" step="0.01" value="0" aria-label="Time"></div>
     <span class="dp-time"></span>
-    <select class="dp-speed" aria-label="Speed"><option value="0.75">0.75&times;</option><option value="1" selected>1&times;</option><option value="1.25">1.25&times;</option><option value="1.5">1.5&times;</option><option value="2">2&times;</option></select>
+    <select class="dp-speed" aria-label="Speed">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((v) => `<option value="${v}"${v === (board.speed ?? 1) ? " selected" : ""}>${v}&times;</option>`).join("")}</select>
   </div>
   <noscript><p>This board plays with JavaScript. Its explanation: ${esc(board.beats.map((b) => b.say).join(" "))}</p></noscript>
 </div>

@@ -278,7 +278,7 @@ test("every board ends on the outro: the guide waves, the circle closes on it, t
   assert.ok(!normalize({ ...tiny(), outro: false }).board.outro === true);
 });
 
-test("a mark can span several things, and a child's board reads more slowly", () => {
+test("a mark can span several things, and a child's board plays at half speed", () => {
   const s = {
     title: "Cells",
     regions: [{ id: "arr", title: "An array", layout: "cells", items: [{ id: "c0", label: "4" }, { id: "c1", label: "1" }, { id: "c2", label: "7" }, { id: "c3", label: "2" }] }],
@@ -293,8 +293,11 @@ test("a mark can span several things, and a child's board reads more slowly", ()
     const b = comp.elements.get(id).box;
     assert.ok(mark.box.x <= b.x + 8 && mark.box.x + mark.box.w >= b.x + b.w - 8, `the window spans ${id}`);
   }
-  const kid = build({ ...s, audience: "child" }).tl;
-  assert.ok(kid.beats[1].t1 - kid.beats[1].t0 > tl.beats[1].t1 - tl.beats[1].t0, "a child's beat is held longer");
+  // a child's board plays at half speed by default: its captions are read at about eight letters a second
+  const kid = build({ ...s, audience: "child" });
+  assert.equal(kid.board.speed, 0.5);
+  assert.equal(sceneOf(kid.board, kid.comp, kid.tl).speed, 0.5);
+  assert.equal(tl.beats.length, kid.tl.beats.length);
 });
 
 test("cells with places make a matrix, and a line link is an edge with no head", () => {
