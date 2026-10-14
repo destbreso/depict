@@ -32,8 +32,12 @@ for (const [n, b] of beats.entries()) {
   await board.evaluate(`depict.render(${Math.min(b.t1 - 0.05, b.draw1 + 0.3)}); new Promise(r => requestAnimationFrame(() => r()))`);
   shots.push(await board.shot(path.join(dir, `${name}-beat-${String(n + 1).padStart(2, "0")}.png`)));
 }
-await board.evaluate(`depict.render(${duration}); new Promise(r => requestAnimationFrame(() => r()))`);
+const explore = (await board.evaluate("depict.explore")) ?? duration;
+await board.evaluate(`depict.render(${explore}); new Promise(r => requestAnimationFrame(() => r()))`);
 shots.push(await board.shot(path.join(dir, `${name}-overview.png`)));
+// and the last frame of the film: the outro's end card
+await board.evaluate(`depict.render(${duration}); new Promise(r => requestAnimationFrame(() => r()))`);
+shots.push(await board.shot(path.join(dir, `${name}-end.png`)));
 problems.push(...board.problems);
 await board.close();
 

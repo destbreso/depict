@@ -22,6 +22,7 @@ export const FEELINGS = {
   worried: { brows: "worried", mouth: "wavy", eyes: "open" },
   thinking: { brows: "quizzical", mouth: "side", eyes: "open", look: [0.4, -1] },
   proud: { brows: "up", mouth: "grin", eyes: "squint" },
+  wink: { brows: "up", mouth: "grin", eyes: "wink" },
   sad: { brows: "sad", mouth: "frown", eyes: "open" },
 };
 

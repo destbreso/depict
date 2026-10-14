@@ -42,6 +42,7 @@ export function normalize(input) {
   // the house style: the guide, the marker who greets the viewer beside the title, and a story arrow from each idea to the next
   b.guide = b.guide ?? true;
   b.story = b.story ?? true;
+  b.outro = b.outro ?? true; // the standard ending: a goodbye from the guide and the title
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
 
   const ids = new Map(); // id -> kind

@@ -13,6 +13,7 @@ A board is a JavaScript module whose default export is the script. It says what 
 | `accent` | `"#c43f0a"` | The one accent color: the road, the guide's cap and cheeks, title underlines, marks, the live part's play mark. |
 | `guide` | `true` | The guide: the animated marker who presents the board. `false` leaves it out. |
 | `story` | `true` | The story road (or, in a plain flow, the story arrows). `false` leaves it out; then link regions yourself, or the audit warns about islands. |
+| `outro` | `true` | The standard ending: the camera comes in on the guide, who waves and winks as a circle closes on it, then the title on the dark. `false` ends on the held overview. |
 | `seed` | `1` | The wobble of every line and the guide's blinking. The same seed draws the same board; change it to redraw by hand. |
 | `lang` | `"en"` | The page's language. |
 | `regions` | required | The ideas, in the order you tell them. |

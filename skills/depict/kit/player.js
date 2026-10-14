@@ -74,7 +74,16 @@
   actorLayer.setAttribute("stroke-linecap", "round");
   actorLayer.setAttribute("stroke-linejoin", "round");
   cam.append(sheetLayer, hoverBox, shadow, under, inkLayer, actorLayer, pen);
-  svg.append(bg, cam);
+  // the outro, over the board in the frame's own coordinates: the closing circle and the title on the dark
+  const outroLayer = document.createElementNS(NS, "g");
+  outroLayer.setAttribute("stroke-linecap", "round");
+  outroLayer.setAttribute("stroke-linejoin", "round");
+  const iris = document.createElementNS(NS, "path");
+  iris.setAttribute("fill", "#1b1b19");
+  iris.setAttribute("fill-rule", "evenodd");
+  outroLayer.append(iris);
+  outroLayer.style.display = "none";
+  svg.append(bg, cam, outroLayer);
   const stage = root.querySelector(".dp-board");
   stage.append(svg);
   const caption = root.querySelector(".dp-caption");
@@ -248,8 +257,8 @@
     for (const [part, g] of X.groups) {
       const m = /^(brows|mouth):(\w+)$/.exec(part);
       if (m) g.style.display = (m[1] === "brows" ? F.brows : F.mouth) === m[2] ? "" : "none";
-      else if (/^squint\d$/.test(part)) g.style.display = F.eyes === "squint" ? "" : "none";
-      else if (/^eyes\d$/.test(part)) g.style.display = F.eyes === "squint" ? "none" : "";
+      else if (/^squint\d$/.test(part)) g.style.display = F.eyes === "squint" || (F.eyes === "wink" && part === "squint1") ? "" : "none";
+      else if (/^eyes\d$/.test(part)) g.style.display = F.eyes === "squint" || (F.eyes === "wink" && part === "eyes1") ? "none" : "";
     }
     A.eyes.forEach(([cx, cy], i) => {
       const g = X.groups.get(`eyes${i}`);
@@ -283,6 +292,40 @@
     }
     if (!tip) return null;
     return { x: st.x + st.facing * st.sx * tip.x, y: st.y - st.lift + st.sy * tip.y };
+  }
+
+  const card = (S.outro ? S.outro.card : []).map((c) => {
+    const n = node("path", { stroke: S.palette[c.c], "stroke-width": c.w, fill: "none" }, outroLayer);
+    n.style.display = "none";
+    return Object.assign(measured(c.pts), { t0: c.t0, t1: c.t1, node: n });
+  });
+  const smooth = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
+  /** The outro at time t: the circle closing on the guide, then the title written on the dark. Played, never paused over. */
+  function renderOutro(t, shot) {
+    const O = S.outro;
+    const on = O && t >= O.iris.t0 && (capture || playing);
+    outroLayer.style.display = on ? "" : "none";
+    if (!on) return;
+    const I = O.iris;
+    const k = VW / shot[2];
+    const sx = (I.cx - shot[0]) * k + VW / 2;
+    const sy = (I.cy - shot[1]) * k + VH / 2;
+    const far = Math.hypot(Math.max(sx, VW - sx), Math.max(sy, VH - sy)) / k;
+    let r;
+    if (t < I.hold) r = far + (I.r - far) * smooth((t - I.t0) / (I.hold - I.t0));
+    else if (t < I.close) r = I.r;
+    else if (t < I.t1) r = I.r * (1 - smooth((t - I.close) / (I.t1 - I.close)));
+    else r = 0;
+    const rs = r * k;
+    iris.setAttribute("d", `M-20 -20H${VW + 20}V${VH + 20}H-20Z` + (rs > 0.5 ? `M${sx + rs} ${sy}A${rs} ${rs} 0 1 0 ${sx - rs} ${sy}A${rs} ${rs} 0 1 0 ${sx + rs} ${sy}Z` : ""));
+    for (const c of card) {
+      if (t < c.t0) {
+        c.node.style.display = "none";
+        continue;
+      }
+      c.node.style.display = "";
+      c.node.setAttribute("d", t >= c.t1 ? pathOf(c.pts, c.pts.length) : partial(c, c.len * ((t - c.t0) / (c.t1 - c.t0))).d);
+    }
   }
 
   let now = 0;
@@ -333,6 +376,7 @@
       pen.setAttribute("transform", `translate(${tip.x} ${tip.y}) scale(${pen.dataset.k * 1.15})`);
     } else pen.style.display = "none";
     showCaption(b);
+    renderOutro(now, shotNow);
     updateBar();
   }
   const beatAt = (t) => {
@@ -390,6 +434,7 @@
   }
   function ended() {
     root.classList.remove("playing");
+    if (S.explore != null) render(S.explore);
     root.classList.add("ended");
   }
 
@@ -604,10 +649,10 @@
     requestAnimationFrame(idle);
   }
 
-  window.depict = { render, seek, play, pause, duration: T, beats, get time() { return now; } };
+  window.depict = { render, seek, play, pause, duration: T, explore: S.explore, beats, get time() { return now; } };
   hoverBox.style.display = "none";
   const at = q.get("t");
-  render(at != null ? Number(at) : capture ? 0 : T);
+  render(at != null ? Number(at) : capture ? 0 : S.explore ?? T);
   if (!capture && at == null) root.classList.add("ended", "fresh");
   document.documentElement.dataset.ready = "1";
 })();

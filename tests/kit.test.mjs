@@ -262,3 +262,18 @@ test("a slide whose content is small is drawn larger to fill its page", async ()
     for (const e of comp.elements.values()) if (e.region === r.id && !e.joins && e.kind !== "guide") assert.ok(e.box.x >= sheet.x && e.box.x + e.box.w <= sheet.x + sheet.w, `${e.id} stays on its sheet`);
   }
 });
+
+test("every board ends on the outro: the guide waves, the circle closes on it, the title is written, and the page rests on the whole board", async () => {
+  const { actorAt } = await import("../skills/depict/kit/act.mjs");
+  const input = await load("cpu-cache");
+  const { tl } = build(input);
+  const o = tl.outro;
+  assert.ok(o, "the board has its outro");
+  assert.ok(tl.explore < o.iris.t0 && o.iris.t0 < o.iris.hold && o.iris.hold < o.iris.close && o.iris.close < o.iris.t1, "the circle closes in order");
+  assert.ok(o.card.length && o.card[0].t0 >= o.iris.t1 && o.card.at(-1).t1 < tl.duration, "the title is written on the dark, then held");
+  // the guide waves goodbye, then winks inside the circle
+  const [guide] = tl.actors;
+  assert.equal(actorAt(guide, o.iris.t0 + 0.2).front.glove, "open");
+  assert.equal(actorAt(guide, o.iris.close - 0.1).feel, "wink");
+  assert.ok(!normalize({ ...tiny(), outro: false }).board.outro === true);
+});

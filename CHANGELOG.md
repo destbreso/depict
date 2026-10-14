@@ -8,6 +8,7 @@
 - Weight and depth: marker fills, grey drop shadows under frames, banners colored in, `bold` links drawn as wide filled arrows, solid arrowheads, a highlighter swash under the title, thicker lines.
 - `far: true` on a link sets its two items further apart.
 - The camera opens close on the guide and the title, and the overview frames the drawing rather than the regions' shots.
+- The outro, the same on every board: the guide waves goodbye and winks while a circle closes on it, then the title is written on the dark; the page then rests on the whole board (`outro: false` ends on the overview). The check pictures the last frame too.
 - Slides: a sheet whose content is small has it drawn larger to fill its page.
 - Audit: a focal point in every region, no empty paper, no crossing lines, no long bridges between regions.
 - The build creates its output folder.

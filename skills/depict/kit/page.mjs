@@ -57,6 +57,8 @@ export function sceneOf(board, comp, tl) {
     overview: tl.overview.map(r),
     sheets: board.mode === "slides" ? [...comp.sheets.values()].map((f) => [r(f.x), r(f.y), r(f.w), r(f.h)]) : [],
     actors: (tl.actors ?? []).map((a) => actorOf(a, color)),
+    explore: r(tl.explore * 100) / 100,
+    outro: tl.outro ? { iris: Object.fromEntries(Object.entries(tl.outro.iris).map(([k, v]) => [k, r(v * 1000) / 1000])), card: tl.outro.card.map((s) => ({ t0: r(s.t0 * 1000) / 1000, t1: r(s.t1 * 1000) / 1000, w: r(s.width), c: color(s.color), pts: s.pts.map(r) })) } : null,
   };
 }
 

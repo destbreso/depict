@@ -6,6 +6,7 @@
 import { cumulative, union, pad } from "./geom.mjs";
 import { flight, flightTime, pan, shotOf, shotSafe } from "./camera.mjs";
 import { perform } from "./perform.mjs";
+import { actorAt } from "./act.mjs";
 
 /** The pen, in board units per second, and its pauses, in seconds. */
 export const PACE = {
@@ -27,7 +28,7 @@ export const PACE = {
   regionHold: 0.7, // more when the next beat moves to another region
   readBase: 0.5, // a caption takes readBase + chars / readRate seconds to read
   readRate: 16,
-  overviewHold: 4.5,
+  overviewHold: 2.8, // the whole board, held, before the outro
 };
 
 /**
@@ -231,8 +232,53 @@ export function time(board, comp) {
     const done = drawWithin(end, beats.length - 1, t + dur * 0.12, t + dur * 0.95, 0.02);
     beats.at(-1).t1 = Math.max(t + dur, done);
   }
-  t += dur + PACE.overviewHold;
-  const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [] };
+  const explore = t + dur; // the board complete: where the page rests when the film is over
+  t = explore + PACE.overviewHold;
+  const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [], explore };
   if (appear) result.actors.push(perform(board, comp, result, appear));
+  if (board.outro) outro(comp, result);
   return result;
+}
+
+/**
+ * The outro, the same on every board: the camera comes in on the guide, who
+ * waves goodbye and winks while a circle closes on it, as old cartoons end;
+ * then the board's title is written on the dark and held. The page plays it
+ * and then goes back to the whole board to explore; a video ends on the title.
+ */
+function outro(comp, tl) {
+  let t = tl.duration;
+  const A = tl.actors[0];
+  const st = A ? actorAt(A, t) : null;
+  const h = A ? A.h : 0;
+  const cx = st ? st.x : tl.overview[0];
+  const cy = st ? st.y - h * 0.55 : tl.overview[1];
+  const close = [cx, cy + h * 0.06, Math.max(h * 3.4, 1000)];
+  const fly = Math.max(0.9, flightTime(flight(tl.overview, close).S) * 0.8);
+  tl.camera.push({ t0: t, t1: t + fly, from: tl.overview, to: close });
+  if (A) {
+    A.track.arms.push([t + 0.15, "wave"]);
+    A.track.feel.push([t + 0.15, "happy"]);
+    A.track.look.push([t + 0.15, null]);
+  }
+  t += fly;
+  const iris = { t0: t, hold: t + 0.85, close: t + 1.85, t1: t + 2.17, cx, cy, r: h ? h * 0.66 : 260 };
+  if (A) {
+    A.track.feel.push([iris.hold + 0.1, "wink"]);
+    A.track.bounces.push([iris.hold + 0.1, 0.35]);
+    for (const list of [A.track.arms, A.track.feel, A.track.look, A.track.bounces]) list.sort((a, b) => a[0] - b[0]);
+  }
+  t = iris.t1 + 0.25;
+  // the title, written on the dark at the pen's pace
+  const card = [];
+  const lens = comp.endCard.map((s) => cumulative(s.pts).at(-1));
+  const total = lens.reduce((a, l) => a + l, 0) || 1;
+  const span = 1.4;
+  comp.endCard.forEach((s, i) => {
+    const d = Math.max(0.02, ((span - 0.02 * comp.endCard.length) * lens[i]) / total);
+    card.push({ ...s, t0: t, t1: t + d });
+    t += d + 0.02;
+  });
+  tl.outro = { t0: tl.duration, iris, card };
+  tl.duration = t + 1.8;
 }

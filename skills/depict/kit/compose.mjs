@@ -908,7 +908,14 @@ export function compose(board, font) {
   let extent = all.reduce((b, e) => union(b, e.box), null);
   if (board.mode === "slides") for (const s of sheets.values()) extent = union(extent, s);
   for (const q of guide?.spots ?? []) extent = union(extent, spotBox(q, guide.h));
-  return { elements, regions, sheets, opening, guide, extent: pad(extent, board.mode === "slides" ? 60 : 110) };
+  // the end card: the title in paper on the dark, in the frame's own coordinates (1920 x 1080), underlined in the accent
+  const et = write(font, board.title, { x: 960, y: 0, size: 76, align: "center", maxWidth: 1500, lineHeight: 1.5, rng: S("endcard") });
+  const ey = 520 - (et.box.y + et.box.h / 2);
+  const endCard = [
+    ...et.strokes.map((pts) => ({ pts: pts.map((v, i) => (i % 2 ? v + ey : v)), width: W.title * 1.15, color: PAPER })),
+    ...ink.underline(ink.pen(S("endcard.under"), { width: W.mark * 1.3 }), et.box.x, et.box.y + ey + et.box.h + 22, et.box.w).map((pts) => ({ pts, width: W.mark * 1.3, color: board.accent })),
+  ];
+  return { elements, regions, sheets, opening, guide, endCard, extent: pad(extent, board.mode === "slides" ? 60 : 110) };
 }
 
 /**
