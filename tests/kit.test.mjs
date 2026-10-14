@@ -296,3 +296,19 @@ test("a mark can span several things, and a child's board reads more slowly", ()
   const kid = build({ ...s, audience: "child" }).tl;
   assert.ok(kid.beats[1].t1 - kid.beats[1].t0 > tl.beats[1].t1 - tl.beats[1].t0, "a child's beat is held longer");
 });
+
+test("cells with places make a matrix, and a line link is an edge with no head", () => {
+  const s = {
+    title: "A grid",
+    regions: [
+      { id: "m", title: "Two by two", layout: "cells", items: [{ id: "a", label: "1", at: [0, 0] }, { id: "b", label: "2", at: [1, 0] }, { id: "c", label: "3", at: [0, 1] }, { id: "d", label: "4", at: [1, 1] }] },
+      { id: "t", title: "Two nodes", items: [{ id: "x", label: "8", shape: "circle" }, { id: "y", label: "3", shape: "circle" }] },
+    ],
+    links: [{ id: "e", from: "x", to: "y", style: "line" }],
+    beats: [{ say: "A grid, and an edge.", draw: ["title", "m", "a", "b", "c", "d", "t", "x", "y", "e"] }],
+  };
+  const { comp } = build(s);
+  const [a, b, c] = ["a", "b", "c"].map((id) => comp.elements.get(id).box);
+  assert.ok(Math.abs(b.x - (a.x + a.w)) < 14 && Math.abs(c.y - (a.y + a.h)) < 14, "the cells share their edges across and down");
+  assert.equal(comp.elements.get("e").parts[0].strokes.length, 1, "an edge is one line, no head");
+});

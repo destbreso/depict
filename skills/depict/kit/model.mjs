@@ -14,7 +14,7 @@ const PLAIN = { "\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2
 const plain = (s) => s.replace(/[\u2019\u2018\u201c\u201d\u2026\u2192\u2190\u2248\u2260\u2264\u2265\u2014\u2013\u2022\u00a0]/g, (c) => PLAIN[c]);
 
 const SHAPES = ["none", "box", "ellipse", "circle", "cloud", "bubble", "banner"];
-const LINK_STYLES = ["solid", "dashed", "double", "bold"];
+const LINK_STYLES = ["solid", "dashed", "double", "bold", "line"];
 const MARKS = ["circle", "underline", "highlight", "box", "cross"];
 const FLOWS = ["path", "row", "column", "grid"];
 const LAYOUTS = ["row", "column", "grid", "cells", "stack", "radial"];
@@ -113,6 +113,7 @@ export function normalize(input) {
         item.says = String(it.says);
       }
       if (region.layout === "grid" && !Array.isArray(item.at)) err(`${w}: region ${r.id} lays its items on a grid, so give it at: [column, row]`);
+      if (region.layout === "cells" && it.under == null && (r.items ?? []).some((x) => Array.isArray(x.at) && x.under == null) && !Array.isArray(it.at)) err(`${w}: region ${r.id} is a matrix (its cells have at), so give this cell at: [column, row] too`);
       const celled = region.layout === "cells" || region.layout === "stack";
       if (it.under != null) {
         // an item hanging under a cell: a chain in a bucket, a value under a slot

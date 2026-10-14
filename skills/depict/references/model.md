@@ -29,7 +29,7 @@ A region is one idea: a part, a stage, a reason. On a canvas it is a stop on the
 |---|---|
 | `id` | Lowercase letters, digits and dashes. A beat draws the region's title by its id. |
 | `title` | Two to four words, written underlined in the accent above the region's items. |
-| `layout` | How its items sit: `"row"` (default; every picture on one ground line, the labels lined up under them), `"column"`, `"grid"` (each item gives `at: [column, row]`; the default when any item has `at`; each row has its own ground line), `"radial"` (round a hub: the large item, or the first), `"cells"` (adjacent cells of one size, edge to edge: an array, a row of a table) or `"stack"` (the same, top to bottom: a stack, layers). Cells hold a label inside and a note under them (beside them in a stack). They take no icon. |
+| `layout` | How its items sit: `"row"` (default; every picture on one ground line, the labels lined up under them), `"column"`, `"grid"` (each item gives `at: [column, row]`; the default when any item has `at`; each row has its own ground line), `"radial"` (round a hub: the large item, or the first), `"cells"` (adjacent cells of one size, edge to edge: an array, a row of a table) or `"stack"` (the same, top to bottom: a stack, layers). Cells hold a label inside and a note under them (beside them in a stack). They take no icon. Cells that each give `at: [column, row]` make a matrix: a grid of cells sharing their edges. |
 | `at` | `[column, row]` when the board's `flow` is `"grid"`: where the region sits among the others. |
 | `items` | One to four things, at most six (a `cells` or `stack` region may hold more: they are one thing, drawn as a row of slots). |
 
@@ -61,7 +61,7 @@ The kit draws an item in this order: its picture (a sketch's or a character's li
 | `id` | A beat draws the link by its id. |
 | `from`, `to` | Item ids. The arrow runs between the items' edges and points at `to`. |
 | `label` | One to three words beside the arrow (a latency, a verb, a condition). |
-| `style` | `"solid"` (leads to; a solid head), `"dashed"` (weak, optional, slow), `"double"` (both ways), `"bold"` (the main move inside an idea: a wide arrow, colored in, with a shadow). |
+| `style` | `"solid"` (leads to; a solid head), `"dashed"` (weak, optional, slow), `"double"` (both ways), `"bold"` (the main move inside an idea: a wide arrow, colored in, with a shadow), `"line"` (an edge with no head: a tree's, an undirected graph's). For a tree or a graph, give nodes `shape: "circle"` in a `grid` region, each at its place. |
 | `far` | `true` sets the two items further apart in their row or column: the distance means something (memory is far from the CPU). |
 | `bend` | How much the arrow curves, as a share of its length: positive to the left of travel. The kit picks one when it is left out. |
 

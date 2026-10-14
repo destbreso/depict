@@ -224,11 +224,20 @@ function cellCards(board, font, region, S) {
   const labels = cellItems.map((it) => write(font, it.label, { x: 0, y: 0, size: SIZE.label, align: "center", maxWidth: SIZE.cardWidth, rng: S(`${it.id}.label`) }));
   const cw = Math.max(...labels.map((t) => t.box.w)) + 64;
   const ch = Math.max(...labels.map((t) => t.box.h)) + 46;
+  // cells with at: [column, row] make a matrix, every cell sharing its edges with its neighbours
+  const matrix = cellItems.some((it) => Array.isArray(it.at));
   const cells = cellItems.map((it, i) => {
-    const x = across ? i * cw : 0;
-    const y = across ? 0 : i * ch;
+    const [ci, ri] = matrix ? it.at : across ? [i, 0] : [0, i];
+    const x = ci * cw;
+    const y = ri * ch;
     const p = ink.pen(S(`${it.id}.shape`), { width: W.line });
-    const cell = i === 0 ? ink.box(p, x, y, cw, ch, { corner: 3 }) : across ? ink.polyline(p, [x, y, x + cw, y, x + cw, y + ch, x, y + ch]) : ink.polyline(p, [x + cw, y, x + cw, y + ch, x, y + ch, x, y]);
+    let cell;
+    if (matrix) {
+      // its right and bottom sides, and its top and left where no cell is above or before it
+      const above = cellItems.some((o) => o.at[0] === ci && o.at[1] === ri - 1);
+      const before = cellItems.some((o) => o.at[0] === ci - 1 && o.at[1] === ri);
+      cell = ink.polyline(p, !before && !above ? [x, y + ch, x, y, x + cw, y, x + cw, y + ch, x, y + ch] : !above ? [x, y, x + cw, y, x + cw, y + ch, x, y + ch] : !before ? [x + cw, y, x + cw, y + ch, x, y + ch, x, y] : [x + cw, y, x + cw, y + ch, x, y + ch]);
+    } else cell = i === 0 ? ink.box(p, x, y, cw, ch, { corner: 3 }) : across ? ink.polyline(p, [x, y, x + cw, y, x + cw, y + ch, x, y + ch]) : ink.polyline(p, [x + cw, y, x + cw, y + ch, x, y + ch, x, y]);
     const t = labels[i];
     const parts = [part("shape", cell, { width: W.line }), ...move([part("label", t.strokes, { width: W.label, write: true, size: SIZE.label })], x + cw / 2 - (t.box.x + t.box.w / 2), y + ch / 2 - (t.box.y + t.box.h / 2))];
     if (it.note) {
@@ -758,6 +767,7 @@ export function compose(board, font) {
     } else {
       strokes = ink.arrow(p, x1, y1, x2, y2, { bend, double: l.style === "double", head: bridge ? Math.min(26, Math.max(10, len * 0.18)) * Math.sqrt(f) : null, solid: true });
       path = strokes[0];
+      if (l.style === "line") strokes = [strokes[0]]; // an edge, with no head
       if (l.style === "dashed") strokes = [...dashes(strokes[0], 18 * f, 12 * f), ...strokes.slice(1)];
       parts = [part("arrow", strokes, { width })];
     }
