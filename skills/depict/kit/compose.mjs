@@ -235,7 +235,7 @@ const moveBox = (b, dx, dy) => b && { ...b, x: b.x + dx, y: b.y + dy };
 function cellCards(board, font, region, S) {
   const across = region.layout === "cells";
   const cellItems = region.items.filter((it) => it.under == null);
-  const labels = cellItems.map((it) => write(font, it.label, { x: 0, y: 0, size: SIZE.label, align: "center", maxWidth: SIZE.cardWidth, rng: S(`${it.id}.label`) }));
+  const labels = cellItems.map((it) => write(font, it.label, { x: 0, y: 0, size: SIZE.label, align: "center", maxWidth: SIZE.cardWidth * 1.4, rng: S(`${it.id}.label`) }));
   const cw = Math.max(...labels.map((t) => t.box.w)) + 64;
   const ch = Math.max(...labels.map((t) => t.box.h)) + 46;
   // cells with at: [column, row] make a matrix, every cell sharing its edges with its neighbours

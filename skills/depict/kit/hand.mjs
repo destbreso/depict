@@ -58,11 +58,19 @@ export function wrap(font, text, size, maxWidth = Infinity) {
   return greedy(font, text, size, hi);
 }
 
+/** A sum is one word to the wrapper: a line never breaks at the spaces either side of + − × ÷ = < > (10 + 10 = 20 stays whole). */
+const wordsOf = (para) =>
+  para
+    .replace(/ ([+\-\u2212\u00d7\u00f7=<>]) /g, "\u00a0$1\u00a0")
+    .split(/[ \t]+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/\u00a0/g, " "));
+
 function greedy(font, text, size, maxWidth) {
   const lines = [];
   for (const para of String(text).split("\n")) {
     let cur = "";
-    for (const word of para.split(/\s+/).filter(Boolean)) {
+    for (const word of wordsOf(para)) {
       const next = cur ? `${cur} ${word}` : word;
       if (cur && measure(font, next, size) > maxWidth) {
         lines.push(cur);

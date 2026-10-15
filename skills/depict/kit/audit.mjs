@@ -35,6 +35,18 @@ export function audit(board, comp, tl) {
     }
   });
 
+  // and the words written inside a drawing (a clock's numbers, a coin's value) read too
+  board.beats.forEach((bt, i) => {
+    for (const id of bt.draw) {
+      const e = els.get(id);
+      if (e?.kind !== "item" || !e.shot) continue;
+      const inside = e.parts.filter((p) => p.role === "text" && p.size).map((p) => p.size);
+      if (!inside.length) continue;
+      const px = Math.round(Math.min(...inside) * (VW / e.shot[2]) * 10) / 10;
+      if (px < 18) warn("readable", `beat ${i + 1}: the words inside "${id}"'s drawing are ${px.toFixed(1)} px tall on screen; 18 px or more reads comfortably (write them larger in the sketch, or make the item large)`);
+    }
+  });
+
   // nothing drawn lands outside its shot
   board.beats.forEach((bt, i) => {
     for (const id of bt.draw) {

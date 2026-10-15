@@ -28,6 +28,34 @@ export function perform(board, comp, tl, appear) {
     span.set(s.el, sp);
   }
   const center = (b) => [b.x + b.w / 2, b.y + b.h / 2];
+  // a hand (or a pointer's tip) stops short of what it points at: aimed at the side of it that faces the guide,
+  // a glove's length and a little more before it, so the finger never lands on the words
+  const aim = (b, at) => {
+    const sx = at.x;
+    const sy = at.y - 0.6 * g.h;
+    const [cx, cy] = center(b);
+    const dx = sx - cx;
+    const dy = sy - cy;
+    const s = Math.min(1, Math.abs(b.w / 2 / (dx || 1e-9)), Math.abs(b.h / 2 / (dy || 1e-9)));
+    const [ex, ey] = [cx + dx * s, cy + dy * s];
+    const d = Math.hypot(sx - ex, sy - ey) || 1;
+    const off = 0.13 * g.h + 18;
+    return [ex + ((sx - ex) / d) * off, ey + ((sy - ey) / d) * off];
+  };
+  // and its arm reaches no further than the first thing that stands in its way (a label, a picture, a note)
+  const solid = [...els.values()].filter((e) => e.kind === "item" || e.kind === "note" || e.kind === "region" || e.kind === "title");
+  const clear = (at, px, py, skip) => {
+    const sx = at.x + at.facing * 0.165 * g.h;
+    const sy = at.y - 0.39 * g.h;
+    const d = Math.hypot(px - sx, py - sy) || 1;
+    const [ux, uy] = [(px - sx) / d, (py - sy) / d];
+    const glove = 0.13 * g.h;
+    for (let r = 0; r <= 0.36 * g.h + glove; r += 6) {
+      const [qx, qy] = [sx + ux * r, sy + uy * r];
+      if (solid.some((e) => !skip.has(e.id) && qx > e.box.x - 6 && qx < e.box.x + e.box.w + 6 && qy > e.box.y - 6 && qy < e.box.y + e.box.h + 6)) return Math.max(0.1 * g.h, r - glove - 10);
+    }
+    return Infinity;
+  };
 
   // its trips: when the camera flies to another idea, the guide hops there, landing as the camera arrives
   let here = start;
@@ -78,23 +106,27 @@ export function perform(board, comp, tl, appear) {
       const e = els.get(id);
       const sp = span.get(id);
       if (!e || !sp) continue;
-      const [cx, cy] = center(e.kind === "mark" ? e.targetBox ?? els.get(e.target).box : e.box);
+      const tbox = e.kind === "mark" ? e.targetBox ?? els.get(e.target).box : e.box;
+      const [cx, cy] = center(tbox);
       const at = whereAt(sp[0]);
+      const [px, py] = aim(tbox, at);
+      const way = clear(at, px, py, new Set([id, e.target, e.kind === "mark" ? e.target : null]));
+      const most = Number.isFinite(way) ? [Math.round(way)] : []; // the page's track is JSON: no Infinity in it
       // it turns to face what is drawn behind it
       const side = Math.sign(cx - at.x);
       if (side && side !== at.facing && Math.abs(cx - at.x) > 0.3 * g.h) track.turns.push([sp[0], side]);
       track.look.push([sp[0], cx, cy]);
       if (bt.act && !acted) {
-        track.arms.push([sp[0], bt.act, cx, cy]);
+        track.arms.push([sp[0], bt.act, px, py, ...most]);
         acted = true;
       } else if (e.kind === "mark") {
         // something circled or underlined: surprise, a jolt, and a hand toward it
         track.feel.push([sp[0], "surprised"]);
         track.bounces.push([sp[0], 0.55]);
         track.feel.push([sp[0] + 1.4, bt.feel ?? "happy"]);
-        if (!bt.act) track.arms.push([sp[0], "present", cx, cy]);
+        if (!bt.act) track.arms.push([sp[0], "present", px, py, ...most]);
       } else if (!bt.act && (e.kind === "item" || e.kind === "region" || e.kind === "note")) {
-        track.arms.push([sp[0], "point", cx, cy]);
+        track.arms.push([sp[0], "point", px, py, ...most]);
       }
     }
     // after its drawing, the hands go back to the hips and the eyes to the viewer (before the next beat begins)
@@ -138,6 +170,7 @@ export function perform(board, comp, tl, appear) {
     id: "guide",
     h: g.h,
     rig: g.rig,
+    hold: g.rig.hold,
     eyes: g.rig.eyes,
     shoulders: g.rig.shoulders,
     poses: POSES,

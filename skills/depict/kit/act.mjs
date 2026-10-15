@@ -155,6 +155,7 @@ function along(pts, u) {
 /** The hands for an arms key [t, pose, tx, ty]: the pose's own, or a hand aimed at the target (in board units). */
 function armsFor(actor, key, x, y, facing, t) {
   const [t0, pose, tx, ty] = key;
+  const most = key[4] ?? Infinity; // how far the arm may reach before something in its way
   const P = actor.poses[pose] ?? actor.poses.rest;
   const at = ([u, v]) => [u * actor.h, (v - 0.99) * actor.h];
   const hand = (side) => ({ hand: at(P[side].hand), bow: at(P[side].bow), glove: P[side].glove });
@@ -172,7 +173,8 @@ function armsFor(actor, key, x, y, facing, t) {
       dx = 0.25;
       dy = Math.sign(dy || 1) * Math.sqrt(1 - dx * dx);
     }
-    const reach = 0.36 * actor.h;
+    // as far as an arm goes, and never past the thing pointed at (less a pointer's length, when it holds one)
+    const reach = Math.max(0.1 * actor.h, Math.min(0.36 * actor.h, most, l - (actor.hold === "pointer" ? 0.27 * actor.h : 0)));
     const hx = sh[0] + dx * reach;
     const hy = sh[1] + dy * reach;
     // the hose sags a little under the line from shoulder to hand
