@@ -21,6 +21,8 @@ if (!file) {
 const name = path.basename(file).replace(/\.html$/, "");
 const dir = path.resolve(i >= 0 ? args[i + 1] : path.join(path.dirname(file), "shots"));
 fs.mkdirSync(dir, { recursive: true });
+// pictures of an earlier build of this board (it may have had more beats) would be read as this one's: they go first
+for (const f of fs.readdirSync(dir)) if (f.startsWith(`${name}-`) && f.endsWith(".png")) fs.rmSync(path.join(dir, f));
 const url = pathToFileURL(path.resolve(file)).href;
 const shots = [];
 const problems = [];
