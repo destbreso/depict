@@ -515,14 +515,23 @@ function freeSpot(r, elements, taken, h, top = 0) {
     }
     return a;
   };
-  // on free paper, and of those the one that widens the region's shot the least (the larger the shot, the smaller its words)
-  const grows = (q) => {
+  // on free paper, and of those the one that widens the region's shot the least (the larger the shot, the smaller its
+  // words) and pulls the least of another idea into it (a neighbour's notes at the edge of the shot)
+  const others = [...elements.values()].filter((e) => e.region && e.region !== r.id && (e.kind === "item" || e.kind === "region" || e.kind === "note" || e.kind === "title"));
+  const intrudes = (f) =>
+    others.reduce((a, e) => {
+      const w = Math.min(f.x + f.w, e.box.x + e.box.w) - Math.max(f.x, e.box.x);
+      const hh = Math.min(f.y + f.h, e.box.y + e.box.h) - Math.max(f.y, e.box.y);
+      return a + (w > 0 && hh > 0 ? w * hh : 0);
+    }, 0);
+  const already = intrudes(r.frame);
+  const cost = (q) => {
     const f = fit169(union(r.frame, pad(spotBox(q, h), 30)));
-    return f.w * f.h - r.frame.w * r.frame.h;
+    return f.w * f.h - r.frame.w * r.frame.h + 3 * (intrudes(f) - already);
   };
   let best = null;
   cands.forEach((q, i) => {
-    const score = clash(q) * 1e3 + grows(q) + i; // ties keep the order: beside the title first
+    const score = clash(q) * 1e3 + cost(q) + i; // ties keep the order: beside the title first
     if (!best || score < best.score) best = { q, score };
   });
   return { region: r.id, ...best.q };
