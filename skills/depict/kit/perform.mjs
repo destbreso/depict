@@ -3,7 +3,8 @@
 // cap, a jump), presents the title while it is written, looks at and
 // points to each new thing as the pen draws it, turns to face what is behind
 // it, is surprised when something is marked, hops to the next idea while the
-// camera flies there, and cheers at the end. A beat can set how it feels
+// camera flies there, and presents the whole board at the end (or, with no
+// outro to say goodbye, cheers). A beat can set how it feels
 // (`feel`) and what it does (`act`). Blinks come at the guide's own uneven
 // pace, from the board's seed.
 import { splitmix32 } from "./rng.mjs";
@@ -102,15 +103,30 @@ export function perform(board, comp, tl, appear) {
     track.look.push([Math.max(beat.draw1 + 0.5, beat.t1 - 0.8), null]);
   });
 
-  // the end: it cheers and hops for joy
+  // the end of the explanation. With an outro to come, the goodbye is the outro's: here it turns to the whole
+  // board and presents it, proud, as the camera pulls back to it. Without one, this is the goodbye: it cheers and
+  // hops for joy.
   const end = tl.beats.at(-1).draw1 + 0.15;
   const at = whereAt(end);
-  track.arms.push([end, "cheer"]);
-  track.feel.push([end, "proud"]);
-  track.moves.push({ t0: end + 0.1, t1: end + 1.05, from: [at.x, at.y], to: [at.x, at.y], hops: 2, height: 55, facing: at.facing, land: at.facing });
-  track.bounces.push([end + 1.05, 0.7]);
-  track.arms.push([end + 2.6, "rest"]);
-  track.feel.push([end + 2.6, "happy"]);
+  if (board.outro) {
+    const ex = comp.extent;
+    const [cx, cy] = [ex.x + ex.w / 2, ex.y + ex.h / 2];
+    const side = Math.sign(cx - at.x);
+    if (side && side !== at.facing && Math.abs(cx - at.x) > 0.3 * g.h) track.turns.push([end, side]);
+    track.arms.push([end, "present", cx, cy]);
+    track.look.push([end, cx, cy]);
+    track.feel.push([end, "proud"]);
+    track.bounces.push([end + 0.05, 0.45]);
+    track.arms.push([end + 2.4, "rest"]);
+    track.feel.push([end + 2.4, "happy"]);
+  } else {
+    track.arms.push([end, "cheer"]);
+    track.feel.push([end, "proud"]);
+    track.moves.push({ t0: end + 0.1, t1: end + 1.05, from: [at.x, at.y], to: [at.x, at.y], hops: 2, height: 55, facing: at.facing, land: at.facing });
+    track.bounces.push([end + 1.05, 0.7]);
+    track.arms.push([end + 2.6, "rest"]);
+    track.feel.push([end + 2.6, "happy"]);
+  }
 
   // blinks, at its own uneven pace
   const rng = splitmix32((board.seed * 2654435761) >>> 0);

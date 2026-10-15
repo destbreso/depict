@@ -333,7 +333,9 @@
   });
   const smooth = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
   /** The outro at time t: the circle closing on the guide, then the title written on the dark. Played, never paused over. */
+  let fading = false; // the title on the dark, fading away to leave the whole board when the film is over
   function renderOutro(t, shot) {
+    if (fading) return;
     const O = S.outro;
     const on = O && t >= O.iris.t0 && (capture || playing);
     outroLayer.style.display = on ? "" : "none";
@@ -458,6 +460,7 @@
     requestAnimationFrame(tick);
   };
   function play() {
+    unfade();
     // from the end, or from the board at rest after it, the film starts again from the beginning
     if (now >= T || root.classList.contains("ended")) seek(0);
     root.classList.remove("fresh");
@@ -479,16 +482,32 @@
   }
   function ended() {
     root.classList.remove("playing");
+    // the title on the dark stays a moment and fades away over the whole board, which stays to explore
+    const veil = S.outro && outroLayer.style.display !== "none";
+    if (veil) {
+      fading = true;
+      outroLayer.style.transition = "opacity .9s ease";
+      outroLayer.getBoundingClientRect();
+      outroLayer.style.opacity = "0";
+      setTimeout(unfade, 950);
+    }
     if (S.explore != null) render(S.explore);
     root.classList.add("ended");
     forget();
+  }
+  function unfade() {
+    if (!fading) return;
+    fading = false;
+    outroLayer.style.display = "none";
+    outroLayer.style.transition = "";
+    outroLayer.style.opacity = "";
   }
   // where the film was, while it plays: a page reloaded under the viewer (a preview refreshing as the file is
   // rebuilt) picks up where it was instead of starting over. Best effort: storage may be missing or blocked.
   const KEY = `depict:${location.pathname}`;
   let saved = 0;
   function remember() {
-    if (capture || performance.now() - saved < 1000) return;
+    if (capture || performance.now() - saved < 250) return;
     saved = performance.now();
     try {
       sessionStorage.setItem(KEY, JSON.stringify({ t: now, at: Date.now() }));
