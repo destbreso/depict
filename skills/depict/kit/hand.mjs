@@ -66,6 +66,11 @@ const wordsOf = (para) =>
     .filter(Boolean)
     .map((w) => w.replace(/\u00a0/g, " "));
 
+/** The width of the widest piece of text that cannot be broken (a word, or a sum). */
+export function widest(font, text, size) {
+  return Math.max(0, ...String(text).split("\n").flatMap(wordsOf).map((w) => measure(font, w, size)));
+}
+
 function greedy(font, text, size, maxWidth) {
   const lines = [];
   for (const para of String(text).split("\n")) {

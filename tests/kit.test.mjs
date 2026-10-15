@@ -10,6 +10,7 @@ import { flight, pan, shotOf } from "../skills/depict/kit/camera.mjs";
 import { flattenPath, shapeLines } from "../skills/depict/kit/svgpath.mjs";
 import { sceneOf } from "../skills/depict/kit/page.mjs";
 import { audit } from "../skills/depict/kit/audit.mjs";
+import { bounds } from "../skills/depict/kit/geom.mjs";
 
 const examples = fs.readdirSync(new URL("../skills/depict/examples/", import.meta.url)).filter((d) => fs.existsSync(new URL(`../skills/depict/examples/${d}/board.mjs`, import.meta.url)));
 const load = async (name) => (await import(`../skills/depict/examples/${name}/board.mjs`)).default;
@@ -440,4 +441,26 @@ test("a matrix is a table with columns of their own width, and a second note on 
   assert.ok(Math.abs(b.x - (a.x + a.w)) < 1 && Math.abs(c.y - (a.y + a.h)) < 1, "the cells still share their edges");
   const [n1, n2] = ["note-1-1", "note-2-1"].map((id) => comp.elements.get(id).box);
   assert.ok(n2.y >= n1.y + n1.h, "the second note sits below the first");
+});
+
+test("the first idea's shot shows the board's title whole or not at all, and notes under narrow cells never touch", () => {
+  const s = {
+    title: "A rather long title that runs much wider than the first idea under it",
+    regions: [
+      { id: "a", title: "Small", items: [{ id: "x", icon: "cpu", label: "One" }] },
+      { id: "r", title: "Sums", layout: "cells", items: [{ id: "c0", label: "1", note: "100 + 200" }, { id: "c1", label: "2", note: "300 + 150" }] },
+    ],
+    beats: [
+      { say: "A small first idea under a long title.", draw: ["title", "a", "x"] },
+      { say: "Two cells with sums under them.", draw: ["r", "c0", "c1"] },
+    ],
+  };
+  const { comp } = build(s);
+  const f = comp.regions[0].frame;
+  const t = comp.elements.get("title").box;
+  const whole = t.x >= f.x - 1 && t.x + t.w <= f.x + f.w + 1 && t.y >= f.y - 1;
+  const none = t.y + t.h <= f.y + 1;
+  assert.ok(whole || none, "the title is whole in the first idea's shot, or out of it");
+  const [n0, n1] = ["c0", "c1"].map((id) => bounds(comp.elements.get(id).parts.filter((q) => q.role === "note").flatMap((q) => q.strokes)));
+  assert.ok(n0.x + n0.w < n1.x, "the two notes stand apart");
 });

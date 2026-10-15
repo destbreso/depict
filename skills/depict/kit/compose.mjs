@@ -5,7 +5,7 @@
 // is close to 1:1 and only the final overview pulls back.
 import { hash32, streams } from "./rng.mjs";
 import * as ink from "./ink.mjs";
-import { write } from "./hand.mjs";
+import { widest, write } from "./hand.mjs";
 import { icon } from "./icons.mjs";
 import { person, TINTS } from "./people.mjs";
 import { reachAbove, rig } from "./rig.mjs";
@@ -236,7 +236,9 @@ function cellCards(board, font, region, S) {
   const across = region.layout === "cells";
   const cellItems = region.items.filter((it) => it.under == null);
   const labels = cellItems.map((it) => write(font, it.label, { x: 0, y: 0, size: SIZE.label, align: "center", maxWidth: SIZE.cardWidth * 1.4, rng: S(`${it.id}.label`) }));
-  const cw = Math.max(...labels.map((t) => t.box.w)) + 64;
+  // a cell is as wide as its label, and as its note's longest word under it (notes under narrow cells would run together)
+  const noteRoom = (it) => (across && it.note ? widest(font, it.note, SIZE.note) + 14 : 0);
+  const cw = Math.max(Math.max(...labels.map((t) => t.box.w)) + 64, ...cellItems.map(noteRoom));
   const ch = Math.max(...labels.map((t) => t.box.h)) + 46;
   // cells with at: [column, row] make a matrix, every cell sharing its edges with its neighbours
   const matrix = cellItems.some((it) => Array.isArray(it.at));
@@ -252,7 +254,7 @@ function cellCards(board, font, region, S) {
   const rowH = new Map();
   if (matrix)
     cellItems.forEach((it, i) => {
-      colW.set(it.at[0], Math.max(colW.get(it.at[0]) ?? 0, labels[i].box.w + 64));
+      colW.set(it.at[0], Math.max(colW.get(it.at[0]) ?? 0, labels[i].box.w + 64, noteRoom(it)));
       rowH.set(it.at[1], Math.max(rowH.get(it.at[1]) ?? 0, labels[i].box.h + 46));
     });
   const widthOf = (c) => (matrix ? colW.get(c) ?? cw : cw);
@@ -502,7 +504,7 @@ function freeSpot(r, elements, taken, h, top = 0) {
   if (tb) cands.push({ x: tb.x - 40 - GUIDE.reach * h, y: tb.y + tb.h + 40, facing: 1, top });
   cands.push({ x: content.x - 40 - GUIDE.front * h, y: ground, facing: 1, top });
   cands.push({ x: content.x + content.w + 40 + GUIDE.front * h, y: ground, facing: -1, top });
-  if (tb) cands.push({ x: tb.x + tb.w + 60 + GUIDE.back * h, y: tb.y + tb.h + 40, facing: 1, top });
+  if (tb) cands.push({ x: tb.x + tb.w + 40 + GUIDE.front * h, y: tb.y + tb.h + 40, facing: -1, top }); // after the title, facing back into the idea
   const clash = (q) => {
     const b = spotBox(q, h);
     let a = 0;
@@ -1002,6 +1004,22 @@ export function compose(board, font) {
     const spot = guide?.spots.find((q) => q.region === r.id);
     if (spot) f = union(f, pad(spotBox(spot, guide.h), 30));
     if (f !== r.frame && board.mode !== "slides") r.frame = fit169(f);
+  }
+  // the first idea's shots show the board's title above it whole, or not at all: a title cut by the edge reads as a mistake
+  const tEl = elements.get("title");
+  if (tEl && board.mode !== "slides") {
+    const r0 = regions.find((r) => r.id === tEl.region);
+    const [f, t] = [r0.frame, tEl.box];
+    const inside = t.x >= f.x && t.x + t.w <= f.x + f.w && t.y >= f.y;
+    if (!inside && t.y + t.h > f.y) {
+      const whole = fit169(union(f, pad(t, 30)));
+      const spot = guide?.spots.filter((q) => q.region === r0.id).at(-1);
+      const low = t.y + t.h + 14; // where a shot under the title starts
+      const content = [...elements.values()].filter((e) => e.region === r0.id && !e.joins && e.kind !== "title" && e.kind !== "guide").reduce((b, e) => union(b, e.box), null);
+      const clear = content && low <= content.y - 16 && (!spot || low <= spotBox(spot, guide.h).y - 10);
+      if (whole.w <= f.w * 1.12 || !clear) r0.frame = whole;
+      else r0.frame = { ...f, y: Math.max(f.y, low) };
+    }
   }
   const sheets = new Map(regions.map((r) => [r.id, r.frame]));
   // the closing overview frames what is drawn (on a canvas) or the sheets on the table (slides), with a margin

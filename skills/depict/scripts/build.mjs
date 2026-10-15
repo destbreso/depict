@@ -52,7 +52,10 @@ fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 const findings = audit(board, comp, tl);
 const verdict = report(findings);
-const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+const fmt = (s) => {
+  const r = Math.round(s);
+  return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`;
+};
 console.log(`${path.relative(process.cwd(), out)}: ${board.beats.length} beats, ${fmt(tl.duration)}, ${tl.strokes.length} strokes, ${(html.length / 1024).toFixed(0)} KB`);
 if (args.includes("--audit") || !verdict.ok) {
   console.log(verdict.text);
