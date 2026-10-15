@@ -968,7 +968,8 @@ export function compose(board, font) {
       const p = ink.pen(S(id), { width: W.mark * Math.pow(z, 0.6) });
       // a highlight runs a little past the words it marks; over cells or frames it stays inside them, clear of their edges and of the next ones
       const inside = !!many && many.every((e) => e.framed);
-      const nib = Math.max(18, (inside ? Math.min(tb.w, tb.h) - 16 : tb.h) * 0.5); // a column of cells is painted with the width of a cell
+      const own = many && !inside ? Math.min(...many.map((t) => (t.kind === "item" && !t.framed ? t.wordsBox ?? t.box : t.box).h)) : null;
+      const nib = Math.max(18, (inside ? Math.min(tb.w, tb.h) - 16 : own ?? tb.h) * 0.5); // a column of cells is painted with the width of a cell
       const hb = inside ? { x: tb.x + nib / 2 + 8, y: tb.y + 8, w: Math.max(2, tb.w - nib - 16), h: tb.h - 16 } : pad(tb, 6, -2);
       const strokes = {
         // an item of words is circled round its words; one with a picture, or in a frame of its own, round all of it (a circle
@@ -979,7 +980,8 @@ export function compose(board, font) {
         // a box or a cross on one cell is on the cell itself, inside its edges
         box: () => (target.cell && !span ? ink.box(p, target.cell.x + 6, target.cell.y + 6, target.cell.w - 12, target.cell.h - 12) : ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32)),
         cross: () => ink.crossOut(p, target.cell && !span ? pad(target.cell, -10) : tb),
-        highlight: () => ink.highlight(ink.pen(S(id), { width: nib }), hb),
+        // several things that are not cells side by side are each highlighted on their own, not as one block over the gaps
+        highlight: () => (many && !inside ? many.flatMap((t, k) => ink.highlight(ink.pen(S(`${id}.${k}`), { width: nib }), pad(t.kind === "item" && !t.framed ? t.wordsBox ?? t.box : t.box, 6, -2))) : ink.highlight(ink.pen(S(id), { width: nib }), hb)),
       }[m.kind]();
       const hl = m.kind === "highlight";
       const e = element(id, "mark", [part("mark", strokes, { width: hl ? nib : W.mark * Math.pow(z, 0.6), color: hl ? HIGHLIGHTER : board.accent, layer: hl ? "under" : "ink", opacity: hl ? 0.6 : 1 })]);
