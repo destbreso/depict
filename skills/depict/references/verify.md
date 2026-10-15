@@ -43,4 +43,4 @@ The audit cannot answer these; the pictures can.
 
 ## The video
 
-`node scripts/video.mjs board.html` renders every frame with the page's own `depict.render(t)` and encodes them with ffmpeg: 1920 x 1080 at 30 frames a second, H.264 in studio-range yuv420p with Rec. 709 tags, a silent AAC track and the index first, the form social sites take without problems (LinkedIn drops a file with an ICC profile, full-range color or no audio track, without an error). Captions are part of the frame. A minute of board takes about two minutes to render.
+`node scripts/video.mjs board.html` renders every frame with the page's own `depict.render(t)` and encodes them with ffmpeg: 1920 x 1080 at 30 frames a second, H.264 in studio-range yuv420p with Rec. 709 tags, a silent AAC track and the index first, the form social sites take without problems (LinkedIn drops a file with an ICC profile, full-range color or no audio track, without an error). The frames are the board alone: the sentences are written beside the video as board.srt, each timed to its beat at the video's speed, for a site's subtitles or for a voice laid over it. A minute of board takes about two minutes to render.

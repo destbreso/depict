@@ -35,7 +35,7 @@ export function audit(board, comp, tl) {
     }
   });
 
-  // nothing drawn lands outside its shot, or under the caption
+  // nothing drawn lands outside its shot
   board.beats.forEach((bt, i) => {
     for (const id of bt.draw) {
       const e = els.get(id);
@@ -43,7 +43,7 @@ export function audit(board, comp, tl) {
       const safe = safeArea(e.shot);
       const bb = e.box;
       if (bb.x < safe.x || bb.y < safe.y || bb.x + bb.w > safe.x + safe.w || bb.y + bb.h > safe.y + safe.h) {
-        problem("safe", `beat ${i + 1}: "${id}" reaches ${bb.y + bb.h > safe.y + safe.h ? "under the caption" : "outside the shot"}; move it (a note to another side) or give its region less to hold`);
+        problem("safe", `beat ${i + 1}: "${id}" reaches outside the shot; move it (a note to another side) or give its region less to hold`);
       }
     }
   });

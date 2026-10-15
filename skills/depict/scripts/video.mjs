@@ -2,12 +2,16 @@
 // A board's page as a video: node scripts/video.mjs <page.html> [--out board.mp4] [--fps 30] [--speed 1]
 //
 // The page draws itself as a pure function of time, so each frame is
-// depict.render(t) and a screenshot; ffmpeg encodes them. The file is 16:9 at
-// 1920 x 1080, H.264 in studio-range yuv420p with Rec. 709 tags, a silent
-// AAC track and the index first: the form social sites take without
-// re-encoding problems (LinkedIn drops files with an ICC profile, full-range
-// color or no audio track, without an error). Needs Chrome and ffmpeg.
+// depict.render(t) and a screenshot; ffmpeg encodes them. The frames are the
+// board alone, clean (no caption, no controls): the sentences go beside the
+// video as subtitles, board.srt, timed to it, for a site's captions or for a
+// voice laid over it. The file is 16:9 at 1920 x 1080, H.264 in studio-range
+// yuv420p with Rec. 709 tags, a silent AAC track and the index first: the
+// form social sites take without re-encoding problems (LinkedIn drops files
+// with an ICC profile, full-range color or no audio track, without an error).
+// Needs Chrome and ffmpeg.
 import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { needsWebSocketFlag, open } from "./chrome.mjs";
 
@@ -30,6 +34,7 @@ const fps = Number(opt("fps", 30));
 const out = path.resolve(opt("out", file.replace(/\.html$/, "") + ".mp4"));
 const page = await open(`${path.resolve(file)}`.replace(/^/, "file://") + "?capture", { width: 1920, height: 1080, scale: 1, wait: 400 });
 const duration = await page.evaluate("depict.duration");
+const beats = await page.evaluate("depict.beats");
 // a video plays at the board's own speed (a child's board at half speed) unless --speed says otherwise
 const speed = Number(opt("speed", await page.evaluate("depict.speed || 1")));
 const frames = Math.ceil((duration / speed) * fps);
@@ -62,5 +67,13 @@ if (code !== 0) {
   console.error("ffmpeg failed");
   process.exit(1);
 }
+// the sentences as subtitles, each shown while its beat plays, at the video's speed
+const stamp = (s) => {
+  const ms = Math.max(0, Math.round((s / speed) * 1000));
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+};
+const srt = out.replace(/\.mp4$/, "") + ".srt";
+fs.writeFileSync(srt, beats.map((b, i) => `${i + 1}\n${stamp(b.t0)} --> ${stamp(b.t1)}\n${b.say.replace(/\u00a0/g, " ")}\n`).join("\n"));
 const mb = (Number(spawnSync("stat", ["-f", "%z", out]).stdout) || 0) / 1e6;
-console.log(`\r${path.relative(process.cwd(), out)}: ${frames} frames at ${fps} fps, ${(duration / speed).toFixed(1)} s, ${mb ? mb.toFixed(1) + " MB, " : ""}made in ${Math.round((Date.now() - started) / 1000)} s`);
+console.log(`\r${path.relative(process.cwd(), out)}: ${frames} frames at ${fps} fps, ${(duration / speed).toFixed(1)} s, ${mb ? mb.toFixed(1) + " MB, " : ""}made in ${Math.round((Date.now() - started) / 1000)} s; its sentences in ${path.relative(process.cwd(), srt)}`);

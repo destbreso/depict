@@ -165,12 +165,12 @@ test("a circle holds every corner of what it circles", async () => {
   }
 });
 
-test("a note low in its region stays clear of the caption: the shot makes room for it", () => {
+test("a note low in its region stays inside its shot", () => {
   const s = tiny();
   s.beats[1].draw.push({ note: "a note that sits low on purpose", near: "b", side: "below" });
   const { board, comp, tl } = build(s);
   const findings = audit(board, comp, tl);
-  assert.ok(!findings.some((f) => f.rule === "safe"), "the shot keeps the note clear of the caption");
+  assert.ok(!findings.some((f) => f.rule === "safe"), "the shot holds the note");
 });
 
 test("regions on a grid need a place each, and two cannot share one", () => {

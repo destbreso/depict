@@ -93,22 +93,25 @@ const CSS = `
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .dp{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px;outline:none}
-.dp-frame{position:relative;width:min(100%,calc((100vh - 110px)*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
+.dp-frame{position:relative;width:min(100%,calc((100vh - 200px)*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
 .dp-board,.dp-stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none}
 .dp-paper{fill:var(--dp-paper)}
 .slides .dp-paper{fill:var(--dp-room)}
 .dp-sheet{fill:var(--dp-paper);stroke:rgba(40,36,24,.12);stroke-width:2}
 .dp-hover{fill:rgba(242,201,76,.16);stroke:rgba(196,63,10,.35);stroke-width:2;stroke-dasharray:8 6;pointer-events:none}
-.dp-caption{position:absolute;left:50%;bottom:4.2%;transform:translateX(-50%);max-width:78%;padding:.45em .9em;border-radius:12px;background:rgba(27,27,25,.82);color:#fbfaf7;font-size:clamp(13px,2.15vw,30px);line-height:1.3;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;text-wrap:balance}
+.dp-under{width:min(100%,calc((100vh - 200px)*16/9));min-height:calc(2 * 1.35 * clamp(15px,1.7vw,24px) + 12px);display:flex;align-items:flex-start;justify-content:center;text-align:center}
+.child .dp-under{min-height:calc(2 * 1.35 * clamp(17px,2.1vw,30px) + 12px)}
+.dp-caption{max-width:46em;padding:2px 8px;color:var(--dp-ink);font-size:clamp(15px,1.7vw,24px);line-height:1.35;opacity:0;transition:opacity .25s;text-wrap:balance}
 .dp-caption.on{opacity:1}
-.child .dp-caption{font-size:clamp(16px,2.9vw,40px);max-width:70%;padding:.5em 1em;line-height:1.35}
-.dp-start{position:absolute;top:3.5%;right:2.5%;display:none;pointer-events:none}
+.child .dp-caption{font-size:clamp(17px,2.1vw,30px)}
+.dp.fresh .dp-caption,.dp.ended .dp-caption{display:none}
+.dp-start{display:none}
 .dp.fresh .dp-start{display:flex}
-.dp-start button{pointer-events:auto;display:flex;align-items:center;gap:.6em;padding:.7em 1.2em .7em 1em;border:0;border-radius:999px;background:var(--dp-ink);color:var(--dp-paper);font:600 clamp(13px,1.35vw,19px)/1 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.22);cursor:pointer}
+.dp-start button{display:flex;align-items:center;gap:.6em;padding:.65em 1.2em .65em 1em;border:0;border-radius:999px;background:var(--dp-ink);color:var(--dp-paper);font:600 clamp(14px,1.3vw,18px)/1 system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
 .dp-start button::before{content:"";width:0;height:0;border-left:.8em solid currentColor;border-top:.5em solid transparent;border-bottom:.5em solid transparent}
-.dp-hint{position:absolute;top:3%;left:50%;transform:translateX(-50%);padding:.3em .8em;border-radius:999px;background:rgba(251,250,247,.92);color:var(--dp-muted);font-size:clamp(11px,1.1vw,15px);display:none;pointer-events:none;box-shadow:0 0 0 1px rgba(40,36,24,.1)}
+.dp-hint{display:none;padding-top:4px;color:var(--dp-muted);font-size:clamp(13px,1.2vw,16px)}
 .dp.ended:not(.fresh) .dp-hint{display:block}
-.dp-bar{display:flex;align-items:center;gap:10px;width:min(100%,calc((100vh - 110px)*16/9));padding:6px 4px}
+.dp-bar{display:flex;align-items:center;gap:10px;width:min(100%,calc((100vh - 200px)*16/9));padding:6px 4px}
 .dp-bar button,.dp-bar select{height:34px;min-width:34px;border:1px solid rgba(40,36,24,.18);border-radius:8px;background:var(--dp-paper);color:var(--dp-ink);font:inherit;cursor:pointer}
 .dp-bar button:focus-visible,.dp-bar select:focus-visible,.dp-scrub:focus-visible{outline:2px solid var(--dp-accent);outline-offset:2px}
 .dp-play::before{content:"";display:inline-block;border-left:11px solid currentColor;border-top:7px solid transparent;border-bottom:7px solid transparent;margin-left:3px}
@@ -125,9 +128,8 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .dp-live-bar span{padding:.3em .7em;border-radius:999px;background:rgba(251,250,247,.94);color:var(--dp-muted);font-size:13px;box-shadow:0 0 0 1px rgba(40,36,24,.12)}
 .dp-live-bar button{height:32px;padding:0 .8em;border:0;border-radius:999px;background:var(--dp-ink);color:var(--dp-paper);font:600 13px system-ui,sans-serif;cursor:pointer}
 .capture .dp{padding:0}
-.capture .dp-caption{transition:none}
 .capture .dp-frame{width:100vw;height:100vh;border-radius:0;box-shadow:none}
-.capture .dp-bar,.capture .dp-start,.capture .dp-hint{display:none!important}
+.capture .dp-bar,.capture .dp-under{display:none!important}
 @media (max-width:640px){.dp-time{display:none}.dp-speed{display:none}}
 `;
 
@@ -151,9 +153,6 @@ export function page(board, scene) {
 <div class="dp${board.audience === "child" ? " child" : ""}" tabindex="0">
   <div class="dp-frame">
     <div class="dp-board"></div>
-    <div class="dp-caption" aria-live="polite"></div>
-    <div class="dp-hint">Drag and zoom the board. Tap any part to hear it again.</div>
-    <div class="dp-start"><button type="button" class="dp-go">Watch it drawn · ${mins}</button></div>
     <div class="dp-live" hidden><div class="dp-live-bar"><span class="dp-live-name"></span><button type="button" class="dp-live-close">Back to the board</button></div></div>
   </div>
   <div class="dp-bar">
@@ -163,6 +162,11 @@ export function page(board, scene) {
     <div class="dp-track"><div class="dp-ticks"></div><input class="dp-scrub" type="range" min="0" step="0.01" value="0" aria-label="Time"></div>
     <span class="dp-time"></span>
     <select class="dp-speed" aria-label="Speed">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((v) => `<option value="${v}"${v === (board.speed ?? 1) ? " selected" : ""}>${v}&times;</option>`).join("")}</select>
+  </div>
+  <div class="dp-under">
+    <div class="dp-caption" aria-live="polite"></div>
+    <div class="dp-hint">Drag and zoom the board. Tap any part to hear it again.</div>
+    <div class="dp-start"><button type="button" class="dp-go">Watch it drawn · ${mins}</button></div>
   </div>
   <noscript><p>This board plays with JavaScript. Its explanation: ${esc(board.beats.map((b) => b.say).join(" "))}</p></noscript>
 </div>

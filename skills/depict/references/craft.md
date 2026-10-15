@@ -78,7 +78,7 @@ The rules here come from the people who make whiteboard explainers and from rese
 ## Words, voice and captions
 
 - **Spoken to the viewer.** Conversational narration, "you" and "I", beats formal prose (personalization, 14 of 17 tests, median d = 0.79).
-- **Captions carry the sentences; the board does not.** With a voice, sentences on screen as well as spoken hurt (redundancy, 16 of 16 tests, median d = 0.86); without one, the captions are the voice. A depict page shows each beat's sentence as its caption, and the board holds labels.
+- **Captions carry the sentences; the board does not.** With a voice, sentences on screen as well as spoken hurt (redundancy, 16 of 16 tests, median d = 0.86); without one, the captions are the voice. A depict page writes each beat's sentence under the board, outside the drawing, as it is said, and the board holds labels; a video leaves the board clean and carries the sentences as subtitles beside it.
 - **Captions for silent viewing**: most social video is watched with the sound off ([Digiday 2016](https://digiday.com/media/silent-world-facebook-video/); [Verizon Media 2019](https://www.streamingmedia.com/Articles/News/Online-Video-News/80-of-Video-Caption-Users-Arent-Hearing-Impaired-Finds-Verizon-131860.aspx)). Keep each to two lines of about 42 characters, read at no more than 20 characters a second ([Netflix](https://partnerhelp.netflixstudios.com/hc/en-us/articles/217350977)); the audit holds a beat's sentence to that.
 - **Length**: explainers run one to three minutes ([TruScribe](https://truscribe.com/blog/how-whiteboard-animation-videos-are-created/)), learning segments under six (Guo et al. 2014).
 

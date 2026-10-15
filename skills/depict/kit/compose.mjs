@@ -12,7 +12,7 @@ import { reachAbove, rig } from "./rig.mjs";
 import { INTRO_HEIGHT } from "./perform.mjs";
 import { flattenPath } from "./svgpath.mjs";
 import { bounds, cubic, pad, union } from "./geom.mjs";
-import { CAPTION_BAND, shotSafe } from "./camera.mjs";
+import { shotSafe } from "./camera.mjs";
 
 export const INK = "#1b1b19";
 export const GREY = "#55554f";
@@ -609,7 +609,7 @@ function placeRegions(board, laid) {
       h = Math.max(h, f.h);
     }
     for (const r of laid) {
-      const k = Math.min(1.45, (w - 2 * SIZE.frameAir) / r.box.w, (h * (1 - CAPTION_BAND) - 2 * SIZE.frameAir) / r.box.h);
+      const k = Math.min(1.45, (w - 2 * SIZE.frameAir) / r.box.w, (h - 2 * SIZE.frameAir) / r.box.h);
       if (k > 1.04) scaleLaid(r, k);
     }
   }
@@ -620,8 +620,8 @@ function placeRegions(board, laid) {
     const [x, y] = at[i];
     if (slides) {
       const frame = { x, y, w, h };
-      // the content is centered in its sheet, in the part above the caption's band
-      return { ...r, frame, dx: frame.x + (frame.w - r.box.w) / 2 - r.box.x, dy: frame.y + (frame.h * (1 - CAPTION_BAND) - r.box.h) / 2 - r.box.y };
+      // the content is centered in its sheet
+      return { ...r, frame, dx: frame.x + (frame.w - r.box.w) / 2 - r.box.x, dy: frame.y + (frame.h - r.box.h) / 2 - r.box.y };
     }
     const dx = x - r.box.x;
     const dy = y - r.box.y;

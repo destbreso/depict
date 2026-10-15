@@ -44,7 +44,7 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 
 ## What you get
 
-- **A page that plays like a video.** One standalone HTML file, no network. A pen draws each shape and writes each word in the order a hand would, and each sentence shows as a caption. Pause, scrub, step sentence by sentence, change the speed.
+- **A page that plays like a video.** One standalone HTML file, no network. A pen draws each shape and writes each word in the order a hand would, and each sentence is written under the board as it is said, never over the drawing. Pause, scrub, step sentence by sentence, change the speed.
 - **A guide with a face.** Every board is presented by the same character: a felt marker with its cap in the board's accent. It is drawn first, then comes alive its own way (a wave, a hop, a spin, a bow, a tip of its cap, a jump), points at each new thing as the pen draws it, follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops to the next idea and cheers at the end. It is dressed for the subject: a mortarboard and a book, a hard hat and a wrench, glasses and a pointer, headphones, a crown, a ruler, a coin, a clock. It blinks and breathes while you explore, and waves back when you tap it.
 - **Numbered ideas, read as a page.** Each idea is numbered in the order it is told and the ideas are laid out as a page is read, left to right in balanced rows, so three or ten compose into one 16:9 poster with no empty corner.
 - **Explained completely.** The problem and why the obvious way falls short, the mechanism traced step by step on one worked example, why it works, what it costs, the classic mistakes and when to use it.
@@ -55,7 +55,7 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 - **A camera that is computed.** Every shot is checked to be readable; the board opens close on the guide and the title, the camera flies between shots along the optimal zoom path, and the board ends on a held overview that reads as a map of the idea.
 - **Two modes from one script.** A tour of one big canvas, or sketched slides that end laid out as a numbered storyboard.
 - **Live parts.** An item can open into a running [Dissect](https://github.com/destbreso/dissect) figure, grown from its place on the board: the board explains, the figure lets you try.
-- **A video when you want one.** 1920 x 1080 with the captions burned in, in the form social sites take without trouble.
+- **A video when you want one.** 1920 x 1080, the board alone and clean, in the form social sites take without trouble, with its sentences as an .srt beside it: subtitles for the site, or the script for a voice.
 
 ## Gallery
 
