@@ -1013,10 +1013,41 @@ export function compose(board, font) {
   for (const r of regions) {
     let f = r.frame;
     for (const e of elements.values()) if (e.region === r.id && !e.joins && e.kind !== "title" && e.kind !== "guide") f = union(f, pad(e.box, 40));
-    const spot = guide?.spots.find((q) => q.region === r.id);
+    const spot = guide?.spots.filter((q) => q.region === r.id).at(-1); // where it stands for this idea (the first idea's start is the opening's)
     if (spot) f = union(f, pad(spotBox(spot, guide.h), 30));
     if (f !== r.frame && board.mode !== "slides") r.frame = fit169(f);
   }
+  // a region's shot has room to spare round its own idea: it slides within that room (never off what it holds) to take in
+  // as little of its neighbours as it can; a cut-off slice of the next idea at the edge of a shot reads as a mistake
+  if (board.mode !== "slides")
+    for (const r of regions) {
+      const mine = [...elements.values()].filter((e) => e.region === r.id && !e.joins && e.kind !== "title" && e.kind !== "guide");
+      if (!mine.length) continue;
+      let own = mine.reduce((b, e) => union(b, e.box), null);
+      const spot = guide?.spots.filter((q) => q.region === r.id).at(-1);
+      if (spot) own = union(own, spotBox(spot, guide.h));
+      const others = [...elements.values()].filter((e) => e.region && e.region !== r.id && !e.joins && e.kind !== "mark" && e.kind !== "guide").map((e) => e.box);
+      const cost = (f) => {
+        const s = pad(f, 40); // the shot is the frame and 40 round it
+        return others.reduce((a, b) => {
+          const w = Math.min(s.x + s.w, b.x + b.w) - Math.max(s.x, b.x);
+          const h = Math.min(s.y + s.h, b.y + b.h) - Math.max(s.y, b.y);
+          return a + (w > 0 && h > 0 ? w * h : 0);
+        }, 0);
+      };
+      const f = r.frame;
+      let best = { f, c: cost(f) };
+      if (best.c === 0) continue;
+      const [xlo, xhi] = [own.x + own.w + 20 - (f.x + f.w), own.x - 20 - f.x];
+      const [ylo, yhi] = [own.y + own.h + 20 - (f.y + f.h), own.y - 20 - f.y];
+      for (const ux of [0, 0.25, 0.5, 0.75, 1])
+        for (const uy of [0, 0.25, 0.5, 0.75, 1]) {
+          const g = { ...f, x: f.x + (xlo <= xhi ? xlo + (xhi - xlo) * ux : 0), y: f.y + (ylo <= yhi ? ylo + (yhi - ylo) * uy : 0) };
+          const c = cost(g);
+          if (c < best.c - 1) best = { f: g, c };
+        }
+      r.frame = best.f;
+    }
   // the first idea's shots show the board's title above it whole, or not at all: a title cut by the edge reads as a mistake
   const tEl = elements.get("title");
   if (tEl && board.mode !== "slides") {
@@ -1042,7 +1073,7 @@ export function compose(board, font) {
     // the guide ends beside the idea it presented last, and the closing shot holds it there
     let last = null;
     for (const bt of board.beats) for (const id of bt.draw) if (elements.get(id)?.region && !elements.get(id).joins) last = elements.get(id).region;
-    extent = union(extent, spotBox(guide.spots.find((q) => q.region === last) ?? guide.spots.at(-1), guide.h));
+    extent = union(extent, spotBox(guide.spots.filter((q) => q.region === last).at(-1) ?? guide.spots.at(-1), guide.h));
   }
   // the end card: the title in paper on the dark, in the frame's own coordinates (1920 x 1080), underlined in the accent
   const et = write(font, board.title, { x: 960, y: 0, size: 76, align: "center", maxWidth: 1500, lineHeight: 1.5, rng: S("endcard") });

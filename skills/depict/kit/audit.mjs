@@ -109,9 +109,10 @@ export function audit(board, comp, tl) {
     }
   }
 
-  // every element sits inside its region's frame (a slide's sheet in slides mode)
+  // every element sits inside its region's frame (a slide's sheet in slides mode); on a canvas the board's title and
+  // the guide's first place belong to the opening shot instead
   for (const e of els.values()) {
-    if (e.joins) continue;
+    if (e.joins || (board.mode !== "slides" && (e.kind === "title" || e.kind === "guide"))) continue;
     const f = comp.sheets.get(e.region);
     const b = e.box;
     if (b.x < f.x - 1 || b.y < f.y - 1 || b.x + b.w > f.x + f.w + 1 || b.y + b.h > f.y + f.h + 1) {
