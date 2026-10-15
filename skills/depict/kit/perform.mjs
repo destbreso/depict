@@ -28,31 +28,19 @@ export function perform(board, comp, tl, appear) {
     span.set(s.el, sp);
   }
   const center = (b) => [b.x + b.w / 2, b.y + b.h / 2];
-  // a hand (or a pointer's tip) stops short of what it points at: aimed at the side of it that faces the guide,
-  // a glove's length and a little more before it, so the finger never lands on the words
-  const aim = (b, at) => {
-    const sx = at.x;
-    const sy = at.y - 0.6 * g.h;
-    const [cx, cy] = center(b);
-    const dx = sx - cx;
-    const dy = sy - cy;
-    const s = Math.min(1, Math.abs(b.w / 2 / (dx || 1e-9)), Math.abs(b.h / 2 / (dy || 1e-9)));
-    const [ex, ey] = [cx + dx * s, cy + dy * s];
-    const d = Math.hypot(sx - ex, sy - ey) || 1;
-    const off = 0.13 * g.h + 18;
-    return [ex + ((sx - ex) / d) * off, ey + ((sy - ey) / d) * off];
-  };
-  // and its arm reaches no further than the first thing that stands in its way (a label, a picture, a note)
+  // it points at the middle of a thing, and its hand stops where the tip of its glove (or of its pointer) would reach the
+  // first thing in the way, the thing itself included: a finger that lands on the words hides them
   const solid = [...els.values()].filter((e) => e.kind === "item" || e.kind === "note" || e.kind === "region" || e.kind === "title");
-  const clear = (at, px, py, skip) => {
+  const tip = 0.13 * g.h + (g.rig.hold === "pointer" ? 0.27 * g.h : 0) + 12;
+  const reachTo = (at, px, py, also) => {
     const sx = at.x + at.facing * 0.165 * g.h;
     const sy = at.y - 0.39 * g.h;
     const d = Math.hypot(px - sx, py - sy) || 1;
     const [ux, uy] = [(px - sx) / d, (py - sy) / d];
-    const glove = 0.13 * g.h;
-    for (let r = 0; r <= 0.36 * g.h + glove; r += 6) {
+    const boxes = [...solid.map((e) => e.box), ...(also ? [also] : [])];
+    for (let r = 0; r <= 0.36 * g.h + tip; r += 5) {
       const [qx, qy] = [sx + ux * r, sy + uy * r];
-      if (solid.some((e) => !skip.has(e.id) && qx > e.box.x - 6 && qx < e.box.x + e.box.w + 6 && qy > e.box.y - 6 && qy < e.box.y + e.box.h + 6)) return Math.max(0.1 * g.h, r - glove - 10);
+      if (boxes.some((b) => qx > b.x - 6 && qx < b.x + b.w + 6 && qy > b.y - 6 && qy < b.y + b.h + 6)) return Math.max(0.05 * g.h, r - tip);
     }
     return Infinity;
   };
@@ -97,6 +85,12 @@ export function perform(board, comp, tl, appear) {
     track.look.push([title[0], tb.x + tb.w * 0.4, tb.y + tb.h / 2]);
   }
 
+  /** Where it stands for a gesture at t: where a hop under way at t lands (it points from there, not from where it left). */
+  const settledAt = (t) => {
+    const m = track.moves.find((q) => q.t0 <= t && t < q.t1 && (q.to[0] !== q.from[0] || q.to[1] !== q.from[1]));
+    return m ? { x: m.to[0], y: m.to[1], facing: m.land } : whereAt(t);
+  };
+
   board.beats.forEach((bt, bi) => {
     const beat = tl.beats[bi];
     track.feel.push([beat.t0, bt.feel ?? "happy"]);
@@ -108,9 +102,9 @@ export function perform(board, comp, tl, appear) {
       if (!e || !sp) continue;
       const tbox = e.kind === "mark" ? e.targetBox ?? els.get(e.target).box : e.box;
       const [cx, cy] = center(tbox);
-      const at = whereAt(sp[0]);
-      const [px, py] = aim(tbox, at);
-      const way = clear(at, px, py, new Set([id, e.target, e.kind === "mark" ? e.target : null]));
+      const at = settledAt(sp[0]);
+      const [px, py] = [cx, cy];
+      const way = reachTo(at, px, py, tbox);
       const most = Number.isFinite(way) ? [Math.round(way)] : []; // the page's track is JSON: no Infinity in it
       // it turns to face what is drawn behind it
       const side = Math.sign(cx - at.x);

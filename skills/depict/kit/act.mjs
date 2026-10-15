@@ -174,7 +174,7 @@ function armsFor(actor, key, x, y, facing, t) {
       dy = Math.sign(dy || 1) * Math.sqrt(1 - dx * dx);
     }
     // as far as an arm goes, and never past the thing pointed at (less a pointer's length, when it holds one)
-    const reach = Math.max(0.1 * actor.h, Math.min(0.36 * actor.h, most, l - (actor.hold === "pointer" ? 0.27 * actor.h : 0)));
+    const reach = Math.max(0.05 * actor.h, Math.min(0.36 * actor.h, most, l - (actor.hold === "pointer" ? 0.27 * actor.h : 0)));
     const hx = sh[0] + dx * reach;
     const hy = sh[1] + dy * reach;
     // the hose sags a little under the line from shoulder to hand
