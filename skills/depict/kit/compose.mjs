@@ -76,7 +76,8 @@ function sketchParts(board, font, S, id, p, paths, x, y, size, width) {
       return;
     }
     const polys = flattenPath(e.d, 0.8).map((pts) => pts.map((v, i) => (i % 2 ? y + v * k : x + v * k)));
-    for (const pts of polys) (e.fine ? thin : lines).push(ink.wobble(p, pts, { amp: Math.min(e.fine ? 0.6 : 1.4, 0.32 * p.width) }));
+    // a shape with line: false is colored in with no outline (a shaded band, a part of a whole)
+    if (e.line !== false) for (const pts of polys) (e.fine ? thin : lines).push(ink.wobble(p, pts, { amp: Math.min(e.fine ? 0.6 : 1.4, 0.32 * p.width) }));
     if (e.fill) {
       const f = ink.fill(p, polys[0], { nib: Math.max(7, size * 0.07), angle: -35 });
       fills.push(part("fill", f.strokes, { width: f.width, color: fillColor(board, e.fill), layer: "under", opacity: e.fill === "ink" ? 0.95 : 0.88, group: "figure" }));
@@ -109,7 +110,7 @@ function itemParts(board, font, it, S) {
       // a sketch or a character is a picture of several parts (lines, then color), drawn as one gesture
       const drawn =
         kind === "sketch"
-          ? sketchParts(board, font, S, it.id, p, it.sketch, -size / 2, y, size, width)
+          ? sketchParts(board, font, S, it.id, p, it.sketch, -((it.box?.[0] ?? 100) * size) / 200, y, size, width)
           : person(p, 0, y, size, { ...it.character, shirt: it.character.shirt ?? SHIRTS[hash32(it.id) % SHIRTS.length], accent: board.accent }).map((q) => part(q.role, q.strokes, { width: q.width, color: q.color, layer: q.layer, opacity: q.opacity, group: "figure" }));
       parts.push(...drawn);
       strokes = drawn.filter((q) => q.layer === "ink").flatMap((q) => q.strokes);

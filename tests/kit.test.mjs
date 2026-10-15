@@ -464,3 +464,12 @@ test("the first idea's shot shows the board's title whole or not at all, and not
   const [n0, n1] = ["c0", "c1"].map((id) => bounds(comp.elements.get(id).parts.filter((q) => q.role === "note").flatMap((q) => q.strokes)));
   assert.ok(n0.x + n0.w < n1.x, "the two notes stand apart");
 });
+
+test("a long sketch takes a wide box, and a shape can be colored in with no outline", () => {
+  const s = { title: "A line", regions: [{ id: "a", title: "Numbers", items: [{ id: "line", box: [300, 60], sketch: ["M10 30 H290", { d: "M10 24 H150 V36 H10 Z", fill: "yellow", line: false }], label: "0 to 30" }, { id: "sq", sketch: ["M10 10 H90 V90 H10 Z"], label: "A square" }] }], beats: [{ say: "A long line and a square.", draw: ["title", "a", "line", "sq"] }] };
+  const { comp } = build(s);
+  const pic = (id) => bounds(comp.elements.get(id).parts.filter((q) => q.role === "sketch").flatMap((q) => q.strokes));
+  assert.ok(pic("line").w > 2.5 * pic("sq").w, "the 300-wide box draws about three times as wide as a square one");
+  assert.equal(comp.elements.get("line").parts.find((q) => q.role === "sketch").strokes.length, 1, "the band has no outline of its own");
+  assert.match(normalize({ ...s, regions: [{ ...s.regions[0], items: [{ id: "x", box: [300, 60], sketch: ["M10 30 H350"], label: "Too long" }] }] }).errors.join("\n"), /outside its 300 x 60 box/);
+});

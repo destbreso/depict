@@ -110,19 +110,25 @@ export function normalize(input) {
       if (it.sketch != null) {
         const paths = (Array.isArray(it.sketch) ? it.sketch : [it.sketch]).map((e) => (typeof e === "string" ? { d: e } : { ...e }));
         item.sketch = paths;
+        // its box: 100 x 100 units, or wider (or taller) for a long thing: a number line, a time line, a bar graph
+        const [bw, bh] = it.box ?? [100, 100];
+        if (it.box != null && !(Array.isArray(it.box) && it.box.length === 2 && it.box.every((v) => Number.isFinite(v) && v >= 40 && v <= 400))) err(`${w}: box: [width, height] takes two numbers from 40 to 400 (the sketch's box, in its own units)`);
+        item.box = [bw, bh];
+        const outside = (x, y) => x < -20 || x > bw + 20 || y < -20 || y > bh + 20;
         for (const e of paths) {
           if (e.text != null) {
             // words inside the drawing: { text, at: [x, y], size } in the box's units
-            if (!Array.isArray(e.at) || e.at.length !== 2 || e.at.some((v) => !Number.isFinite(v) || v < -20 || v > 120)) err(`${w}: a sketch's text "${e.text}" needs at: [x, y] inside its 100 x 100 box`);
+            if (!Array.isArray(e.at) || e.at.length !== 2 || !e.at.every(Number.isFinite) || outside(e.at[0], e.at[1])) err(`${w}: a sketch's text "${e.text}" needs at: [x, y] inside its ${bw} x ${bh} box`);
             if (e.size != null && !(e.size > 0)) err(`${w}: a sketch's text "${e.text}" has a size that is not a positive number`);
             continue;
           }
           const d = String(e.d ?? "");
           if (e.fill != null && !FILLS.includes(e.fill)) err(`${w}: a sketch's fill "${e.fill}": use ${FILLS.join(", ")}`);
+          if (e.line === false && e.fill == null) err(`${w}: a sketch path with line: false draws nothing; give it a fill`);
           try {
             const lines = flattenPath(d);
             if (!lines.length) err(`${w}: a sketch path draws nothing: "${d.slice(0, 40)}"`);
-            if (lines.some((l) => l.some((v) => v < -20 || v > 120))) err(`${w}: a sketch path reaches outside its 100 x 100 box: "${d.slice(0, 40)}"`);
+            if (lines.some((l) => l.some((v, i) => (i % 2 ? false : outside(v, l[i + 1]))))) err(`${w}: a sketch path reaches outside its ${bw} x ${bh} box: "${d.slice(0, 40)}"`);
           } catch (x) {
             err(`${w}: a sketch path does not parse (${x.message})`);
           }
