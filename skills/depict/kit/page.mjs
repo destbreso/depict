@@ -64,7 +64,10 @@ export function sceneOf(board, comp, tl) {
 }
 
 /** A caption breaks between words, never inside a sum: the spaces either side of + - × ÷ = < > hold together (10 + 10 = 20 stays on one line). */
-const keepSums = (text) => String(text).replace(/ ([+\-\u2212\u00d7\u00f7=<>]) /g, "\u00a0$1\u00a0");
+const keepSums = (text) =>
+  String(text)
+    .replace(/ ([+\-\u2212\u00d7\u00f7=<>]) /g, "\u00a0$1\u00a0")
+    .replace(/(\d) (?=\p{L})/gu, "$1\u00a0");
 
 /** An actor as the page carries it: its rig's strokes in its own frame (with when each is drawn as it first appears), its gloves, and its track. */
 function actorOf(a, color) {

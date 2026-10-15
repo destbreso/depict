@@ -1024,7 +1024,7 @@ export function compose(board, font) {
     if (!inside && t.y + t.h > f.y) {
       const whole = fit169(union(f, pad(t, 30)));
       const spot = guide?.spots.filter((q) => q.region === r0.id).at(-1);
-      const low = t.y + t.h + 14; // where a shot under the title starts
+      const low = t.y + t.h + 48; // where a frame starts whose shot (40 round it) stays under the title
       const content = [...elements.values()].filter((e) => e.region === r0.id && !e.joins && e.kind !== "title" && e.kind !== "guide").reduce((b, e) => union(b, e.box), null);
       const clear = content && low <= content.y - 16 && (!spot || low <= spotBox(spot, guide.h).y - 10);
       if (whole.w <= f.w * 1.12 || !clear) r0.frame = whole;
