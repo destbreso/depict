@@ -164,9 +164,20 @@
     const backGloveG = node("g", {}, root);
     const bodyUnder = node("g", {}, root);
     const bodyInk = node("g", {}, root);
+    // the cap, with whatever hat is on it: one group, so it can be lifted and tipped
+    const capG = node("g", {}, root);
+    const [capUnder, capInk, hatUnder, hatInk] = [0, 1, 2, 3].map(() => node("g", {}, capG));
     const face = node("g", {}, root);
+    const wearG = node("g", {}, root);
+    const [wearUnder, wearInk] = [0, 1].map(() => node("g", {}, wearG));
     const frontArm = node("path", { stroke: INKC, "stroke-width": A.arm.width }, root);
+    const pointerG = node("g", {}, root); // a pointer, under the fist that holds it
     const frontGloveG = node("g", {}, root);
+    const [pointerUnder, pointerInk] = [0, 1].map(() => node("g", {}, pointerG));
+    // what it holds, upright in its back hand, in front of it
+    const heldG = node("g", {}, root);
+    const [heldUnder, heldInk] = [0, 1].map(() => node("g", {}, heldG));
+    const layered = { body: [bodyUnder, bodyInk], cap: [capUnder, capInk], hat: [hatUnder, hatInk], wear: [wearUnder, wearInk], pointer: [pointerUnder, pointerInk], held: [heldUnder, heldInk] };
     const groups = new Map();
     const groupFor = (part) => {
       if (groups.has(part)) return groups.get(part);
@@ -181,7 +192,7 @@
       return g;
     };
     const strokes = A.strokes.map((st) => {
-      const parent = st.part === "body" ? (st.l === 1 ? bodyUnder : bodyInk) : groupFor(st.part);
+      const parent = layered[st.part] ? layered[st.part][st.l === 1 ? 0 : 1] : groupFor(st.part);
       const n = node("path", { stroke: S.palette[st.c], "stroke-width": st.w }, parent);
       if (st.o < 1) n.setAttribute("stroke-opacity", st.o);
       n.style.display = "none";
@@ -199,7 +210,7 @@
       }
       return set;
     };
-    return { A, floor, root, backArm, frontArm, backGloveG, frontGloveG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups };
+    return { A, floor, root, backArm, frontArm, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups };
   });
   const revealed = (rv, t) => (!rv ? 1 : t < rv[0] ? 0 : t >= rv[1] ? 1 : (t - rv[0]) / (rv[1] - rv[0]));
   /** Poses an actor at time t (and, paused, breathes and blinks on the wall clock); returns the pen's tip while it is being drawn. */
@@ -272,6 +283,16 @@
       const pg = X.groups.get(`pupil${i}`);
       if (pg) pg.setAttribute("transform", `translate(${st.look[0]} ${st.look[1]})`);
     });
+    // the cap, lifted and tipped about the middle of its rim
+    const cap = st.cap || { lift: 0, angle: 0 };
+    const cp = A.capPivot || [0, 0];
+    const capT = cap.lift || cap.angle ? `translate(0 ${-cap.lift * A.h}) rotate(${cap.angle} ${cp[0]} ${cp[1]})` : "";
+    if (X.capG.__t !== capT) {
+      X.capG.setAttribute("transform", capT);
+      X.capG.__t = capT;
+    }
+    // what it holds goes where its back hand goes, upright
+    X.heldG.setAttribute("transform", `translate(${st.back.hand[0]} ${st.back.hand[1]}) rotate(-6)`);
     // the arms, bent anew to wherever the hands are, and the gloves on them
     for (const side of ["back", "front"]) {
       const arm = st[side];
@@ -293,7 +314,13 @@
       const ang = (Math.atan2(arm.hand[1] - arm.bow[1], arm.hand[0] - arm.bow[0]) * 180) / Math.PI;
       gG.setAttribute("transform", `translate(${arm.hand[0]} ${arm.hand[1]}) rotate(${ang}) scale(1 ${side === "front" ? 1 : -1})`);
       gG.setAttribute("opacity", Math.min(1, gf * 1.6));
-      for (const kind in X.gloves[side]) X.gloves[side][kind].style.display = kind === arm.glove && gf > 0 ? "" : "none";
+      // a hand holding a pointer keeps its fist round it, the stick along the arm when it points and held up and out otherwise
+      const glove = side === "front" && A.hold === "pointer" ? "fist" : arm.glove;
+      if (side === "front" && A.hold === "pointer") {
+        X.pointerG.setAttribute("transform", `translate(${arm.hand[0]} ${arm.hand[1]}) rotate(${arm.glove === "point" ? ang : -62})`);
+        X.pointerG.setAttribute("opacity", Math.min(1, gf * 1.6));
+      }
+      for (const kind in X.gloves[side]) X.gloves[side][kind].style.display = kind === glove && gf > 0 ? "" : "none";
     }
     if (!tip) return null;
     return { x: st.x + st.facing * st.sx * tip.x, y: st.y - st.lift + st.sy * tip.y };
@@ -512,7 +539,7 @@
     const [x, y] = toBoard(ev);
     let best = null;
     for (const e of S.elements) {
-      if (!visible(e) || e.kind === "story") continue;
+      if (!visible(e)) continue;
       const [bx, by, bw, bh] = e.box;
       if (x >= bx - 12 && x <= bx + bw + 12 && y >= by - 12 && y <= by + bh + 12 && (!best || bw * bh < best.box[2] * best.box[3])) best = e;
     }

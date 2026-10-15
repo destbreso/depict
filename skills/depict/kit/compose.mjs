@@ -8,8 +8,8 @@ import * as ink from "./ink.mjs";
 import { write } from "./hand.mjs";
 import { icon } from "./icons.mjs";
 import { person, TINTS } from "./people.mjs";
-import { rig } from "./rig.mjs";
-import { layRoad, stretch } from "./road.mjs";
+import { reachAbove, rig } from "./rig.mjs";
+import { INTRO_HEIGHT } from "./perform.mjs";
 import { flattenPath } from "./svgpath.mjs";
 import { bounds, cubic, pad, union } from "./geom.mjs";
 import { CAPTION_BAND, shotSafe } from "./camera.mjs";
@@ -34,17 +34,17 @@ export const SIZE = {
   sketch: 150, // a drawn object, across
   character: 210, // a person, tall
   guide: 270, // the marker who greets the viewer beside the title
-  story: 40, // the width of a story arrow, the wide arrow from one idea to the next
   large: 1.55, // how much bigger a large item's picture is (its label grows by a fifth)
   cardWidth: 300, // the widest a label or note runs before it wraps
   gapRow: 160, // between items side by side: room for an arrow and its label
   gapColumn: 100,
-  regionGap: 340, // between one region's content and the next on a canvas: about twice the gap inside a region, so ideas read as groups, and room for a story arrow
+  regionGap: 340, // between one region's content and the next on a canvas: about twice the gap inside a region, so ideas read as groups
+  rowGap: 260, // between one row of regions and the next
   sheetGap: 200, // between slides on the table
   frame: [1120, 630], // the smallest shot of a region
   frameAir: 90, // space round a region's content inside its shot
 };
-const W = { line: 5, icon: 4.6, label: 4, note: 3.1, title: 6.4, mark: 5, link: 4.6, story: 4.8, highlight: 0 };
+const W = { line: 5, icon: 4.6, label: 4, note: 3.1, title: 6.4, mark: 5, link: 4.6, highlight: 0 };
 
 /** One element: something drawn as one gesture group (an item, a link, a note, a mark), with the strokes of each of its parts. */
 const element = (id, kind, parts) => ({ id, kind, parts, box: bounds(parts.flatMap((p) => p.strokes)) });
@@ -145,7 +145,9 @@ function itemParts(board, font, it, S) {
     const t = write(font, it.label, { x: 0, y, size: ls, align: "center", maxWidth: wide * (big > 1 ? 1.2 : 1), rng: S(`${it.id}.label`), lineHeight: 1.6 });
     parts.push(part("label", t.strokes, { width: W.label * (big > 1 ? 1.15 : 1), write: true, size: ls }));
     labelBox = t.box;
-    y = t.box.y + t.box.h + 12;
+    // the note goes under the label's lowest ink: a g or a y reaches below the line
+    const drawn = bounds(t.strokes);
+    y = Math.max(t.box.y + t.box.h, drawn.y + drawn.h + 4) + 12;
   }
   if (it.note) {
     const t = write(font, it.note, { x: 0, y, size: SIZE.note, align: "center", maxWidth: SIZE.cardWidth, rng: S(`${it.id}.note`), lineHeight: 1.75 });
@@ -238,18 +240,41 @@ function cellCards(board, font, region, S) {
   const ch = Math.max(...labels.map((t) => t.box.h)) + 46;
   // cells with at: [column, row] make a matrix, every cell sharing its edges with its neighbours
   const matrix = cellItems.some((it) => Array.isArray(it.at));
+  const placeOf = (it, i) => (matrix ? it.at : across ? [i, 0] : [0, i]);
+  const byPlace = new Map(cellItems.map((it, i) => [String(placeOf(it, i)), it]));
+  // a side two cells share is drawn by whichever of them is drawn first, so no cell ever stands open
+  const order = new Map();
+  for (const bt of board.beats) for (const id of bt.draw) if (typeof id === "string" && !order.has(id)) order.set(id, order.size);
+  const drawnFirst = (a, b) => (order.get(a.id) ?? Infinity) <= (order.get(b.id) ?? Infinity);
   const cells = cellItems.map((it, i) => {
-    const [ci, ri] = matrix ? it.at : across ? [i, 0] : [0, i];
+    const [ci, ri] = placeOf(it, i);
     const x = ci * cw;
     const y = ri * ch;
     const p = ink.pen(S(`${it.id}.shape`), { width: W.line });
+    // its top, right, bottom and left: a side is its own unless the cell across it was drawn before it
+    const sides = [[0, -1], [1, 0], [0, 1], [-1, 0]].map(([dx, dy]) => {
+      const o = byPlace.get(String([ci + dx, ri + dy]));
+      return !o || drawnFirst(it, o);
+    });
     let cell;
-    if (matrix) {
-      // its right and bottom sides, and its top and left where no cell is above or before it
-      const above = cellItems.some((o) => o.at[0] === ci && o.at[1] === ri - 1);
-      const before = cellItems.some((o) => o.at[0] === ci - 1 && o.at[1] === ri);
-      cell = ink.polyline(p, !before && !above ? [x, y + ch, x, y, x + cw, y, x + cw, y + ch, x, y + ch] : !above ? [x, y, x + cw, y, x + cw, y + ch, x, y + ch] : !before ? [x + cw, y, x + cw, y + ch, x, y + ch, x, y] : [x + cw, y, x + cw, y + ch, x, y + ch]);
-    } else cell = i === 0 ? ink.box(p, x, y, cw, ch, { corner: 3 }) : across ? ink.polyline(p, [x, y, x + cw, y, x + cw, y + ch, x, y + ch]) : ink.polyline(p, [x + cw, y, x + cw, y + ch, x, y + ch, x, y]);
+    if (sides.every(Boolean)) cell = matrix ? ink.polyline(p, [x, y + ch, x, y, x + cw, y, x + cw, y + ch, x, y + ch]) : ink.box(p, x, y, cw, ch, { corner: 3 });
+    else {
+      // the sides it draws, as one line round the cell wherever they meet
+      const corner = [[x, y], [x + cw, y], [x + cw, y + ch], [x, y + ch]];
+      const runs = [];
+      let run = null;
+      const open = sides.indexOf(false);
+      for (let k = 1; k <= 4; k++) {
+        const side = (open + k) % 4;
+        if (!sides[side]) {
+          run = null;
+          continue;
+        }
+        if (!run) runs.push((run = [...corner[side]]));
+        run.push(...corner[(side + 1) % 4]);
+      }
+      cell = runs.flatMap((pts) => ink.polyline(p, pts));
+    }
     const t = labels[i];
     const parts = [part("shape", cell, { width: W.line }), ...move([part("label", t.strokes, { width: W.label, write: true, size: SIZE.label })], x + cw / 2 - (t.box.x + t.box.w / 2), y + ch / 2 - (t.box.y + t.box.h / 2))];
     if (it.note) {
@@ -258,7 +283,7 @@ function cellCards(board, font, region, S) {
       parts.push(...move([part("note", n.strokes, { width: W.note, color: GREY, write: true, size: SIZE.note })], nx, ny));
     }
     const words = bounds(parts.filter((q) => q.role !== "shape").flatMap((q) => q.strokes));
-    return { it, parts, labelBox: moveBox(t.box, x + cw / 2 - (t.box.x + t.box.w / 2), y + ch / 2 - (t.box.y + t.box.h / 2)), wordsBox: words, box: bounds(parts.flatMap((q) => q.strokes)) };
+    return { it, parts, labelBox: moveBox(t.box, x + cw / 2 - (t.box.x + t.box.w / 2), y + ch / 2 - (t.box.y + t.box.h / 2)), wordsBox: words, cellBox: { x, y, w: cw, h: ch }, box: bounds(parts.flatMap((q) => q.strokes)) };
   });
   // items that hang under a cell, one below the other, with room for an arrow between
   const hung = [];
@@ -299,7 +324,7 @@ const radialAngle = (i, n) => ((-90 + 180 / n + (360 * i) / n) * Math.PI) / 180;
 const groundOf = (c) => c.ground ?? (c.labelBox ? c.labelBox.y - 18 : c.box.y + c.box.h / 2);
 
 /** Lays out one region's items (row, column, grid, radial, cells or stack) with the region's top-left at (0, 0). The first region also carries the board's title, as its top line, and the guide beside it. */
-function layoutRegion(board, font, region, S, first) {
+function layoutRegion(board, font, region, S, first, index) {
   const celled = region.layout === "cells" || region.layout === "stack";
   region.items.forEach((it, i) => {
     if (it.character && it.character.facing == null) it.character.facing = faceInto(region, it, i);
@@ -317,6 +342,7 @@ function layoutRegion(board, font, region, S, first) {
     c.parts = move(c.parts, dx, dy);
     c.labelBox = moveBox(c.labelBox, dx, dy);
     c.wordsBox = moveBox(c.wordsBox, dx, dy);
+    c.cellBox = moveBox(c.cellBox, dx, dy);
     if (c.ground != null) c.ground += dy;
     c.box = moveBox(c.box, dx, dy);
   };
@@ -389,9 +415,13 @@ function layoutRegion(board, font, region, S, first) {
   }
   let title = null;
   if (region.title) {
-    const t = write(font, region.title, { x: content.x, y: top, size: SIZE.regionTitle, rng: S(`${region.id}.title`) });
+    // its number before it, in paper on a disc of the accent, says where the idea comes in the explanation
+    const nr = board.numbers ? SIZE.regionTitle * 0.78 : 0;
+    const t = write(font, region.title, { x: content.x + (nr ? 2 * nr + 22 : 0), y: top, size: SIZE.regionTitle, rng: S(`${region.id}.title`) });
     const under = ink.underline(ink.pen(S(`${region.id}.under`), { width: W.mark }), t.box.x, t.box.y + t.box.h + 6, t.box.w);
-    title = { parts: [part("text", t.strokes, { width: W.title * 0.9, write: true, size: SIZE.regionTitle }), part("underline", under, { width: W.mark, color: board.accent })], box: t.box };
+    const number = nr ? badge(board, font, S, region.id, index + 1, content.x + nr, t.box.y + SIZE.regionTitle * 0.62, nr) : [];
+    const parts = [...number, part("text", t.strokes, { width: W.title * 0.9, write: true, size: SIZE.regionTitle }), part("underline", under, { width: W.mark, color: board.accent })];
+    title = { parts, box: number.length ? union(t.box, bounds(number.flatMap((q) => q.strokes))) : t.box };
     top = t.box.y + t.box.h + 64;
   }
   // the items sit under the titles
@@ -403,7 +433,8 @@ function layoutRegion(board, font, region, S, first) {
     const line = title ?? boardTitle;
     const h = SIZE.guide;
     const feet = [content.x - 34 - GUIDE.reach * h, line.box.y + line.box.h + 40];
-    guide = { feet, box: { x: feet[0] - GUIDE.back * h, y: feet[1] - h, w: (GUIDE.back + GUIDE.reach) * h, h } };
+    const up = h * reachAbove(board.cast); // and a hat above it, if it wears one
+    guide = { feet, box: { x: feet[0] - GUIDE.back * h, y: feet[1] - h - up, w: (GUIDE.back + GUIDE.reach) * h, h: h + up } };
   }
   let box = cards.reduce((b, c) => union(b, c.box), null);
   if (title) box = union(box, title.box);
@@ -412,27 +443,44 @@ function layoutRegion(board, font, region, S, first) {
   return { region, cards, title, boardTitle, guide, box };
 }
 
+/** A region's number: a disc of the accent with the number in it, in paper, the way the steps of a page are numbered. */
+function badge(board, font, S, id, n, cx, cy, r) {
+  const p = ink.pen(S(`${id}.badge`), { width: W.mark });
+  const ring = ink.ellipse(p, cx, cy, r, r, { overshoot: 0.05 });
+  const disc = [];
+  for (let k = 0; k < 28; k++) disc.push(cx + Math.cos((2 * Math.PI * k) / 28) * (r - 1), cy + Math.sin((2 * Math.PI * k) / 28) * (r - 1));
+  const f = ink.fill(p, disc, { nib: 12, angle: -35, edge: 0.12 });
+  const size = r * (n > 9 ? 0.84 : 1.06);
+  const t = write(font, String(n), { x: 0, y: 0, size, align: "center", rng: S(`${id}.number`) });
+  const b = bounds(t.strokes);
+  return [
+    part("badge", ring, { width: W.mark }),
+    part("fill", f.strokes, { width: f.width, color: board.accent, layer: "under", opacity: 0.95 }),
+    ...move([part("number", t.strokes, { width: W.title, color: PAPER, write: true, size })], cx - (b.x + b.w / 2), cy - (b.y + b.h / 2)),
+  ];
+}
+
 /** The guide's measures, in units of its height, from the point between its feet: how far it reaches back and forward (a pointing finger), and how tall it is. */
 const GUIDE = { back: 0.32, reach: 0.56, front: 0.36 };
 
 /** The paper the guide takes on a spot, at rest (hands on its hips), facing either way. */
-const spotBox = (q, h) => ({ x: q.x - (q.facing > 0 ? GUIDE.back : GUIDE.front) * h, y: q.y - h, w: (GUIDE.back + GUIDE.front) * h, h });
+const spotBox = (q, h) => ({ x: q.x - (q.facing > 0 ? GUIDE.back : GUIDE.front) * h, y: q.y - h * (1 + (q.top ?? 0)), w: (GUIDE.back + GUIDE.front) * h, h: h * (1 + (q.top ?? 0)) });
 
 /**
  * Where the guide stands in a region: beside its title, beside its items, or
  * after them, whichever leaves it on free paper and inside the region's shot,
  * facing into the region. When none is free, the least crowded.
  */
-function freeSpot(r, elements, taken, h) {
+function freeSpot(r, elements, taken, h, top = 0) {
   const tb = elements.get(r.id)?.box;
   const items = r.items.map((id) => elements.get(id).box);
   const content = items.reduce((b, x) => union(b, x), null);
   const ground = Math.max(...items.map((b) => b.y + b.h));
   const cands = [];
-  if (tb) cands.push({ x: tb.x - 40 - GUIDE.reach * h, y: tb.y + tb.h + 40, facing: 1 });
-  cands.push({ x: content.x - 40 - GUIDE.front * h, y: ground, facing: 1 });
-  cands.push({ x: content.x + content.w + 40 + GUIDE.front * h, y: ground, facing: -1 });
-  if (tb) cands.push({ x: tb.x + tb.w + 60 + GUIDE.back * h, y: tb.y + tb.h + 40, facing: 1 });
+  if (tb) cands.push({ x: tb.x - 40 - GUIDE.reach * h, y: tb.y + tb.h + 40, facing: 1, top });
+  cands.push({ x: content.x - 40 - GUIDE.front * h, y: ground, facing: 1, top });
+  cands.push({ x: content.x + content.w + 40 + GUIDE.front * h, y: ground, facing: -1, top });
+  if (tb) cands.push({ x: tb.x + tb.w + 60 + GUIDE.back * h, y: tb.y + tb.h + 40, facing: 1, top });
   const clash = (q) => {
     const b = spotBox(q, h);
     let a = 0;
@@ -452,42 +500,6 @@ function freeSpot(r, elements, taken, h) {
   return { region: r.id, ...best.q };
 }
 
-/**
- * Where the guide stands in a region on a board with a road: on the road
- * itself, near the region's stop, where nothing drawn is in its way, facing
- * the region. Off the turns, so it stands on level road.
- */
-function roadSpot(r, road, index, elements, taken, h) {
-  const stop = road.stops[index];
-  const { pts, cum, width } = road;
-  const at = (s) => {
-    let k = 1;
-    while (k < cum.length - 1 && cum[k] < s) k++;
-    const t = Math.max(0, Math.min(1, (s - cum[k - 1]) / (cum[k] - cum[k - 1] || 1)));
-    const dx = pts[2 * k] - pts[2 * k - 2];
-    const dy = pts[2 * k + 1] - pts[2 * k - 1];
-    return { x: pts[2 * k - 2] + dx * t, y: pts[2 * k - 1] + dy * t, level: Math.abs(dy) < 0.4 * Math.abs(dx) };
-  };
-  const center = r.slot.x + r.slot.w / 2;
-  let best = null;
-  for (const d of [0, -170, 170, -340, 340, -510, 510, -680, 680, -850, 850]) {
-    const s = Math.max(0, Math.min(cum.at(-1), stop.s + d));
-    const q = at(s);
-    if (!q.level) continue;
-    const spot = { region: r.id, x: q.x, y: q.y - width / 2 + 6, facing: center >= q.x ? 1 : -1, s };
-    const b = spotBox(spot, h);
-    let a = 0;
-    for (const o of taken) {
-      const w = Math.min(b.x + b.w, o.x + o.w) - Math.max(b.x, o.x);
-      const hh = Math.min(b.y + b.h, o.y + o.h) - Math.max(b.y, o.y);
-      if (w > 0 && hh > 0) a += w * hh;
-    }
-    if (!best || a < best.a) best = { spot, a };
-    if (a === 0) break;
-  }
-  return best.spot;
-}
-
 /** A region's shot frame: its content with air round it, grown to 16:9 about its center, never smaller than the smallest shot. */
 function frameFor(box) {
   const [fw, fh] = SIZE.frame;
@@ -499,13 +511,10 @@ function frameFor(box) {
 }
 
 /**
- * Where the regions go on a canvas: packed as a mural, each region's content
- * a gap from the next along the flow, and every row with its region titles on
- * one line. A path wraps into the rows that bring the board closest to 16:9
- * and turns back on every other row, so each region is next to the one told
- * before it. A region's frame, the shot that shows it, is its content with
- * air round it; the edge of a neighbour may show in it, as the rest of a mural
- * does.
+ * Where the regions go on a canvas laid out by hand: in one row (their titles
+ * on one line), one column, or a grid of places the script gives. A region's
+ * frame, the shot that shows it, is its content with air round it; the edge of
+ * a neighbour may show in it.
  */
 function placeMural(board, laid) {
   const gap = SIZE.regionGap;
@@ -535,42 +544,22 @@ function placeMural(board, laid) {
       }
       y += heightOf(row) + gap;
     }
+  } else if (board.flow === "row") {
+    // a row: the regions side by side, their titles on one line
+    const line = lineOf([...Array(n).keys()]);
+    let x = 0;
+    laid.forEach((r, i) => {
+      pos[i] = [x, line - off[i]];
+      x += r.box.w + gap;
+    });
   } else {
-    // a path (or a row, or a column) laid as a mural: the regions of the first row side by side with their titles
-    // on one line, and every later region straight under the one above it in its column, as close as the gap
-    // allows, so a short region leaves no hole under it. A path turns back on every other row, so each region
-    // is next to the one told before it.
-    const arrange = (per) => {
-      const rows = [];
-      for (let k = 0; k * per < n; k++) rows.push([...Array(Math.min(per, n - k * per)).keys()].map((j) => k * per + j));
-      const widthOf = (row) => row.reduce((a, i) => a + laid[i].box.w, 0) + gap * (row.length - 1);
-      const W = Math.max(...rows.map(widthOf));
-      const at = Array(n);
-      const placed = [];
-      rows.forEach((row, k) => {
-        const order = board.flow === "path" && k % 2 === 1 ? [...row].reverse() : row;
-        const line = lineOf(row);
-        // the first row starts at the left; a later row is centered under it, and on a path a full row runs back from the right
-        let x = k === 0 ? 0 : (W - widthOf(row)) / 2;
-        for (const i of order) {
-          const r = laid[i];
-          // as high as the regions above it allow: under the lowest one it would overlap
-          const above = placed.filter((q) => q.x < x + r.box.w + gap * 0.5 && x < q.x + q.w + gap * 0.5);
-          const top = k === 0 ? line - off[i] : Math.max(0, ...above.map((q) => q.y + q.h)) + gap;
-          at[i] = [x, top];
-          placed.push({ x, y: top, w: r.box.w, h: r.box.h });
-          x += r.box.w + gap;
-        }
-      });
-      return { at, w: Math.max(...placed.map((q) => q.x + q.w)), h: Math.max(...placed.map((q) => q.y + q.h)) };
-    };
-    const misfit = (per) => {
-      const { w, h } = arrange(per);
-      return Math.abs(Math.log((w + 2 * SIZE.frameAir) / (h + 2 * SIZE.frameAir) / (16 / 9)));
-    };
-    let best = n;
-    for (let per = n; per >= 1; per--) if (misfit(per) < misfit(best) - 1e-9) best = per;
-    arrange(board.flow === "row" ? n : board.flow === "column" ? 1 : best).at.forEach((v, i) => (pos[i] = v));
+    // a column: one under the other, on one middle line
+    const widest = Math.max(...laid.map((r) => r.box.w));
+    let y = 0;
+    laid.forEach((r, i) => {
+      pos[i] = [(widest - r.box.w) / 2, y];
+      y += r.box.h + gap;
+    });
   }
   return laid.map((r, i) => {
     const dx = pos[i][0] - r.box.x;
@@ -595,6 +584,7 @@ function scaleLaid(r, k) {
     c.parts = sparts(c.parts);
     c.labelBox = sb(c.labelBox);
     c.wordsBox = sb(c.wordsBox);
+    c.cellBox = sb(c.cellBox);
     c.box = sb(c.box);
     if (c.ground != null) c.ground = oy + (c.ground - oy) * k;
   }
@@ -605,10 +595,10 @@ function scaleLaid(r, k) {
   r.zoom = k;
 }
 
-/** Where the regions go on the board: a canvas is packed as a mural; slides lie on the table as sheets of one size, in the order they are told. */
+/** Where the regions go on the board: a canvas is laid out as a page (or a plain row, column or grid); slides lie on the table as sheets of one size. */
 function placeRegions(board, laid) {
   const slides = board.mode === "slides";
-  if (!slides && board.flow !== "path") return { laid: placeMural(board, laid), road: null };
+  if (!slides && board.flow !== "page") return placeMural(board, laid);
   let w = 0;
   let h = 0;
   if (slides) {
@@ -623,22 +613,83 @@ function placeRegions(board, laid) {
       if (k > 1.04) scaleLaid(r, k);
     }
   }
-  // the ideas (or the sheets) along the story road, each on the other side of it from the one before
-  const boxes = laid.map((r) => (slides ? { w, h } : { w: r.box.w, h: r.box.h }));
-  const { places, road } = layRoad(boxes, slides ? { side: 46, same: 110, stagger: 0.5, band: 70 } : {});
-  const placed = laid.map((r, i) => {
-    const q = places[i];
+  // the ideas (or the sheets) in the order they are told, read as a page: left to right, then the next row down
+  const boxes = laid.map((r) => (slides ? { w, h, line: 0 } : { w: r.box.w, h: r.box.h, line: (r.title ? r.title.box.y : r.box.y) - r.box.y }));
+  const at = layPage(boxes, slides ? SIZE.sheetGap : SIZE.regionGap, slides ? SIZE.sheetGap : SIZE.rowGap);
+  return laid.map((r, i) => {
+    const [x, y] = at[i];
     if (slides) {
-      const frame = { x: q.x, y: q.y, w, h };
+      const frame = { x, y, w, h };
       // the content is centered in its sheet, in the part above the caption's band
-      return { ...r, frame, side: q.side, dx: frame.x + (frame.w - r.box.w) / 2 - r.box.x, dy: frame.y + (frame.h * (1 - CAPTION_BAND) - r.box.h) / 2 - r.box.y };
+      return { ...r, frame, dx: frame.x + (frame.w - r.box.w) / 2 - r.box.x, dy: frame.y + (frame.h * (1 - CAPTION_BAND) - r.box.h) / 2 - r.box.y };
     }
-    const dx = q.x - r.box.x;
-    const dy = q.y - r.box.y;
+    const dx = x - r.box.x;
+    const dy = y - r.box.y;
     const slot = moveBox(r.box, dx, dy);
-    return { ...r, frame: frameFor(slot), slot, side: q.side, dx, dy };
+    return { ...r, frame: frameFor(slot), slot, dx, dy };
   });
-  return { laid: placed, road };
+}
+
+/**
+ * The regions laid out as a page is read: left to right in rows, the rows top
+ * to bottom, as many rows as bring the board closest to 16:9. The regions are
+ * shared out among the rows in their order so the rows run about as wide as
+ * each other; each row has its titles on one line, its spare width goes
+ * between its regions (up to a gap more) and the rest round it, so the page
+ * has no empty corner. Returns the top-left of each box.
+ */
+function layPage(boxes, gap, rowGap) {
+  const n = boxes.length;
+  const widthOf = (a, b) => boxes.slice(a, b).reduce((sum, q) => sum + q.w, 0) + gap * (b - a - 1);
+  // the split into k rows, in order, whose widest row is the narrowest
+  const split = (k) => {
+    const best = Array.from({ length: k + 1 }, () => Array(n + 1).fill(Infinity));
+    const cut = Array.from({ length: k + 1 }, () => Array(n + 1).fill(0));
+    best[0][0] = 0;
+    for (let j = 1; j <= k; j++)
+      for (let i = j; i <= n; i++)
+        for (let s = j - 1; s < i; s++) {
+          const v = Math.max(best[j - 1][s], widthOf(s, i));
+          if (v < best[j][i] - 1e-6) {
+            best[j][i] = v;
+            cut[j][i] = s;
+          }
+        }
+    const rows = [];
+    for (let j = k, i = n; j > 0; j--) {
+      const s = cut[j][i];
+      rows.unshift(Array.from({ length: i - s }, (_, q) => s + q));
+      i = s;
+    }
+    return rows;
+  };
+  const arrange = (rows) => {
+    const W = Math.max(...rows.map((row) => widthOf(row[0], row.at(-1) + 1)));
+    const at = Array(n);
+    let y = 0;
+    for (const row of rows) {
+      const line = Math.max(...row.map((i) => boxes[i].line));
+      const natural = widthOf(row[0], row.at(-1) + 1);
+      const extra = row.length > 1 ? Math.min((W - natural) / (row.length - 1), gap) : 0;
+      let x = (W - natural - extra * (row.length - 1)) / 2;
+      for (const i of row) {
+        at[i] = [x, y + line - boxes[i].line];
+        x += boxes[i].w + gap + extra;
+      }
+      y += Math.max(...row.map((i) => line - boxes[i].line + boxes[i].h)) + rowGap;
+    }
+    return { at, W, H: y - rowGap, rows };
+  };
+  let best = null;
+  for (let k = 1; k <= n; k++) {
+    const a = arrange(split(k));
+    // close to 16:9, with rows about as wide as each other
+    const shape = Math.abs(Math.log((a.W + 2 * SIZE.frameAir) / (a.H + 2 * SIZE.frameAir) / (16 / 9)));
+    const ragged = a.rows.reduce((sum, row) => sum + (a.W - widthOf(row[0], row.at(-1) + 1)) / a.W, 0) / a.rows.length;
+    const score = shape + 0.8 * ragged;
+    if (!best || score < best.score - 1e-9) best = { ...a, score };
+  }
+  return best.at;
 }
 
 /** The point where a ray from a box's center toward (tx, ty) leaves the box, `gap` further out. */
@@ -652,6 +703,24 @@ function exitPoint(b, tx, ty, gap) {
   return [cx + dx * s + (dx / len) * gap, cy + dy * s + (dy / len) * gap];
 }
 
+/** The middle of an element: its ring's, when it has one. */
+const centerOf = (e) => {
+  const b = e.ring ?? e.box;
+  return [b.x + b.w / 2, b.y + b.h / 2];
+};
+
+/** Where a link leaves an element toward (tx, ty): a ring at its outline, anything else at its box; `gap` further out. */
+function leave(e, tx, ty, gap) {
+  const r = e.ring;
+  if (!r) return exitPoint(e.box, tx, ty, gap);
+  const [cx, cy] = centerOf(e);
+  const dx = tx - cx;
+  const dy = ty - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const t = 1 / (Math.hypot(dx / (r.w / 2 || 1), dy / (r.h / 2 || 1)) || 1);
+  return [cx + dx * t + (dx / len) * gap, cy + dy * t + (dy / len) * gap];
+}
+
 /** A frame grown to 16:9 about its center. */
 const fit169 = (f) => {
   const w = Math.max(f.w, (f.h * 16) / 9);
@@ -662,7 +731,7 @@ const fit169 = (f) => {
 /** Composes the whole board: every element, with its strokes, its box and the region it belongs to. */
 export function compose(board, font) {
   const S = streams(board.seed);
-  const { laid, road } = placeRegions(board, board.regions.map((r, i) => layoutRegion(board, font, r, S, i === 0)));
+  const laid = placeRegions(board, board.regions.map((r, i) => layoutRegion(board, font, r, S, i === 0, i)));
   const elements = new Map();
   const regions = [];
   let guideStart = null;
@@ -677,7 +746,7 @@ export function compose(board, font) {
       // the guide is an actor, not strokes: its element holds the place it first stands in
       const e = { id: "guide", kind: "guide", parts: [], box: moveBox(r.guide.box, r.dx, r.dy), region: r.region.id };
       elements.set("guide", e);
-      guideStart = { region: r.region.id, x: r.guide.feet[0] + r.dx, y: r.guide.feet[1] + r.dy, facing: 1 };
+      guideStart = { region: r.region.id, x: r.guide.feet[0] + r.dx, y: r.guide.feet[1] + r.dy, facing: 1, top: reachAbove(board.cast) };
     }
     // on a slide, the place beside the sheet's title
     if (r.guide) reserved.set(r.region.id, { region: r.region.id, x: r.guide.feet[0] + r.dx, y: r.guide.feet[1] + r.dy, facing: 1 });
@@ -688,6 +757,10 @@ export function compose(board, font) {
       e.labelBox = moveBox(c.labelBox, r.dx, r.dy);
       e.wordsBox = moveBox(c.wordsBox, r.dx, r.dy);
       e.framed = c.it.shape !== "none" || ((r.region.layout === "cells" || r.region.layout === "stack") && c.it.under == null);
+      e.cell = moveBox(c.cellBox, r.dx, r.dy) ?? null;
+      // a ring (a circle or an ellipse drawn round it): a link meets its outline, not the corner of its box
+      const ring = (c.it.shape === "circle" || c.it.shape === "ellipse") && e.parts.find((q) => q.role === "shape");
+      e.ring = ring ? bounds(ring.strokes) : null;
       e.zoom = r.zoom ?? 1;
       elements.set(c.it.id, e);
     }
@@ -700,7 +773,9 @@ export function compose(board, font) {
     else elements.delete("guide");
   }
   // the opening shot: the guide presenting the title, close, before the camera pulls back to the first idea
-  const opening = elements.has("title") ? pad([elements.get("title"), elements.get("guide")].filter(Boolean).reduce((b, e) => union(b, e.box), null), 70) : null;
+  const g0 = elements.get("guide")?.box;
+  const leap = INTRO_HEIGHT[board.cast?.intro] ?? 0; // room for it to jump, when it comes alive with a jump
+  const opening = elements.has("title") ? pad([elements.get("title").box, g0 && { ...g0, y: g0.y - leap, h: g0.h + leap }].filter(Boolean).reduce((b, x) => union(b, x), null), 70) : null;
 
   // links. Inside a region, an arrow between two items. Between regions, a bridge: the connection that
   // ties one idea to another on the map. It is routed round what stands in its way, and drawn larger in
@@ -723,8 +798,12 @@ export function compose(board, font) {
       f = Math.min(3, Math.max(1, both / own));
     }
     const others = obstacles.filter((e) => e.id !== l.from && e.id !== l.to).map((e) => pad(e.box, 12 * f));
-    let [x1, y1] = exitPoint(a, b.x + b.w / 2, b.y + b.h / 2, 18 * f);
-    let [x2, y2] = exitPoint(b, a.x + a.w / 2, a.y + a.h / 2, 22 * f);
+    // a link leaves a box a little way off it, and a ring right at its outline: a tree's edge touches its nodes
+    const [ax, ay] = centerOf(from);
+    const [bx, by] = centerOf(to);
+    const edge = l.style === "line";
+    let [x1, y1] = leave(from, bx, by, (from.ring ? (edge ? 5 : 10) : 18) * f);
+    let [x2, y2] = leave(to, ax, ay, (to.ring ? (edge ? 5 : 14) : 22) * f);
     if (bridge && l.bend == null) {
       // the sides of each box that face the other: the line may leave by any of them (not through a title above it)
       const sides = (bx, tx, ty, gap) => {
@@ -831,20 +910,24 @@ export function compose(board, font) {
       const target = elements.get(m.target);
       // several targets side by side are marked as one: the box round all of them
       const many = m.targets.length > 1 ? m.targets.map((id) => elements.get(id)) : null;
-      const span = many && many.reduce((b, e) => union(b, e.kind === "item" && !e.framed ? e.wordsBox ?? e.box : e.box), null);
+      const span = many && many.reduce((b, e) => union(b, e.kind === "item" && !e.framed ? e.wordsBox ?? e.box : e.cell ?? e.box), null);
       const tb = span ?? (m.target === "title" || target.kind !== "item" ? target.box : target.labelBox ?? target.box);
       const z = zoomOf.get(target.region) ?? 1;
       const p = ink.pen(S(id), { width: W.mark * Math.pow(z, 0.6) });
+      // a highlight runs a little past the words it marks; over cells or frames it stays inside them, clear of their edges and of the next ones
+      const inside = !!many && many.every((e) => e.framed);
+      const nib = Math.max(18, (inside ? tb.h - 16 : tb.h) * 0.5);
+      const hb = inside ? { x: tb.x + nib / 2 + 8, y: tb.y + 8, w: Math.max(2, tb.w - nib - 16), h: tb.h - 16 } : pad(tb, 6, -2);
       const strokes = {
-        // an item's words are circled; an item in a frame of its own is circled round the frame
-        circle: () => ink.circleAround(p, span ?? (target.kind === "item" && !target.framed ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb), 12),
+        // an item's words are circled; an item in a frame of its own round the frame; a cell, which shares its edges, at its words
+        circle: () => ink.circleAround(p, span ?? (target.cell ? target.labelBox : target.kind === "item" && !target.framed ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb), target.cell && !span ? 8 : 12),
         underline: () => ink.underline(p, tb.x, tb.y + tb.h + 8, tb.w),
         box: () => ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32),
         cross: () => ink.crossOut(p, tb),
-        highlight: () => ink.highlight(ink.pen(S(id), { width: Math.max(18, tb.h * 0.5) }), pad(tb, 6, -2)),
+        highlight: () => ink.highlight(ink.pen(S(id), { width: nib }), hb),
       }[m.kind]();
       const hl = m.kind === "highlight";
-      const e = element(id, "mark", [part("mark", strokes, { width: hl ? Math.max(18, tb.h * 0.5) : W.mark * Math.pow(z, 0.6), color: hl ? HIGHLIGHTER : board.accent, layer: hl ? "under" : "ink", opacity: hl ? 0.6 : 1 })]);
+      const e = element(id, "mark", [part("mark", strokes, { width: hl ? nib : W.mark * Math.pow(z, 0.6), color: hl ? HIGHLIGHTER : board.accent, layer: hl ? "under" : "ink", opacity: hl ? 0.6 : 1 })]);
       e.region = target.region;
       e.target = m.target;
       e.targets = m.targets;
@@ -853,71 +936,19 @@ export function compose(board, font) {
       bt.draw.push(id);
     });
   });
-  // the story arrows: a wide arrow in the accent from each idea to the next, in the order they are told,
-  // across the gap between them. They are what ties the board together, so no idea is left an island
-  // and no long line is needed for it.
-  if (board.story && road) {
-    // the road, drawn a stretch at a time: its start with the title, a stretch on each flight to the next idea, its arrowhead at the end
-    const n = regions.length;
-    const stops = road.stops;
-    const pieces = [{ id: "story-0", s0: 0, s1: stops[0].s, from: regions[0].id, to: regions[0].id, cap: true }];
-    for (let i = 0; i + 1 < n; i++) pieces.push({ id: `story-${i + 1}`, s0: stops[i].s, s1: stops[i + 1].s, from: regions[i].id, to: regions[i + 1].id });
-    pieces.push({ id: "story-end", s0: stops[n - 1].s, s1: road.cum.at(-1), from: regions[n - 1].id, to: regions[n - 1].id, head: true });
-    for (const q of pieces) {
-      if (q.s1 - q.s0 < 8) continue;
-      const path = stretch(road.pts, road.cum, q.s0, q.s1);
-      const p = ink.pen(S(q.id), { width: W.story });
-      const rb = ink.ribbon(p, path, { width: road.width, head: q.head });
-      const lines = [...rb.lines];
-      if (q.cap) {
-        // the road begins in a round end
-        const [x0, y0, x1, y1] = path;
-        const a = Math.atan2(y1 - y0, x1 - x0);
-        const cap = [];
-        for (let k = 0; k <= 10; k++) {
-          const t = a + Math.PI / 2 + (Math.PI * k) / 10;
-          cap.push(x0 + Math.cos(t) * road.width / 2, y0 + Math.sin(t) * road.width / 2);
-        }
-        lines.unshift(ink.wobble(p, cap, { amp: 0.6 }));
-      }
-      const sh = ink.fill(p, ink.shift(rb.poly, 8, 9), { nib: 16 });
-      // and a dashed line down its middle, in paper, so it reads as a road
-      const mid = dashes(q.head ? stretch(path, cumulate(path), 0, Math.max(0, cumulate(path).at(-1) - road.width * 1.6)) : path, 20, 16);
-      const st = element(q.id, "story", [
-        part("arrow", lines, { width: W.story }),
-        part("fill", rb.along(14), { width: 14, color: board.accent, layer: "under", opacity: 0.9 }),
-        part("lane", mid.map((d) => ink.wobble(p, d, { amp: 0.4 })), { width: 3.4, color: PAPER }),
-        part("shadow", sh.strokes, { width: sh.width, color: SHADOW, layer: "shadow" }),
-      ]);
-      st.region = q.to;
-      st.joins = [q.from, q.to];
-      st.path = path;
-      elements.set(q.id, st);
-    }
-    // the road's start is drawn as the camera first goes to the first idea, its end as it pulls back to the whole board
-  } else if (board.story) {
-    const blockers = [...elements.values()].filter((e) => !e.joins && e.kind !== "mark").map((e) => pad(e.box, 16));
-    for (let i = 0; i + 1 < regions.length; i++) {
-      const st = storyArrow(board, S, regions[i], regions[i + 1], elements, blockers, drawnCurves, `story-${i + 1}`);
-      elements.set(st.id, st);
-      drawnCurves.push(st.path);
-      blockers.push(pad(st.box, 8));
-    }
-  }
-
   // the guide's spots: where it stands in each idea, in free paper beside it, so it never covers the drawing
   let guide = null;
   if (guideStart) {
     const h = SIZE.guide;
-    const taken = [...elements.values()].filter((e) => e.kind !== "guide" && e.kind !== "story").map((e) => pad(e.box, 18));
+    const taken = [...elements.values()].filter((e) => e.kind !== "guide").map((e) => pad(e.box, 18));
     const spots = [guideStart];
     for (const r of regions) {
       if (r.id === guideStart.region) continue;
-      const spot = reserved.get(r.id) ?? (road && board.mode !== "slides" ? roadSpot(r, road, regions.indexOf(r), elements, taken, h) : freeSpot(r, elements, taken, h));
+      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast))) };
       spots.push(spot);
       taken.push(pad(spotBox(spot, h), 10));
     }
-    guide = { h, rig: rig(ink.pen(S("guide"), { width: W.icon }), h, board.accent), spots, road: board.mode !== "slides" ? road : null };
+    guide = { h, rig: rig(ink.pen(S("guide"), { width: W.icon }), h, board.accent, board.cast), spots };
   }
 
   // a region's frame holds everything drawn in it (a note or a mark may reach past the content), grown to 16:9;
@@ -934,7 +965,12 @@ export function compose(board, font) {
   const all = [...elements.values()];
   let extent = all.reduce((b, e) => union(b, e.box), null);
   if (board.mode === "slides") for (const s of sheets.values()) extent = union(extent, s);
-  for (const q of guide?.spots ?? []) extent = union(extent, spotBox(q, guide.h));
+  if (guide) {
+    // the guide ends beside the idea it presented last, and the closing shot holds it there
+    let last = null;
+    for (const bt of board.beats) for (const id of bt.draw) if (elements.get(id)?.region && !elements.get(id).joins) last = elements.get(id).region;
+    extent = union(extent, spotBox(guide.spots.find((q) => q.region === last) ?? guide.spots.at(-1), guide.h));
+  }
   // the end card: the title in paper on the dark, in the frame's own coordinates (1920 x 1080), underlined in the accent
   const et = write(font, board.title, { x: 960, y: 0, size: 76, align: "center", maxWidth: 1500, lineHeight: 1.5, rng: S("endcard") });
   const ey = 520 - (et.box.y + et.box.h / 2);
@@ -943,99 +979,6 @@ export function compose(board, font) {
     ...ink.underline(ink.pen(S("endcard.under"), { width: W.mark * 1.3 }), et.box.x, et.box.y + ey + et.box.h + 22, et.box.w).map((pts) => ({ pts, width: W.mark * 1.3, color: board.accent })),
   ];
   return { elements, regions, sheets, opening, guide, endCard, extent: pad(extent, board.mode === "slides" ? 60 : 110) };
-}
-
-/**
- * The story arrow between two regions told one after the other: a wide arrow
- * in the accent, outlined in ink, with a shadow, across the gap between them.
- * Side by side it arcs over the gap at a height both share; one above the
- * other it drops down the gap; corner to corner it swings from one to the
- * other. Of a few such arrows, the one that runs into the least wins.
- * Between slides it runs from the margin of one sheet to the next.
- */
-function storyArrow(board, S, a, b, elements, blockers, curves, id) {
-  const slides = board.mode === "slides";
-  const A = slides ? a.frame : a.slot;
-  const B = slides ? b.frame : b.slot;
-  const m = slides ? -70 : 46; // how far from each side it starts and stops (on a slide: inside the sheet's margin)
-  const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x);
-  const oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
-  const cands = [];
-  if (slides) {
-    // between sheets: from the margin of one to the margin of the next, at the height of their titles
-    const right = B.x > A.x;
-    const y = (oy > 120 ? Math.max(A.y, B.y) + oy * 0.22 : null);
-    if (y != null) for (const bend of [-0.2, 0.2]) cands.push({ s: [right ? A.x + A.w + m : A.x - m, y], e: [right ? B.x - m : B.x + B.w + m, y], bend: right ? bend : -bend });
-    else {
-      const down = B.y > A.y;
-      const x = Math.max(A.x, B.x) + Math.max(0, ox) * 0.5;
-      for (const bend of [0.2, -0.2]) cands.push({ s: [x, down ? A.y + A.h + m : A.y - m], e: [x, down ? B.y - m : B.y + B.h + m], bend });
-    }
-  } else {
-    // on a canvas the arrow points at where the next idea starts, its title, from the side of this one that faces it;
-    // when that path is long or in the way, at the nearest side of the next region instead
-    const tb = elements.get(b.id)?.box ?? B;
-    const right = B.x >= A.x + A.w - 1;
-    const left = B.x + B.w <= A.x + 1;
-    const below = !right && !left && B.y > A.y;
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const ends = [];
-    if (right) ends.push({ e: [tb.x - 28, tb.y + tb.h * 0.55], title: true }, { e: [B.x - m * 0.6, clamp(A.y + A.h / 2, B.y + 40, B.y + B.h - 40)], title: false });
-    else if (left) ends.push({ e: [tb.x + tb.w + 28, tb.y + tb.h * 0.55], title: true }, { e: [B.x + B.w + m * 0.6, clamp(A.y + A.h / 2, B.y + 40, B.y + B.h - 40)], title: false });
-    else if (below) {
-      ends.push({ e: [tb.x + Math.min(tb.w * 0.35, 160), tb.y - 30], title: true });
-      const lo = Math.max(A.x, B.x);
-      const hi = Math.min(A.x + A.w, B.x + B.w);
-      if (hi - lo > 80) ends.push({ e: [(lo + hi) / 2, B.y - m * 0.6], title: false });
-      else ends.push({ e: [clamp(A.x + A.w / 2, B.x + 60, B.x + B.w - 60), B.y - m * 0.6], title: false });
-    } else ends.push({ e: [clamp(A.x + A.w / 2, B.x + 60, B.x + B.w - 60), B.y + B.h + m * 0.6], title: false });
-    for (const { e: e0, title } of ends) {
-      for (const k of [0, 1, 2, 3]) {
-        let s0;
-        if (right) s0 = [A.x + A.w + m * 0.6, clamp(e0[1] + k * 60, A.y + 40, A.y + A.h - 40)];
-        else if (left) s0 = [A.x - m * 0.6, clamp(e0[1] + k * 60, A.y + 40, A.y + A.h - 40)];
-        else if (below) s0 = [clamp(e0[0] + (k - 1.5) * 50, A.x + 60, A.x + A.w - 60), A.y + A.h + m * 0.6];
-        else s0 = [clamp(e0[0] + (k - 1.5) * 50, A.x + 60, A.x + A.w - 60), A.y - m * 0.6];
-        for (const bend of [-0.22, 0.22, -0.1, 0.1]) cands.push({ s: s0, e: e0, bend: right ? bend : -bend, title });
-      }
-    }
-  }
-  const centerline = ({ s, e, bend }) => {
-    const len = Math.hypot(e[0] - s[0], e[1] - s[1]) || 1;
-    const nx = -(e[1] - s[1]) / len;
-    const ny = (e[0] - s[0]) / len;
-    const k = bend * len;
-    return cubic(s[0], s[1], s[0] + (e[0] - s[0]) / 3 + nx * k, s[1] + (e[1] - s[1]) / 3 + ny * k, s[0] + (2 * (e[0] - s[0])) / 3 + nx * k, s[1] + (2 * (e[1] - s[1])) / 3 + ny * k, e[0], e[1], 6);
-  };
-  const half = SIZE.story * 0.62;
-  const cost = (pts) => {
-    let n = 0;
-    for (let i = 0; i < pts.length; i += 2) {
-      // the arrow is wide: a box within its half-width of the centerline is in the way
-      if (blockers.some((o) => pts[i] > o.x - half && pts[i] < o.x + o.w + half && pts[i + 1] > o.y - half && pts[i + 1] < o.y + o.h + half)) n++;
-    }
-    for (let i = 0; i + 3 < pts.length; i += 2) n += 15 * crossings(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], curves);
-    return n;
-  };
-  // in the way of nothing first; then short, and pointing at a title when that is not much longer
-  let best = null;
-  for (const c of cands) {
-    const pts = centerline(c);
-    const n = cost(pts) * 1000 + Math.hypot(c.e[0] - c.s[0], c.e[1] - c.s[1]) * (c.title === false ? 1.6 : 1) + Math.abs(c.bend) * 40;
-    if (!best || n < best.n) best = { pts, n };
-  }
-  const p = ink.pen(S(id), { width: W.story });
-  const fat = ink.fatArrow(p, best.pts, { width: SIZE.story });
-  const sh = ink.fill(p, ink.shift(fat.poly, 8, 9), { nib: 16 });
-  const st = element(id, "story", [
-    part("arrow", [fat.outline], { width: W.story }),
-    part("fill", fat.along(15), { width: 15, color: board.accent, layer: "under", opacity: 0.92 }),
-    part("shadow", sh.strokes, { width: sh.width, color: SHADOW, layer: "shadow" }),
-  ]);
-  st.region = b.id;
-  st.joins = [a.id, b.id];
-  st.path = best.pts;
-  return st;
 }
 
 /** The best bend for a line between two points, and how much it hits, without a label. */
@@ -1119,13 +1062,6 @@ function crossings(ax, ay, bx, by, curves) {
     }
   }
   return n;
-}
-
-/** The cumulative lengths along a polyline. */
-function cumulate(pts) {
-  const cum = [0];
-  for (let k = 1; k < pts.length / 2; k++) cum.push(cum[k - 1] + Math.hypot(pts[2 * k] - pts[2 * k - 2], pts[2 * k + 1] - pts[2 * k - 1]));
-  return cum;
 }
 
 /** A polyline cut into dashes of `on` units with `off` gaps, for dashed links. */

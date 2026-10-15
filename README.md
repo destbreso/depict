@@ -21,10 +21,10 @@
 </p>
 
 <p align="center">
-  <a href="skills/depict/examples/cpu-cache/cpu-cache.html"><img src="assets/drawing.gif" width="800" alt="A hand-drawn board being drawn: the guide, a cartoon marker with a red cap, is drawn stroke by stroke, comes alive and points at the title 'How a CPU cache works' as it is written with a yellow highlighter swash; the camera pulls back as a CPU chip is drawn and a red road with a dashed lane starts under it; then the cache and two memory sticks, circled, while a caption under the board says each sentence."></a>
+  <a href="skills/depict/examples/cpu-cache/cpu-cache.html"><img src="assets/drawing.gif" width="800" alt="A hand-drawn board being drawn: the guide, a cartoon marker with a red cap, glasses, a bow tie and a teacher\'s pointer, is drawn stroke by stroke beside the title How a CPU cache works, comes alive its own way and presents the title as it is written over a yellow highlighter swash; then the first idea, numbered 1 in a red disc, Where data lives, and a green CPU chip drawn pin by pin, while a caption under the board says each sentence."></a>
 </p>
 
-<p align="center"><sub><code>skills/depict/examples/cpu-cache</code>: the first thirty seconds of a one-minute board. Every letter is written in pen order; the pen follows the tip; the guide is drawn, then performs.</sub></p>
+<p align="center"><sub><code>skills/depict/examples/cpu-cache</code>: the opening of a one-minute board. Every letter is written in pen order; the pen follows the tip; the guide is drawn, then performs.</sub></p>
 
 ## Quick start
 
@@ -45,14 +45,15 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 ## What you get
 
 - **A page that plays like a video.** One standalone HTML file, no network. A pen draws each shape and writes each word in the order a hand would, and each sentence shows as a caption. Pause, scrub, step sentence by sentence, change the speed.
-- **A guide with a face.** Every board is presented by the same character: a felt marker with its cap in the board's accent. It is drawn first, then comes alive, waves, points at each new thing as the pen draws it, follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops along the road to the next idea and cheers at the end. It blinks and breathes while you explore, and waves back when you tap it.
-- **A story road.** The ideas sit on alternate sides of one winding road, so any number of them composes into a 16:9 poster instead of a grid of boxes; a stretch of road is drawn on each camera flight from one idea to the next.
+- **A guide with a face.** Every board is presented by the same character: a felt marker with its cap in the board's accent. It is drawn first, then comes alive its own way (a wave, a hop, a spin, a bow, a tip of its cap, a jump), points at each new thing as the pen draws it, follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops to the next idea and cheers at the end. It is dressed for the subject: a mortarboard and a book, a hard hat and a wrench, glasses and a pointer, headphones, a crown, a ruler, a coin, a clock. It blinks and breathes while you explore, and waves back when you tap it.
+- **Numbered ideas, read as a page.** Each idea is numbered in the order it is told and the ideas are laid out as a page is read, left to right in balanced rows, so three or ten compose into one 16:9 poster with no empty corner.
+- **Explained completely.** The problem and why the obvious way falls short, the mechanism traced step by step on one worked example, why it works, what it costs, the classic mistakes and when to use it.
 - **Things drawn as they are.** A chip with its pins, memory sticks, a server rack, bars and curves drawn to scale, colored in with marker fills, framed with drop shadows; people only where people are part of the idea.
-- **An ending, not a stop.** After the last sentence the camera pulls back to the whole board, then comes in on the guide waving goodbye as a circle closes on it, and the title is written on the dark: the same outro on every board.
+- **An ending, not a stop.** After the last sentence the camera pulls back to the whole board, then comes in on the guide saying goodbye its own way (a wave, a bow, a cheer, a salute, a tip of its cap, a spin) as a circle closes on it, and the title is written on the dark.
 - **A board that stays.** When the film is over the page goes back to the whole board: zoom it, drag it, and tap any part to go back to the sentence that explained it.
 - **Handwriting, not a wipe.** Words are written letter by letter from single-stroke fonts, with a little tilt and drift per letter, in two hands (a clear print and a looser marker), accents and all.
 - **A camera that is computed.** Every shot is checked to be readable; the board opens close on the guide and the title, the camera flies between shots along the optimal zoom path, and the board ends on a held overview that reads as a map of the idea.
-- **Two modes from one script.** A tour of one big canvas, or sketched slides that end laid along the road like a storyboard.
+- **Two modes from one script.** A tour of one big canvas, or sketched slides that end laid out as a numbered storyboard.
 - **Live parts.** An item can open into a running [Dissect](https://github.com/destbreso/dissect) figure, grown from its place on the board: the board explains, the figure lets you try.
 - **A video when you want one.** 1920 x 1080 with the captions burned in, in the form social sites take without trouble.
 
@@ -60,16 +61,16 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 
 <table>
   <tr>
-    <td width="50%"><a href="skills/depict/examples/cpu-cache/cpu-cache.html"><img src="assets/cpu-cache.png" alt="The closing overview of How a CPU cache works: a red road with a dashed lane winds across the board; above it, Where data lives (a green CPU chip, a yellow cache block with a bolt, two memory sticks circled) and Why it pays off (a yellow loop arrow, a row of memory with its neighbors colored, a banner Most reads hit); below it, Hit or miss (a cache block with the found row and a check, an hourglass); the guide stands on the road at the end."></a></td>
-    <td width="50%"><a href="skills/depict/examples/compound-interest/compound-interest.html"><img src="assets/compound-interest.png" alt="Compound interest as four sketched slides laid along a red road: simple interest with a coin stack, compound interest with growing green bars, the gap between a line and a curve colored yellow with 30 years circled, and the rule of 72 with a person saying 72 divided by 10 is 7.2 and the guide beside the title."></a></td>
+    <td width="50%"><a href="skills/depict/examples/cpu-cache/cpu-cache.html"><img src="assets/cpu-cache.png" alt="The closing overview of How a CPU cache works, laid out as a numbered page: 1 Where data lives (a green CPU chip, a yellow cache block with a bolt, two memory sticks circled, a yellow arrow of 1 ns and a dashed one of 100 ns), then below it 2 Hit or miss (a cache block with the found row and a check, an hourglass) and 3 Why it pays off (a yellow loop arrow, a row of memory with its neighbors colored, a banner Most reads hit), and the guide in glasses and a bow tie, holding a pointer."></a></td>
+    <td width="50%"><a href="skills/depict/examples/compound-interest/compound-interest.html"><img src="assets/compound-interest.png" alt="Compound interest as four numbered sketched slides laid out as a storyboard: 1 simple interest with a coin stack, 2 compound interest with growing green bars, 3 the gap between a line and a curve colored yellow with 30 years circled, and 4 the rule of 72 with a person saying 72 divided by 10 is 7.2 and the guide in a bow tie holding a coin."></a></td>
   </tr>
   <tr>
-    <td><b>How a CPU cache works.</b> A canvas tour along the road: the chip, the cache and the memory drawn as they are, a hit and a miss, why it pays off.</td>
-    <td><b>Compound interest.</b> Slides along the road: one idea per sheet, every chart drawn to scale.</td>
+    <td><b>How a CPU cache works.</b> A canvas tour: the chip, the cache and the memory drawn as they are, a hit and a miss, why it pays off.</td>
+    <td><b>Compound interest.</b> Slides: one idea per numbered sheet, every chart drawn to scale.</td>
   </tr>
   <tr>
-    <td width="50%"><a href="skills/depict/examples/ddos/ddos.html"><img src="assets/ddos.png" alt="How a site survives a DDoS attack along the road: the attack (a person waving, a server rack circled, three frowning robots sending a yellow flood arrow), the layers at the edge drawn as a stack (rules, rate limit, challenge, cache), and behind the edge autoscaling racks with a plus and a Try it bubble with a play mark."></a></td>
-    <td width="50%"><a href="skills/depict/examples/hash-table/hash-table.html"><img src="assets/hash-table.png" alt="How a hash table works along the road: an array with one jump to slot 3 and a worried person searching for Ana, a tag hashed through a hash sign to 2,615 % 4 = 3, four buckets with Ana and then Ben chained under bucket 3, and why it is fast ending in a banner."></a></td>
+    <td width="50%"><a href="skills/depict/examples/ddos/ddos.html"><img src="assets/ddos.png" alt="How a site survives a DDoS attack as a numbered page: 1 the attack (a person waving, a server rack circled, three frowning robots sending a yellow flood arrow), 2 the layers at the edge drawn as a stack (rules, rate limit, challenge, cache) and 3 behind the edge, autoscaling racks with a plus and a Try it bubble with a play mark; the guide wears a yellow hard hat and holds a wrench."></a></td>
+    <td width="50%"><a href="skills/depict/examples/hash-table/hash-table.html"><img src="assets/hash-table.png" alt="How a hash table works as a numbered page: 1 an array with one jump to slot 3 and a worried person searching for Ana, 2 a tag hashed through a hash sign to 2,615 % 4 = 3, 3 four buckets with Ana and then Ben chained under bucket 3, and 4 why it is fast, ending in a banner; the guide wears glasses and holds a magnifier."></a></td>
   </tr>
   <tr>
     <td><b>How a site survives a DDoS attack.</b> The last item opens the running Dissect figure of the same system, where every layer has a switch.</td>
@@ -116,11 +117,11 @@ The agent writes a **board script**: the idea's regions, the items in them (a sk
 
 The kit does the rest, in Node, with nothing but its own modules:
 
-1. **Layout.** Items sit in their region by row (on a ground line), column, grid, radial or cells; the regions sit on alternate sides of a winding road that turns back row after row, as many rows as make the board 16:9; every region gets a frame that holds all of it.
+1. **Layout.** Items sit in their region by row (on a ground line), column, grid, radial or cells; the regions are numbered and laid out in reading order, in balanced rows, as many as make the board 16:9; every region gets a frame that holds all of it.
 2. **Strokes.** Every shape, sketch, icon and letter becomes polylines in pen order, wobbled by a seeded hand: lines bowed and jittered as Rough.js draws them, ellipses that overshoot where they close, letters from single-stroke fonts; shapes are colored in with a marker's passes and cast grey shadows.
-3. **Time.** Each stroke gets its moment: the pen's pace, the lifts between strokes, and each beat at least as long as its sentence takes to read; a stretch of road is drawn on each flight.
+3. **Time.** Each stroke gets its moment: the pen's pace, the lifts between strokes, and each beat at least as long as its sentence takes to read.
 4. **Camera.** The board opens close on the guide and the title; each beat is shot from its region's frame; between shots the camera flies along van Wijk and Nuij's path; the board ends on the overview.
-5. **The guide.** A rig of components (cap, body, eyes, pupils, brows, mouths, rubber-hose arms, gloves, legs) and a track written from the timeline: where it stands, its hops along the road, its gestures, feelings, gaze and blinks.
+5. **The guide.** A rig of components (cap, body, eyes, pupils, brows, mouths, rubber-hose arms, gloves, legs, and what it wears and holds) and a track written from the timeline: where it stands, how it arrives and leaves, its hops, bows, spins and tipped cap, its gestures, feelings, gaze and blinks.
 6. **Page.** All of it goes into one HTML file whose player draws the board and poses the guide as a pure function of time, `render(t)`. Playing, scrubbing and capturing a video frame by frame are the same call.
 
 ## Checks

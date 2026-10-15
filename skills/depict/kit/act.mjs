@@ -7,6 +7,8 @@
 
 const easeInOut = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
 const clamp01 = (u) => Math.max(0, Math.min(1, u));
+/** Up over the first share of a span, held, and down over its last: how a bow or a tipped cap comes and goes. */
+const envelope = (u, edge = 0.3) => easeInOut(clamp01(Math.min(u, 1 - u) / edge));
 const lastAt = (keys, t) => {
   let k = null;
   for (const key of keys) {
@@ -18,7 +20,7 @@ const lastAt = (keys, t) => {
 
 /**
  * The state of an actor at time t: { x, y, facing, lift, sx, sy, lean,
- * front, back, feel, look, blink, shown }. Hands are { hand, bow, glove } in
+ * front, back, feel, look, blink, cap, shown }. Hands are { hand, bow, glove } in
  * the figure's own frame (x toward the way it faces, y down, origin between
  * its feet); `look` is the pupils' offset in that frame.
  */
@@ -44,7 +46,7 @@ export function actorAt(actor, t) {
     const u = (t - m.t0) / (m.t1 - m.t0);
     const s = easeInOut(u) * 0.35 + u * 0.65;
     if (m.path) {
-      // along its way (the road), at the same share of its length
+      // along its way, at the same share of its length
       const q = along(m.path, s);
       x = q[0];
       y = q[1];
@@ -72,7 +74,24 @@ export function actorAt(actor, t) {
   const stretch = lift > 0 ? 0.09 * air - 0.03 : 0;
   const sy = (1 - 0.13 * squash + stretch) * (1 + 0.011 * breath);
   const sx = (1 + 0.11 * squash - stretch * 0.6) * (1 - 0.005 * breath);
-  const lean = lift > 0 ? 7 * air : 0; // leaning into the hop, in degrees
+  let lean = lift > 0 ? 7 * air : 0; // leaning into the hop, in degrees
+  // a bow: the whole figure leans forward about its feet, and back up
+  for (const [t0, t1, deg] of tr.leans ?? []) if (t >= t0 && t < t1) lean += deg * envelope((t - t0) / (t1 - t0));
+  // a spin: it turns round where it is, narrowing to its edge and back, as a drawing turns
+  let turnScale = 1;
+  for (const [t0, t1, turns] of tr.spins ?? []) {
+    if (t < t0 || t >= t1) continue;
+    const c = Math.cos(2 * Math.PI * turns * easeInOut((t - t0) / (t1 - t0)));
+    turnScale = Math.max(0.05, Math.abs(c));
+    if (c < 0) facing = -facing;
+  }
+  // its cap, lifted off and tipped, and put back
+  let cap = { lift: 0, angle: 0 };
+  for (const [t0, t1, up, deg] of tr.caps ?? []) {
+    if (t < t0 || t >= t1) continue;
+    const e = envelope((t - t0) / (t1 - t0), 0.35);
+    cap = { lift: up * e, angle: deg * e };
+  }
   // the arms: the pose of the moment, eased in from the one before
   let cur = null;
   let prev = null;
@@ -113,7 +132,7 @@ export function actorAt(actor, t) {
     if (tb > t) break;
     if (t - tb < 0.16) blink = Math.sin((Math.PI * (t - tb)) / 0.16);
   }
-  return { x, y, facing, lift, air, sx, sy, lean, front, back, feel, look, blink, shown: t >= tr.appear[0] };
+  return { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, front, back, feel, look, blink, cap, shown: t >= tr.appear[0] };
 }
 
 /** The point a share u of the way along a polyline, and which way it is heading there (left or right). */

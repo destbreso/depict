@@ -5,7 +5,7 @@
 // as its sentence takes to read. The board ends on a held overview.
 import { cumulative, union, pad } from "./geom.mjs";
 import { flight, flightTime, pan, shotOf, shotSafe } from "./camera.mjs";
-import { perform } from "./perform.mjs";
+import { perform, hopHere } from "./perform.mjs";
 import { actorAt } from "./act.mjs";
 
 /** The pen, in board units per second, and its pauses, in seconds. */
@@ -118,10 +118,6 @@ export function time(board, comp) {
     t += dur;
     shot = next;
   };
-  // the story arrow into a region is drawn as the camera first goes there, from a region told before it
-  const stories = [...comp.elements.values()].filter((e) => e.kind === "story");
-  const visited = new Set();
-  const drawn = new Set();
   /** Draws all of an element's strokes between t0 and t1, each for a time in proportion to its length (fills count for less: a broad nib moves fast). */
   const drawWithin = (e, bi, t0, t1, lift = P.lift) => {
     const all = e.parts.flatMap((part) => part.strokes.map((pts) => ({ part, pts, len: cumulative(pts).at(-1) * (part.layer === "ink" ? 1 : 0.3) })));
@@ -139,10 +135,7 @@ export function time(board, comp) {
       strokes.push({ el: e.id, role: part.role, pts, t0: at, t1: at + d, width: part.width, color: part.color, layer: part.layer, opacity: part.opacity, beat: bi });
       at += d;
     });
-    if (e.kind) {
-      e.beat = bi;
-      drawn.add(e.id);
-    }
+    if (e.kind) e.beat = bi;
     return at;
   };
   const x_lift = (all, i, lift) => (all[i].part !== all[i - 1].part ? lift : 0.002);
@@ -154,19 +147,8 @@ export function time(board, comp) {
       const next = shotFor(board, comp, e);
       // a pause between things (the cells of one array follow each other quickly), then the camera moves if the next one is elsewhere
       if (ei > 0) t += sameCells(beat.draw[ei - 1], id) ? 0.06 : P.element;
-      const due = e.joins ? [] : stories.filter((st) => !drawn.has(st.id) && (st.id === "story-0" ? e.kind !== "title" && e.kind !== "guide" : !visited.has(e.region) && st.joins.includes(e.region) && st.joins.some((r) => r !== e.region && visited.has(r))));
-      const keys = camera.length;
       toward = e.joins ? null : e.region;
       go(next);
-      for (const st of due) {
-        st.shot = next;
-        if (camera.length > keys) {
-          // drawn while the camera flies there: the pen leads the way to the next idea
-          const k = camera[camera.length - 1];
-          t = Math.max(t, drawWithin(st, bi, k.t0 + (k.t1 - k.t0) * 0.08, k.t1 - (k.t1 - k.t0) * 0.06, 0.02));
-        } else t = drawWithin(st, bi, t, t + 1.1, 0.02) + P.part;
-      }
-      if (!e.joins) visited.add(e.region);
       e.shot = next;
       drawStart ??= t;
       e.beat = bi;
@@ -227,32 +209,27 @@ export function time(board, comp) {
     t = Math.max(drawEnd + P.hold, drawStart + read) + (moves ? P.regionHold : 0);
     beats.push({ say: beat.say, t0: start, draw0: drawStart, draw1: drawEnd, t1: t, shot });
   });
-  // the overview: the whole board, held; the road reaches its end as the camera pulls back to it
+  // the overview: the whole board, held
   const overview = shotOf(comp.extent);
   const S = flight(shot, overview).S;
   const dur = flightTime(S) * 1.2;
   camera.push({ t0: t, t1: t + dur, from: shot, to: overview });
-  const end = comp.elements.get("story-end");
-  if (end) {
-    end.shot = overview;
-    const done = drawWithin(end, beats.length - 1, t + dur * 0.12, t + dur * 0.95, 0.02);
-    beats.at(-1).t1 = Math.max(t + dur, done);
-  }
   const explore = t + dur; // the board complete: where the page rests when the film is over
   t = explore + P.overviewHold;
   const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [], explore };
   if (appear) result.actors.push(perform(board, comp, result, appear));
-  if (board.outro) outro(comp, result);
+  if (board.outro) outro(board, comp, result);
   return result;
 }
 
 /**
- * The outro, the same on every board: the camera comes in on the guide, who
- * waves goodbye and winks while a circle closes on it, as old cartoons end;
- * then the board's title is written on the dark and held. The page plays it
- * and then goes back to the whole board to explore; a video ends on the title.
+ * The outro: the camera comes in on the guide, who says goodbye its own way
+ * (a wave, a bow, a cheer, a salute, a tip of its cap, a spin) and winks while
+ * a circle closes on it, as old cartoons end; then the board's title is
+ * written on the dark and held. The page plays it and then goes back to the
+ * whole board to explore; a video ends on the title.
  */
-function outro(comp, tl) {
+function outro(board, comp, tl) {
   let t = tl.duration;
   const A = tl.actors[0];
   const st = A ? actorAt(A, t) : null;
@@ -262,17 +239,17 @@ function outro(comp, tl) {
   const close = [cx, cy + h * 0.06, Math.max(h * 3.4, 1000)];
   const fly = Math.max(0.9, flightTime(flight(tl.overview, close).S) * 0.8);
   tl.camera.push({ t0: t, t1: t + fly, from: tl.overview, to: close });
-  if (A) {
-    A.track.arms.push([t + 0.15, "wave"]);
-    A.track.feel.push([t + 0.15, "happy"]);
-    A.track.look.push([t + 0.15, null]);
-  }
+  const start = t;
   t += fly;
   const iris = { t0: t, hold: t + 0.85, close: t + 1.85, t1: t + 2.17, cx, cy, r: h ? h * 0.66 : 260 };
   if (A) {
+    A.track.feel.push([start + 0.15, "happy"]);
+    A.track.look.push([start + 0.15, null]);
+    OUTROS[board.cast?.outro ?? "wave"](A.track, start, fly, iris, { x: st.x, y: st.y, facing: st.facing });
     A.track.feel.push([iris.hold + 0.1, "wink"]);
     A.track.bounces.push([iris.hold + 0.1, 0.35]);
-    for (const list of [A.track.arms, A.track.feel, A.track.look, A.track.bounces]) list.sort((a, b) => a[0] - b[0]);
+    for (const list of [A.track.arms, A.track.feel, A.track.look, A.track.bounces, A.track.leans, A.track.spins, A.track.caps]) list.sort((a, b) => a[0] - b[0]);
+    A.track.moves.sort((a, b) => a.t0 - b.t0);
   }
   t = iris.t1 + 0.25;
   // the title, written on the dark at the pen's pace
@@ -288,3 +265,34 @@ function outro(comp, tl) {
   tl.outro = { t0: tl.duration, iris, card };
   tl.duration = t + 1.8;
 }
+
+/** The ways the guide says goodbye as the camera comes in on it: keys from `t`, the camera arriving at `t + fly`, the circle closing after `iris.hold`. */
+const OUTROS = {
+  wave: (k, t) => k.arms.push([t + 0.15, "wave"]),
+  bow: (k, t, fly, iris) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.15, "rest"]);
+    k.leans.push([t + fly - 0.1, iris.hold + 0.08, 26]);
+    k.feel.push([t + fly - 0.1, "proud"]);
+  },
+  cheer: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "cheer"]);
+    k.moves.push(hopHere(at, t + fly - 0.5, t + fly + 0.08, 85));
+    k.bounces.push([t + fly + 0.08, 0.8]);
+    k.feel.push([t + 0.15, "excited"]);
+  },
+  salute: (k, t, fly) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.3, "salute"]);
+    k.feel.push([t + fly - 0.3, "proud"]);
+  },
+  tip: (k, t, fly, iris) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.3, "tip"]);
+    k.caps.push([t + fly - 0.15, iris.hold + 0.15, 0.075, 14]);
+    k.feel.push([t + fly - 0.15, "proud"]);
+  },
+  spin: (k, t, fly, iris, at) => {
+    k.moves.push(hopHere(at, t + fly - 0.7, t + fly + 0.05, 115));
+    k.spins.push([t + fly - 0.68, t + fly + 0.03, 1]);
+    k.bounces.push([t + fly + 0.05, 0.85]);
+    k.arms.push([t + 0.15, "cheer"], [t + fly + 0.1, "wave"]);
+  },
+};

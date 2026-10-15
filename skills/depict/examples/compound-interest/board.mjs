@@ -10,6 +10,7 @@ export default {
   title: "Compound interest",
   mode: "slides",
   seed: 21,
+  guide: { wear: ["bow-tie"], hold: "coin", skin: "sand" }, // money
   regions: [
     {
       id: "simple",

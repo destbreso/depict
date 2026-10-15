@@ -7,7 +7,8 @@ import { hasIcon, nearIcons } from "./icons.mjs";
 import { hand } from "./fonts.mjs";
 import { POSE_NAMES, FACES, HAIRS, HATS, TINTS } from "./people.mjs";
 import { flattenPath } from "./svgpath.mjs";
-import { ACTS, FEELINGS } from "./rig.mjs";
+import { ACTS, FEELINGS, HATS as GUIDE_HATS, HOLD, INTROS, OUTROS, SKINS, WEAR } from "./rig.mjs";
+import { hash32 } from "./rng.mjs";
 
 /** Typographic marks a hand writes the plain way; anything else outside its glyphs is a problem. */
 const PLAIN = { "\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u2192": "->", "\u2190": "<-", "\u2248": "~", "\u2260": "!=", "\u2264": "<=", "\u2265": ">=", "\u2014": ", ", "\u2013": "-", "\u2022": "\u00b7", "\u00a0": " " };
@@ -16,7 +17,7 @@ const plain = (s) => s.replace(/[\u2019\u2018\u201c\u201d\u2026\u2192\u2190\u224
 const SHAPES = ["none", "box", "ellipse", "circle", "cloud", "bubble", "banner"];
 const LINK_STYLES = ["solid", "dashed", "double", "bold", "line"];
 const MARKS = ["circle", "underline", "highlight", "box", "cross"];
-const FLOWS = ["path", "row", "column", "grid"];
+const FLOWS = ["page", "row", "column", "grid"];
 const LAYOUTS = ["row", "column", "grid", "cells", "stack", "radial"];
 /** What a sketch's shape can be colored in with: the board's accent, the highlighter, solid ink, grey, or a shirt's tint. */
 export const FILLS = ["accent", "yellow", "ink", "grey", "blue", "green", "sand", "pink"];
@@ -36,12 +37,13 @@ export function normalize(input) {
   if (!["print", "marker"].includes(b.hand)) err(`hand "${b.hand}": use "print" or "marker"`);
   b.mode = b.mode ?? "canvas";
   if (!["canvas", "slides"].includes(b.mode)) err(`mode "${b.mode}": use "canvas" or "slides"`);
-  b.flow = b.flow ?? "path";
+  b.flow = b.flow ?? "page";
   if (!FLOWS.includes(b.flow)) err(`flow "${b.flow}": use ${FLOWS.join(", ")}`);
   b.accent = b.accent ?? "#c43f0a";
-  // the house style: the guide, the marker who greets the viewer beside the title, and a story arrow from each idea to the next
-  b.guide = b.guide ?? true;
-  b.story = b.story ?? true;
+  // the house style: the guide, the marker who greets the viewer beside the title, and each idea numbered in the order it is told
+  const cast = b.guide && typeof b.guide === "object" ? b.guide : {};
+  b.guide = b.guide !== false;
+  b.numbers = b.numbers ?? true;
   b.outro = b.outro ?? true; // the standard ending: a goodbye from the guide and the title
   // who it is for: a child reads slowly, so the captions are larger, shorter and held longer
   b.audience = b.audience ?? "adult";
@@ -50,13 +52,26 @@ export function normalize(input) {
   b.speed = b.speed ?? (b.audience === "child" ? 0.5 : 1);
   if (!(b.speed >= 0.25 && b.speed <= 3)) err(`speed ${b.speed}: use a number from 0.25 to 3 (1 is the drawing's own pace)`);
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
+  // the guide dressed for the subject ({ wear, hold, skin }) and directed ({ intro, outro }); how it arrives and leaves is the seed's pick when not said
+  for (const k of Object.keys(cast)) if (!["wear", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes wear, hold, skin, intro and outro`);
+  const wear = cast.wear == null ? [] : [cast.wear].flat();
+  for (const w of wear) if (!WEAR.includes(w)) err(`the guide wears "${w}": it can wear ${WEAR.join(", ")}`);
+  const hats = wear.filter((w) => GUIDE_HATS.includes(w));
+  if (hats.length > 1) err(`the guide wears ${hats.join(" and ")}: one hat at a time`);
+  if (wear.length > 3) err(`the guide wears ${wear.length} things: three at most, or it stops looking like itself`);
+  if (cast.hold != null && !HOLD.includes(cast.hold)) err(`the guide holds "${cast.hold}": it can hold ${HOLD.join(", ")}`);
+  if (cast.skin != null && !SKINS.includes(cast.skin)) err(`the guide's skin "${cast.skin}": use ${SKINS.join(", ")}`);
+  if (cast.intro != null && !INTROS.includes(cast.intro)) err(`the guide's intro "${cast.intro}": use ${INTROS.join(", ")}`);
+  if (cast.outro != null && !OUTROS.includes(cast.outro)) err(`the guide's outro "${cast.outro}": use ${OUTROS.join(", ")}`);
+  const pick = (list, salt) => list[hash32(`${b.seed}:${b.title}:${salt}`) % list.length];
+  b.cast = { wear, hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(INTROS, "intro"), outro: cast.outro ?? pick(OUTROS, "outro") };
 
   const ids = new Map(); // id -> kind
   const claim = (id, kind, where) => {
     if (!id || typeof id !== "string") return err(`${where} needs an id`);
     if (!/^[a-z][a-z0-9-]*$/.test(id)) err(`${where}: id "${id}" should be lowercase letters, digits and dashes`);
-    // the kit names some things itself: the title, the guide, notes, marks and story arrows
-    if (id === "title" || id === "guide" || /^(note|mark|story|guide)-/.test(id)) err(`${where}: id "${id}" is one the kit uses; pick another`);
+    // the kit names some things itself: the title, the guide, notes and marks
+    if (id === "title" || id === "guide" || /^(note|mark|guide)-/.test(id)) err(`${where}: id "${id}" is one the kit uses; pick another`);
     if (ids.has(id)) err(`id "${id}" is used twice (${ids.get(id)} and ${kind})`);
     ids.set(id, kind);
   };

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- A numbered page: the regions are numbered in the order they are told (in paper on a disc of the accent, before each title) and laid out as a page is read, left to right in balanced rows, as many rows as make the board 16:9, each row's titles on one line and no corner left empty (`flow: "page"`, the default; `numbers: false` leaves the numbers out). Slides end as a numbered storyboard. The story road and the story arrows are gone: the numbers give the order, and a link between regions is only for a connection the order does not say.
+- Explained completely: the skill now asks for the problem, the mechanism traced step by step on one worked example, why it works, what it costs, the classic mistakes and when to use it; the length warning moves to ten minutes at the board's own speed.
+- The guide, dressed for the subject: `guide: { wear, hold, skin }`. Thirteen things to wear (glasses, a bow tie, a scarf, a star, a hair bow, a pencil behind its ear, and one hat: a mortarboard, a hard hat, headphones, a party hat, a crown, a beanie, a chef's hat), twelve to hold (a pointer, which lies along its arm when it points, and a book, a pencil, a ruler, a coin, a clock, a magnifier, a flag, a balloon, a wrench, a calculator, a lightbulb), and a body in a tint, bands or dots.
+- The guide arrives and leaves its own way on each board: `guide: { intro, outro }` (a wave, a hop, a spin, a bow, a tip of its cap, a jump; a wave, a bow, a cheer, a salute, a tip of its cap, a spin), picked by the seed when the script does not say. Its cap is a component of its own, so it can be lifted and tipped, hat and all.
+- Links meet a circle or an ellipse at its outline, so a tree's edges touch their nodes; a side two cells share is drawn by whichever is drawn first, so a cell drawn out of order is never left open; a highlight over several cells stays inside them; a circle on a cell goes round its words; a shape thinner than the marker's nib is colored in with a finer one; a label's descenders no longer run into its note.
+- The hand writes □, the box a missing number goes in, and a minus as wide as the equal sign (a hyphen between spaces is written as one).
+
 ## 0.2.0
 
 - The guide: every board is presented by the same animated character, a felt marker with its cap in the board's accent. It is drawn stroke by stroke, comes alive with a bounce and a wave, presents the title as it is written, looks at and points to each new thing as the pen draws it, turns to face what is behind it, is surprised by a mark, hops along the road to the next idea while the camera flies there, and cheers at the end. It is a rig of components (cap, body, eyes, pupils, brows, mouths, rubber-hose arms, gloves, legs) posed every frame as a pure function of time, so the video shows the same performance. A beat can set how it feels (`feel`) and what it does (`act`). It blinks and breathes while the board is paused, and waves when tapped.

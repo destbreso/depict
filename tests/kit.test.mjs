@@ -200,21 +200,35 @@ test("a marker fill stays inside its shape, even a curved one", async () => {
   for (const pts of arrow.along(14)) for (let i = 0; i < pts.length; i += 2) assert.ok(inside(arrow.poly, pts[i], pts[i + 1]), `a pass leaves the arrow at ${pts[i].toFixed(0)}, ${pts[i + 1].toFixed(0)}`);
 });
 
-test("the story road runs from the first idea to the last, each stretch drawn while the camera flies there", async () => {
+test("the ideas are numbered in the order they are told and read as a page: left to right, then down", async () => {
   const input = await load("cpu-cache");
-  const { board, comp, tl } = build(input);
-  const stories = [...comp.elements.values()].filter((e) => e.kind === "story");
-  // a start, a stretch between each idea and the next, and the end with its arrowhead
-  assert.equal(stories.length, board.regions.length + 1);
-  // the ideas sit on alternate sides of it
-  const sides = comp.regions.map((r) => r.slot.y + r.slot.h / 2 < stories[1].path[1] ? "above" : "below");
-  for (let i = 1; i < sides.length; i++) assert.notEqual(sides[i], sides[i - 1]);
-  for (const st of stories) {
-    const own = tl.strokes.filter((s) => s.el === st.id);
-    assert.ok(own.length, `${st.id} is drawn`);
-    const k = tl.camera.find((c) => c.t0 <= own[0].t0 && own.at(-1).t1 <= c.t1);
-    assert.ok(k, `${st.id} is drawn during a camera flight`);
+  const { comp } = build(input);
+  // each region's title carries its number, in a disc
+  for (const r of comp.regions) assert.ok(comp.elements.get(r.id).parts.some((q) => q.role === "badge"), `${r.id} is numbered`);
+  // reading order: each idea starts to the right of the one before on its row, or on a row below
+  const line = (r) => comp.elements.get(r.id).box;
+  for (let i = 1; i < comp.regions.length; i++) {
+    const a = line(comp.regions[i - 1]);
+    const b = line(comp.regions[i]);
+    assert.ok(b.x > a.x + a.w - 1 || b.y > a.y + a.h, `${comp.regions[i].id} comes after ${comp.regions[i - 1].id} as a page is read`);
   }
+});
+
+test("ten ideas fill a 16:9 page in rows that hold about as many each", () => {
+  const regions = Array.from({ length: 10 }, (_, i) => ({ id: `r${i}`, title: `Idea ${i + 1}`, items: [{ id: `a${i}`, icon: "cpu", label: "One" }, { id: `b${i}`, icon: "database", label: "Two" }] }));
+  const s = { title: "Ten ideas", regions, beats: regions.map((r) => ({ say: `Here is ${r.title}.`, draw: [r.id, ...r.items.map((it) => it.id)] })) };
+  s.beats[0].draw.unshift("title");
+  const { comp } = build(s);
+  const aspect = comp.extent.w / comp.extent.h;
+  assert.ok(aspect > 1.3 && aspect < 2.4, `the page is about 16:9 (${aspect.toFixed(2)})`);
+  const rows = new Map();
+  for (const r of comp.regions) {
+    const y = Math.round(comp.elements.get(r.id).box.y / 40);
+    rows.set(y, (rows.get(y) ?? 0) + 1);
+  }
+  const counts = [...rows.values()];
+  assert.ok(counts.length >= 2 && Math.max(...counts) - Math.min(...counts) <= 1, `rows hold about as many ideas each (${counts.join(", ")})`);
+  assert.equal(comp.elements.get("r9").parts.find((q) => q.role === "number").strokes.length > 0, true, "the tenth is numbered too");
 });
 
 test("the guide comes alive, hops to each new idea with the camera, lands in its shot, and is surprised by a mark", async () => {
@@ -249,7 +263,7 @@ test("a feeling or an act the guide does not have is refused", () => {
   const text = normalize(s).errors.join("\n");
   assert.match(text, /feel "giddy"/);
   assert.match(text, /act "dance"/);
-  assert.match(normalize({ ...tiny(), regions: [{ ...tiny().regions[0], items: [{ id: "story-1", label: "x" }, { id: "b", label: "y" }] }] }).errors.join("\n"), /one the kit uses/);
+  assert.match(normalize({ ...tiny(), regions: [{ ...tiny().regions[0], items: [{ id: "note-1", label: "x" }, { id: "b", label: "y" }] }] }).errors.join("\n"), /one the kit uses/);
 });
 
 test("a slide whose content is small is drawn larger to fill its page", async () => {
@@ -289,10 +303,10 @@ test("a mark can span several things, and a child's board plays at half speed", 
   };
   const { comp, tl } = build(s);
   const mark = [...comp.elements.values()].find((e) => e.kind === "mark");
-  for (const id of ["c1", "c2", "c3"]) {
-    const b = comp.elements.get(id).box;
-    assert.ok(mark.box.x <= b.x + 8 && mark.box.x + mark.box.w >= b.x + b.w - 8, `the window spans ${id}`);
-  }
+  const r = mark.parts[0].width / 2; // the highlighter's nib reaches this far past its line
+  const [c0, c1, c3] = ["c0", "c1", "c3"].map((id) => comp.elements.get(id).cell);
+  assert.ok(mark.box.x - r <= c1.x + 14 && mark.box.x + mark.box.w + r >= c3.x + c3.w - 14, "the window spans the three cells");
+  assert.ok(mark.box.x - r >= c0.x + c0.w && mark.box.y - r >= c1.y && mark.box.y + mark.box.h + r <= c1.y + c1.h, "and stays inside them, off the cell before");
   // a child's board plays at half speed by default: its captions are read at about eight letters a second
   const kid = build({ ...s, audience: "child" });
   assert.equal(kid.board.speed, 0.5);
@@ -314,4 +328,80 @@ test("cells with places make a matrix, and a line link is an edge with no head",
   const [a, b, c] = ["a", "b", "c"].map((id) => comp.elements.get(id).box);
   assert.ok(Math.abs(b.x - (a.x + a.w)) < 14 && Math.abs(c.y - (a.y + a.h)) < 14, "the cells share their edges across and down");
   assert.equal(comp.elements.get("e").parts[0].strokes.length, 1, "an edge is one line, no head");
+});
+
+test("a link meets a ring at its outline, cells drawn out of order are never left open, and a thin bar is colored in", () => {
+  const s = {
+    title: "Edges and cells",
+    regions: [
+      { id: "t", title: "A tree", items: [{ id: "x", label: "8", shape: "circle", at: [1, 0] }, { id: "y", label: "3", shape: "circle", at: [0, 1] }, { id: "z", label: "9", shape: "circle", at: [2, 1] }] },
+      { id: "m", title: "Two by two", layout: "cells", items: [{ id: "a", label: "1", at: [0, 0] }, { id: "b", label: "2", at: [1, 0] }, { id: "c", label: "3", at: [0, 1] }, { id: "d", label: "4", at: [1, 1] }] },
+      { id: "s", title: "A bar", items: [{ id: "bar", sketch: [{ d: "M48 10 L52 10 L52 90 L48 90 Z", fill: "accent" }], label: "Thin" }] },
+    ],
+    links: [{ id: "xy", from: "x", to: "y", style: "line" }, { id: "xz", from: "x", to: "z" }],
+    beats: [
+      { say: "A tree of three nodes.", draw: ["title", "t", "x", "y", "z", "xy", "xz"] },
+      { say: "Its last cell first, then the rest.", draw: ["m", "d", "a", "b", "c"] },
+      { say: "And a thin bar.", draw: ["s", "bar"] },
+    ],
+  };
+  const { comp } = build(s);
+  // the edge starts at the circle, not at the corner of the box round it, on a diagonal too
+  const ring = comp.elements.get("x").ring;
+  const [cx, cy] = [ring.x + ring.w / 2, ring.y + ring.h / 2];
+  for (const id of ["xy", "xz"]) {
+    const [x0, y0] = comp.elements.get(id).parts[0].strokes[0];
+    const d = Math.hypot(x0 - cx, y0 - cy);
+    assert.ok(d < ring.w / 2 + 20, `${id} leaves the circle at its outline (${d.toFixed(0)} from its middle, radius ${(ring.w / 2).toFixed(0)})`);
+  }
+  // d is drawn first, before the cells above and before it, so it draws all four of its sides; a draws three
+  const sidesOf = (id) => comp.elements.get(id).parts.find((q) => q.role === "shape").strokes;
+  const extent = (id) => {
+    const c = comp.elements.get(id).cell;
+    const pts = sidesOf(id).flat();
+    const xs = pts.filter((_, i) => i % 2 === 0);
+    const ys = pts.filter((_, i) => i % 2 === 1);
+    return { c, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  };
+  const d = extent("d");
+  assert.ok(d.x0 < d.c.x + 6 && d.y0 < d.c.y + 6 && d.x1 > d.c.x + d.c.w - 6 && d.y1 > d.c.y + d.c.h - 6, "the cell drawn first is closed on every side");
+  // the bar, four units wide in its drawing, is colored in
+  const fill = comp.elements.get("bar").parts.find((q) => q.role === "fill");
+  assert.ok(fill && fill.strokes.length > 0, "a thin shape gets its color");
+});
+
+test("the guide is dressed for the subject: what it cannot wear is refused, one hat at a time, and the seed picks how it arrives and leaves", async () => {
+  const bad = normalize({ ...tiny(), guide: { wear: ["cape"], hold: "sword", skin: "plaid", intro: "moonwalk", hat: "crown" } }).errors.join("\n");
+  for (const m of [/wears "cape"/, /holds "sword"/, /skin "plaid"/, /intro "moonwalk"/, /guide\.hat/]) assert.match(bad, m);
+  assert.match(normalize({ ...tiny(), guide: { wear: ["crown", "beanie"] } }).errors.join("\n"), /one hat at a time/);
+  // the same board always arrives and leaves the same way; other boards in other ways
+  const ways = new Set();
+  for (let seed = 1; seed <= 12; seed++) {
+    const a = normalize({ ...tiny(), seed }).board.cast;
+    assert.deepEqual(a, normalize({ ...tiny(), seed }).board.cast);
+    ways.add(`${a.intro} ${a.outro}`);
+  }
+  assert.ok(ways.size >= 4, `twelve boards arrive and leave in ${ways.size} ways`);
+  // a tipped cap lifts the cap (and its hat) alone; what it holds is drawn in its hand
+  const { actorAt } = await import("../skills/depict/kit/act.mjs");
+  const { tl } = build({ ...tiny(), guide: { wear: ["grad-cap", "glasses"], hold: "book", intro: "tip" } });
+  const [g] = tl.actors;
+  const parts = new Set(g.rig.strokes.map((s) => s.part));
+  for (const p of ["cap", "hat", "wear", "held"]) assert.ok(parts.has(p), `the rig has its ${p}`);
+  const tip = g.track.caps[0];
+  assert.ok(tip && actorAt(g, (tip[0] + tip[1]) / 2).cap.lift > 0, "the cap is lifted in the tip");
+  assert.equal(actorAt(g, tip[1] + 0.1).cap.lift, 0, "and put back");
+});
+
+test("however it comes alive, the guide ends beside the last idea it presented", () => {
+  for (const intro of ["wave", "hop", "spin", "bow", "tip", "jump"]) {
+    const s = { ...tiny(), guide: { intro } };
+    s.regions = [...s.regions, { id: "r2", title: "A second idea", items: [{ id: "c", icon: "users", label: "Three" }] }];
+    s.beats = [...s.beats, { say: "And a second idea.", draw: ["r2", "c"] }];
+    const { comp, tl } = build(s);
+    const [g] = tl.actors;
+    const last = g.track.moves.filter((m) => m.t1 <= tl.explore).sort((a, b) => a.t1 - b.t1).at(-1);
+    const spot = comp.guide.spots.find((q) => q.region === "r2");
+    assert.deepEqual(last.to, [spot.x, spot.y], `with a ${intro} it ends at the last idea`);
+  }
 });

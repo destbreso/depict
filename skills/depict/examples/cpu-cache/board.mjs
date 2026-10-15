@@ -7,6 +7,7 @@ export default {
   title: "How a CPU cache works",
   mode: "canvas",
   seed: 4,
+  guide: { wear: ["glasses", "bow-tie"], hold: "pointer" }, // a lecture on hardware
   regions: [
     {
       id: "places",

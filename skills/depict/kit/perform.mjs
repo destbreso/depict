@@ -1,12 +1,12 @@
 // The guide's performance, written from the timeline: it comes alive once it
-// is drawn, waves hello, presents the title while it is written, looks at and
+// is drawn (each board its own way: a wave, a hop, a spin, a bow, a tip of its
+// cap, a jump), presents the title while it is written, looks at and
 // points to each new thing as the pen draws it, turns to face what is behind
 // it, is surprised when something is marked, hops to the next idea while the
 // camera flies there, and cheers at the end. A beat can set how it feels
 // (`feel`) and what it does (`act`). Blinks come at the guide's own uneven
 // pace, from the board's seed.
 import { splitmix32 } from "./rng.mjs";
-import { stretch } from "./road.mjs";
 import { FEELINGS, POSES } from "./rig.mjs";
 
 /** The actor for the page: its rig and its track. */
@@ -15,7 +15,7 @@ export function perform(board, comp, tl, appear) {
   const els = comp.elements;
   const spotOf = new Map(g.spots.map((s) => [s.region, s]));
   const start = g.spots[0];
-  const track = { start: [start.x, start.y, start.facing], appear, moves: [], turns: [], arms: [], feel: [[0, "happy"]], look: [], bounces: [], blinks: [] };
+  const track = { start: [start.x, start.y, start.facing], appear, moves: [], turns: [], arms: [], feel: [[0, "happy"]], look: [], bounces: [], blinks: [], leans: [], spins: [], caps: [] };
   const [, alive] = appear;
 
   // when each element is drawn: its first stroke's start and its last stroke's end
@@ -28,36 +28,6 @@ export function perform(board, comp, tl, appear) {
   }
   const center = (b) => [b.x + b.w / 2, b.y + b.h / 2];
 
-  // on a board with a road, a trip follows the road: down onto it, along it, and off at the next spot
-  const road = g.road;
-  const nearest = (q) => {
-    let best = 0;
-    let d = Infinity;
-    for (let k = 0; k < road.pts.length / 2; k++) {
-      const e = Math.hypot(road.pts[2 * k] - q.x, road.pts[2 * k + 1] - q.y);
-      if (e < d) {
-        d = e;
-        best = road.cum[k];
-      }
-    }
-    return best;
-  };
-  const tripPath = (a, b) => {
-    if (!road) return null;
-    const sa = a.s ?? nearest(a);
-    const sb = b.s ?? nearest(b);
-    let mid = stretch(road.pts, road.cum, Math.min(sa, sb), Math.max(sa, sb));
-    if (sb < sa) {
-      const rev = [];
-      for (let k = mid.length / 2 - 1; k >= 0; k--) rev.push(mid[2 * k], mid[2 * k + 1]);
-      mid = rev;
-    }
-    // walking on the road's top edge
-    const lift = road.width / 2 - 6;
-    const on = mid.map((v, i) => (i % 2 ? v - lift : v));
-    return [a.x, a.y, ...on, b.x, b.y];
-  };
-
   // its trips: when the camera flies to another idea, the guide hops there, landing as the camera arrives
   let here = start;
   for (const k of tl.camera) {
@@ -69,8 +39,7 @@ export function perform(board, comp, tl, appear) {
     const hops = Math.max(1, Math.min(3, Math.round(dist / 650)));
     const t0 = k.t0 + 0.08;
     const t1 = Math.max(t0 + 0.42 * hops, k.t1 + 0.2);
-    const path = tripPath(here, to);
-    track.moves.push({ t0, t1, from: [here.x, here.y], to: [to.x, to.y], hops: path ? Math.max(hops, 2) : hops, height: Math.min(path ? 200 : 340, 80 + (0.18 * dist) / hops), facing: Math.sign(dx) || here.facing, land: to.facing, ...(path ? { path } : {}) });
+    track.moves.push({ t0, t1, from: [here.x, here.y], to: [to.x, to.y], hops, height: Math.min(340, 80 + (0.18 * dist) / hops), facing: Math.sign(dx) || here.facing, land: to.facing });
     track.bounces.push([t0 - 0.1, -0.7]); // it crouches before it jumps
     track.bounces.push([t1, 0.85]);
     track.arms.push([t0 - 0.12, "cheer"]);
@@ -79,19 +48,23 @@ export function perform(board, comp, tl, appear) {
   /** Where the guide is at time t, and which way it faces (before any turn). */
   const whereAt = (t) => {
     let at = { x: start.x, y: start.y, facing: start.facing };
-    for (const m of track.moves) if (m.t1 <= t) at = { x: m.to[0], y: m.to[1], facing: m.land };
+    let last = -Infinity;
+    for (const m of track.moves) {
+      if (m.t1 > t || m.t1 < last) continue;
+      at = { x: m.to[0], y: m.to[1], facing: m.land };
+      last = m.t1;
+    }
     return at;
   };
 
-  // it comes alive: a springy bounce, and a wave hello
-  track.bounces.push([alive + 0.02, 1.1]);
-  track.arms.push([alive, "wave"]);
+  // it comes alive, the way the board's cast says (or its seed chose), and then waves hello
+  const ready = INTROS[board.cast?.intro ?? "wave"](track, alive, start);
   track.look.push([alive, null]);
   // the title: it presents it as it is written
   const title = span.get("title");
   if (title) {
     const tb = els.get("title").box;
-    track.arms.push([Math.max(title[0] + 0.4, alive + 1.2), "present", tb.x + Math.min(tb.w * 0.25, 320), tb.y + tb.h * 0.5]);
+    track.arms.push([Math.max(title[0] + 0.4, ready), "present", tb.x + Math.min(tb.w * 0.25, 320), tb.y + tb.h * 0.5]);
     track.look.push([title[0], tb.x + tb.w * 0.4, tb.y + tb.h / 2]);
   }
 
@@ -103,7 +76,7 @@ export function perform(board, comp, tl, appear) {
       if (id === "guide" || id === "title") continue;
       const e = els.get(id);
       const sp = span.get(id);
-      if (!e || !sp || e.kind === "story") continue;
+      if (!e || !sp) continue;
       const [cx, cy] = center(e.kind === "mark" ? e.targetBox ?? els.get(e.target).box : e.box);
       const at = whereAt(sp[0]);
       // it turns to face what is drawn behind it
@@ -143,7 +116,7 @@ export function perform(board, comp, tl, appear) {
   const rng = splitmix32((board.seed * 2654435761) >>> 0);
   for (let t = alive + 1.6; t < tl.duration; t += 2.2 + rng() * 2.4) track.blinks.push(t);
 
-  for (const list of [track.arms, track.feel, track.look, track.turns, track.bounces]) list.sort((a, b) => a[0] - b[0]);
+  for (const list of [track.arms, track.feel, track.look, track.turns, track.bounces, track.leans, track.spins, track.caps]) list.sort((a, b) => a[0] - b[0]);
   track.moves.sort((a, b) => a.t0 - b.t0);
   return {
     id: "guide",
@@ -156,3 +129,60 @@ export function perform(board, comp, tl, appear) {
     track,
   };
 }
+
+/** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
+export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175 };
+
+/** A hop where it stands. */
+export const hopHere = (at, t0, t1, height) => ({ t0, t1, from: [at.x, at.y], to: [at.x, at.y], hops: 1, height, facing: at.facing, land: at.facing });
+
+/**
+ * The ways it comes alive once it is drawn. Each writes its keys from `a`,
+ * the moment it is complete, and returns when it is ready to present the title.
+ */
+const INTROS = {
+  wave: (k, a) => {
+    k.bounces.push([a + 0.02, 1.1]);
+    k.arms.push([a, "wave"]);
+    return a + 1.2;
+  },
+  hop: (k, a, at) => {
+    k.bounces.push([a, -0.6]);
+    k.moves.push(hopHere(at, a + 0.1, a + 0.62, INTRO_HEIGHT.hop));
+    k.bounces.push([a + 0.62, 0.9]);
+    k.arms.push([a, "cheer"], [a + 0.7, "wave"]);
+    return a + 1.5;
+  },
+  spin: (k, a, at) => {
+    k.bounces.push([a, -0.6]);
+    k.moves.push(hopHere(at, a + 0.1, a + 0.82, INTRO_HEIGHT.spin));
+    k.spins.push([a + 0.12, a + 0.8, 1]);
+    k.bounces.push([a + 0.82, 1.0]);
+    k.arms.push([a, "cheer"], [a + 0.9, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.4, "happy"]);
+    return a + 1.7;
+  },
+  bow: (k, a) => {
+    k.arms.push([a, "rest"]);
+    k.leans.push([a + 0.08, a + 1.0, 24]);
+    k.feel.push([a + 0.08, "proud"], [a + 1.0, "happy"]);
+    k.bounces.push([a + 1.0, 0.45]);
+    k.arms.push([a + 1.0, "wave"]);
+    return a + 1.9;
+  },
+  tip: (k, a) => {
+    k.arms.push([a, "tip"]);
+    k.caps.push([a + 0.2, a + 1.05, 0.075, 14]);
+    k.feel.push([a + 0.2, "proud"], [a + 1.05, "happy"]);
+    k.arms.push([a + 1.1, "wave"]);
+    return a + 1.9;
+  },
+  jump: (k, a, at) => {
+    k.bounces.push([a, -0.8]);
+    k.moves.push(hopHere(at, a + 0.14, a + 0.78, INTRO_HEIGHT.jump));
+    k.bounces.push([a + 0.78, 1.05]);
+    k.arms.push([a + 0.1, "cheer"], [a + 0.86, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.4, "happy"]);
+    return a + 1.7;
+  },
+};

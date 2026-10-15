@@ -80,6 +80,8 @@ function actorOf(a, color) {
     gloves: Object.fromEntries(Object.entries(rg.gloves).map(([k, g]) => [k, { lines: g.lines.map(pts), fill: g.fill.map(pts), fillWidth: q(g.fillWidth) }])),
     gloveWidth: q(rg.gloveWidth),
     reveal: rg.reveal,
+    capPivot: rg.capPivot.map(q),
+    hold: rg.hold,
   };
 }
 

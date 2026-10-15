@@ -7,6 +7,7 @@ export default {
   title: "How a hash table works",
   mode: "canvas",
   seed: 7,
+  guide: { wear: ["glasses"], hold: "magnifier" }, // finding things
   regions: [
     {
       id: "intro",

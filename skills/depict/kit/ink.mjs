@@ -376,6 +376,9 @@ export function dot(p, cx, cy, r) {
  * and no stroke jumps across paper. Returns the strokes and the nib width.
  */
 export function fill(p, poly, { nib = 16, angle = -38, edge = 0.34 } = {}) {
+  // a thin shape (a bar, a stem) is colored in with a finer nib, as a thinner marker would do it
+  const thick = thickness(poly);
+  if (thick < nib * 1.2) nib = Math.max(2.5, thick * 0.8);
   const gap = nib * 0.8;
   const a = (angle * Math.PI) / 180;
   const cos = Math.cos(a);
@@ -416,6 +419,19 @@ export function fill(p, poly, { nib = 16, angle = -38, edge = 0.34 } = {}) {
     }
   }
   return { strokes: strips.map((st) => st.pts), width: nib };
+}
+
+/** How thick a polygon is: twice its area over its perimeter (a bar's width, a disc's radius). */
+function thickness(poly) {
+  const n = poly.length / 2;
+  let a = 0;
+  let per = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    a += poly[2 * i] * poly[2 * j + 1] - poly[2 * j] * poly[2 * i + 1];
+    per += Math.hypot(poly[2 * j] - poly[2 * i], poly[2 * j + 1] - poly[2 * i + 1]);
+  }
+  return per ? Math.abs(a) / per : 0;
 }
 
 /** A polygon shrunk toward its centroid by about d (enough for the convex-ish shapes it is used on). */
@@ -543,92 +559,3 @@ export function fatArrow(p, path, { width = 34, head = null, inside = 7 } = {}) 
   return { outline, poly, inner: shape(inside), along };
 }
 
-/**
- * A stretch of the story road: a band of even width along a path. Its sides
- * are drawn as two lines, open at the ends where the stretch meets the next
- * one, or, with `head`, as one line that runs down one side, round an
- * arrowhead and back up the other. Returns those lines, the band's polygon,
- * and its fill: passes along the band, then across the head.
- */
-export function ribbon(p, path, { width = 46, head = false } = {}) {
-  const n = path.length / 2;
-  const cum = [0];
-  for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(path[2 * i] - path[2 * i - 2], path[2 * i + 1] - path[2 * i - 1]));
-  const L = cum[n - 1];
-  const hl = head ? Math.min(width * 1.45, L * 0.6) : 0;
-  const at = (d) => {
-    let i = 1;
-    while (i < n - 1 && cum[i] < d) i++;
-    const t = Math.max(0, Math.min(1, (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1)));
-    const x = path[2 * i - 2] + (path[2 * i] - path[2 * i - 2]) * t;
-    const y = path[2 * i - 1] + (path[2 * i + 1] - path[2 * i - 1]) * t;
-    const dx = path[2 * i] - path[2 * i - 2];
-    const dy = path[2 * i + 1] - path[2 * i - 1];
-    const l = Math.hypot(dx, dy) || 1;
-    return [x, y, -dy / l, dx / l, dx / l, dy / l];
-  };
-  const side = (sign, inset, d1 = L - hl) => {
-    const out = [];
-    const steps = Math.max(3, Math.round(d1 / 14));
-    for (let k = 0; k <= steps; k++) {
-      const [x, y, nx, ny] = at((d1 * k) / steps);
-      out.push(x + nx * sign * (width / 2 - inset), y + ny * sign * (width / 2 - inset));
-    }
-    return out;
-  };
-  const back = (pts) => {
-    const out = [];
-    for (let k = pts.length / 2 - 1; k >= 0; k--) out.push(pts[2 * k], pts[2 * k + 1]);
-    return out;
-  };
-  const left = side(1, 0);
-  const right = side(-1, 0);
-  const amp = Math.min(1.3, 0.28 * p.width);
-  let lines;
-  let poly;
-  if (head) {
-    const [bx, by, nx, ny] = at(L - hl);
-    const hw = width * 0.98;
-    const tip = [path[2 * n - 2], path[2 * n - 1]];
-    const run = [...left, bx + nx * hw, by + ny * hw, ...tip, bx - nx * hw, by - ny * hw, ...back(right)];
-    lines = [wobble(p, run, { amp })];
-    poly = run;
-  } else {
-    lines = [wobble(p, left, { amp }), wobble(p, right, { amp })];
-    poly = [...left, ...back(right)];
-  }
-  const along = (nib) => {
-    const edge = nib * 0.5 + 3;
-    const passes = Math.max(1, Math.ceil((width - 2 * edge) / (nib * 0.78)) + 1);
-    const zig = [];
-    const d1 = L - hl + (head ? nib * 0.3 : 0);
-    const steps = Math.max(3, Math.round(d1 / 12));
-    for (let k = 0; k < passes; k++) {
-      const q = passes === 1 ? 0 : -1 + (2 * k) / (passes - 1);
-      const run = [];
-      for (let j = 0; j <= steps; j++) {
-        const [x, y, nx, ny] = at((d1 * j) / steps);
-        const o = q * (width / 2 - edge);
-        run.push(x + nx * o + p.off(0.8), y + ny * o + p.off(0.8));
-      }
-      zig.push(...(k % 2 ? back(run) : run));
-    }
-    const strokes = [zig];
-    if (head) {
-      const [bx, by, bnx, bny, btx, bty] = at(L - hl);
-      const across = [];
-      const m = Math.max(2, Math.ceil(hl / (nib * 0.72)));
-      for (let j = 0; j <= m; j++) {
-        const s = ((hl - edge * 2) * j) / m;
-        const wj = (width * 0.98 - edge * 1.4) * (1 - s / hl) - nib * 0.15;
-        if (wj < nib * 0.2) break;
-        const cx = bx + btx * (s + edge * 0.4);
-        const cy = by + bty * (s + edge * 0.4);
-        across.push(...(j % 2 ? [cx - bnx * wj, cy - bny * wj, cx + bnx * wj, cy + bny * wj] : [cx + bnx * wj, cy + bny * wj, cx - bnx * wj, cy - bny * wj]));
-      }
-      if (across.length >= 4) strokes.push(across);
-    }
-    return strokes;
-  };
-  return { lines, poly, along };
-}

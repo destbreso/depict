@@ -20,10 +20,10 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 | hook | warning over 7 s (10 s with the guide, whose hello counts as the opening picture) | The first beat's drawing time | Open with a picture; move a long title or a second item to the next beat |
 | focal | warning | A region of two or more items where none is large, a character, a sketch, framed or marked | Draw the thing the region is about as a large sketch, or frame or mark it |
 | sparse | warning under 10% | How much of a region's shot its items cover | Draw the idea as a scene, make the key item large, merge a thin region into another |
-| tangle | warning | Two lines crossing (arrows, the road) | Put the item between the other two, link fewer things, or say the connection in the sentence |
-| bridge | warning | A link between regions that are not side by side, or many links between regions | The road already leads from each idea to the next: say the connection, or put both items in one region |
-| islands | warning | With the road turned off, regions that no link connects | Turn the road back on, or link an item of one region to the next |
-| length | warning over 6 minutes | The whole board | Two boards |
+| tangle | warning | Two lines crossing (arrows) | Put the item between the other two, link fewer things, or say the connection in the sentence |
+| bridge | warning | A link between regions that are not side by side, or many links between regions | The numbers already give the order: say the connection, or put both items in one region |
+| islands | warning | With the numbers turned off, regions that no link connects | Number the ideas again, or link an item of one region to the next |
+| length | warning over 10 minutes, at the speed the board plays at | The whole board | Two boards |
 | map | warning | Region titles in the closing overview under 10 px | A smaller board; the page can still be zoomed |
 
 ## The check
@@ -36,7 +36,8 @@ Read them as the artist. For each beat's picture, ask:
 - Is anything cut at an edge, crowded against another thing, or too small?
 - Does the pen's order make sense: the thing named first, then its label, then the arrow to the next?
 - Is there one place the eye goes first?
-- Does the overview read as a poster: the title, the road leading from idea to idea in the order they were told, the guide at the end?
+- Does the overview read as a poster: the title, the numbered ideas in the order they were told, no empty corner, the guide at the end?
+- Is the idea explained completely: the problem, every step of the worked example, why it works, what it costs, the mistakes, when to use it?
 
 The audit cannot answer these; the pictures can.
 

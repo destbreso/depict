@@ -21,7 +21,7 @@ export function audit(board, comp, tl) {
     const z = e.zoom ?? 1; // a slide's content drawn larger to fill its page
     if (e.kind === "item") return (e.parts.some((p) => p.role === "note") ? SIZE.note : SIZE.label) * z;
     if (e.kind === "note") return SIZE.note * z;
-    return { title: SIZE.boardTitle, region: SIZE.regionTitle, note: SIZE.note, mark: Infinity, guide: Infinity, story: Infinity }[e.kind] ?? SIZE.note;
+    return { title: SIZE.boardTitle, region: SIZE.regionTitle, note: SIZE.note, mark: Infinity, guide: Infinity }[e.kind] ?? SIZE.note;
   };
   board.beats.forEach((bt, i) => {
     for (const id of bt.draw) {
@@ -39,7 +39,7 @@ export function audit(board, comp, tl) {
   board.beats.forEach((bt, i) => {
     for (const id of bt.draw) {
       const e = els.get(id);
-      if (!e.shot || e.kind === "story") continue;
+      if (!e.shot) continue;
       const safe = safeArea(e.shot);
       const bb = e.box;
       if (bb.x < safe.x || bb.y < safe.y || bb.x + bb.w > safe.x + safe.w || bb.y + bb.h > safe.y + safe.h) {
@@ -48,8 +48,8 @@ export function audit(board, comp, tl) {
     }
   });
 
-  // no idea left as an island: every region connects to the rest through some link
-  if (board.regions.length > 1) {
+  // with the ideas unnumbered, no idea left as an island: every region connects to the rest through some link
+  if (!board.numbers && board.regions.length > 1) {
     const parent = new Map(board.regions.map((r) => [r.id, r.id]));
     const find = (x) => (parent.get(x) === x ? x : find(parent.get(x)));
     for (const e of els.values()) if (e.joins) parent.set(find(e.joins[0]), find(e.joins[1]));
@@ -60,12 +60,12 @@ export function audit(board, comp, tl) {
     }
     if (groups.size > 1) {
       const parts = [...groups.values()].map((g) => g.join(" + "));
-      warn("islands", `the board falls apart into ${groups.size} unconnected parts (${parts.join("; ")}); link an item of one region to an item of another, so the map shows how one idea leads to the next`);
+      warn("islands", `the board falls apart into ${groups.size} unconnected parts (${parts.join("; ")}); link an item of one region to an item of another, so the map shows how one idea leads to the next, or number the ideas`);
     }
   }
 
   // nothing lands on top of anything else
-  const solid = [...els.values()].filter((e) => e.kind !== "mark" && e.kind !== "story");
+  const solid = [...els.values()].filter((e) => e.kind !== "mark");
   const boxOf = (e) => {
     if (e.kind !== "link") return e.box;
     // a link's own box spans its ends; what can collide is its label
@@ -172,9 +172,9 @@ export function audit(board, comp, tl) {
   };
   const bridges = [...els.values()].filter((e) => e.kind === "link" && e.bridge);
   for (const e of bridges) {
-    if (!beside(slotOf(e.joins[0]), slotOf(e.joins[1]))) warn("bridge", `link "${e.id}" runs between regions ${e.joins.join(" and ")}, which are not side by side; ${board.story ? "the story arrows already lead from each idea to the next, so say this connection in a sentence" : "say this connection in a sentence"}, or put both items in one region`);
+    if (!beside(slotOf(e.joins[0]), slotOf(e.joins[1]))) warn("bridge", `link "${e.id}" runs between regions ${e.joins.join(" and ")}, which are not side by side; say this connection in a sentence, or put both items in one region`);
   }
-  if (board.story && bridges.length > Math.max(1, board.regions.length - 2)) warn("bridge", `${bridges.length} links run between regions; the story arrows already tie each idea to the next, so keep one or two that say something they do not`);
+  if (bridges.length > Math.max(1, board.regions.length - 2)) warn("bridge", `${bridges.length} links run between regions; the numbers already give the order, so keep one or two that say something the order does not`);
 
   // every region has something the eye goes to first, and is not mostly empty paper
   for (const r of board.regions) {
@@ -193,8 +193,9 @@ export function audit(board, comp, tl) {
   const most = 7 + (board.beats[0].draw.includes("guide") ? 3 : 0);
   if (first.draw1 - first.draw0 > most) warn("hook", `the first beat draws for ${(first.draw1 - first.draw0).toFixed(1)} s; open with a picture within about 5 s, and write the rest in the next beat`);
 
-  // length: an explainer runs one to three minutes, a lesson under six
-  if (tl.duration > 360) warn("length", `the board runs ${(tl.duration / 60).toFixed(1)} minutes; under six holds attention, or split it into two boards`);
+  // length: a complete explanation runs three to six minutes; past ten, at the speed it plays at, it loses its viewer
+  const minutes = tl.duration / (board.speed ?? 1) / 60;
+  if (minutes > 10) warn("length", `the board runs ${minutes.toFixed(1)} minutes at its speed; past ten it loses its viewer, so split it into two boards`);
 
   // the closing map: its titles at least must read in the overview
   const kOverview = VW / tl.overview[2];

@@ -8,6 +8,7 @@ export default {
   title: "How a site survives a DDoS attack",
   mode: "canvas",
   seed: 11,
+  guide: { wear: ["hard-hat"], hold: "wrench" }, // keeping a system standing
   regions: [
     {
       id: "attack",
