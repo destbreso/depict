@@ -845,10 +845,13 @@ function hosePath(sh, bow, hand, wobble) {
       ended();
       return;
     }
+    remember();
     requestAnimationFrame(tick);
   };
   function play() {
-    if (now >= T) seek(0);
+    // from the end, or from the board at rest after it, the film starts again from the beginning
+    if (now >= T || root.classList.contains("ended")) seek(0);
+    root.classList.remove("fresh");
     view = null;
     playing = true;
     last = 0;
@@ -859,6 +862,7 @@ function hosePath(sh, bow, hand, wobble) {
   function pause() {
     playing = false;
     root.classList.remove("playing");
+    forget();
   }
   function seek(t) {
     view = null;
@@ -868,6 +872,23 @@ function hosePath(sh, bow, hand, wobble) {
     root.classList.remove("playing");
     if (S.explore != null) render(S.explore);
     root.classList.add("ended");
+    forget();
+  }
+  // where the film was, while it plays: a page reloaded under the viewer (a preview refreshing as the file is
+  // rebuilt) picks up where it was instead of starting over. Best effort: storage may be missing or blocked.
+  const KEY = `depict:${location.pathname}`;
+  let saved = 0;
+  function remember() {
+    if (capture || performance.now() - saved < 1000) return;
+    saved = performance.now();
+    try {
+      sessionStorage.setItem(KEY, JSON.stringify({ t: now, at: Date.now() }));
+    } catch {}
+  }
+  function forget() {
+    try {
+      sessionStorage.removeItem(KEY);
+    } catch {}
   }
 
   // the bar
@@ -889,7 +910,7 @@ function hosePath(sh, bow, hand, wobble) {
   function updateBar() {
     scrub.value = String(now);
     clock.textContent = `${fmt(now)} / ${fmt(T)}`;
-    playBtn.setAttribute("aria-label", playing ? "Pause" : now >= T ? "Replay" : "Play");
+    playBtn.setAttribute("aria-label", playing ? "Pause" : now >= T || root.classList.contains("ended") ? "Replay" : "Play");
   }
   playBtn.addEventListener("click", () => (playing ? pause() : play()));
   scrub.addEventListener("input", () => {
@@ -1084,8 +1105,19 @@ function hosePath(sh, bow, hand, wobble) {
   window.depict = { render, seek, play, pause, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
   hoverBox.style.display = "none";
   const at = q.get("t");
-  render(at != null ? Number(at) : capture ? 0 : S.explore ?? T);
-  if (!capture && at == null) root.classList.add("ended", "fresh");
+  let resume = null;
+  try {
+    const r = JSON.parse(sessionStorage.getItem(KEY) || "null");
+    if (r && Date.now() - r.at < 20000 && r.t < T) resume = r.t;
+  } catch {}
+  if (!capture && at == null && resume != null) {
+    // it was playing a moment ago: go on from there
+    seek(resume);
+    play();
+  } else {
+    render(at != null ? Number(at) : capture ? 0 : S.explore ?? T);
+    if (!capture && at == null) root.classList.add("ended", "fresh");
+  }
   document.documentElement.dataset.ready = "1";
 })();
 
