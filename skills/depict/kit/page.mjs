@@ -52,7 +52,7 @@ export function sceneOf(board, comp, tl) {
       const item = e.kind === "item" ? board.regions.flatMap((g) => g.items).find((x) => x.id === id) : null;
       return { id, kind: e.kind, beat: e.beat ?? 0, t0: r(firstAt.get(id) ?? 0), box: [r(e.box.x), r(e.box.y), r(e.box.w), r(e.box.h)], ...(item?.figureUrl ? { figure: item.figureUrl, label: item.label || item.id } : {}) };
     }),
-    beats: tl.beats.map((b, i) => ({ say: b.say, t0: r(b.t0 * 100) / 100, t1: r(b.t1 * 100) / 100, draw0: r(b.draw0 * 100) / 100, draw1: r(b.draw1 * 100) / 100, ...(board.beats[i].open ? { open: elIds.indexOf(board.beats[i].open) } : {}) })),
+    beats: tl.beats.map((b, i) => ({ say: keepSums(b.say), t0: r(b.t0 * 100) / 100, t1: r(b.t1 * 100) / 100, draw0: r(b.draw0 * 100) / 100, draw1: r(b.draw1 * 100) / 100, ...(board.beats[i].open ? { open: elIds.indexOf(board.beats[i].open) } : {}) })),
     camera: tl.camera.map((k) => ({ t0: r(k.t0 * 100) / 100, t1: r(k.t1 * 100) / 100, from: k.from.map(r), to: k.to.map(r), ...(k.pan ? { pan: 1 } : {}) })),
     overview: tl.overview.map(r),
     sheets: board.mode === "slides" ? [...comp.sheets.values()].map((f) => [r(f.x), r(f.y), r(f.w), r(f.h)]) : [],
@@ -62,6 +62,9 @@ export function sceneOf(board, comp, tl) {
     outro: tl.outro ? { iris: Object.fromEntries(Object.entries(tl.outro.iris).map(([k, v]) => [k, r(v * 1000) / 1000])), card: tl.outro.card.map((s) => ({ t0: r(s.t0 * 1000) / 1000, t1: r(s.t1 * 1000) / 1000, w: r(s.width), c: color(s.color), pts: s.pts.map(r) })) } : null,
   };
 }
+
+/** A caption breaks between words, never inside a sum: the spaces either side of + - × ÷ = < > hold together (10 + 10 = 20 stays on one line). */
+const keepSums = (text) => String(text).replace(/ ([+\-\u2212\u00d7\u00f7=<>]) /g, "\u00a0$1\u00a0");
 
 /** An actor as the page carries it: its rig's strokes in its own frame (with when each is drawn as it first appears), its gloves, and its track. */
 function actorOf(a, color) {

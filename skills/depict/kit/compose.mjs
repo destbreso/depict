@@ -757,6 +757,7 @@ export function compose(board, font) {
       e.labelBox = moveBox(c.labelBox, r.dx, r.dy);
       e.wordsBox = moveBox(c.wordsBox, r.dx, r.dy);
       e.framed = c.it.shape !== "none" || ((r.region.layout === "cells" || r.region.layout === "stack") && c.it.under == null);
+      e.pictured = !!(c.it.icon || c.it.sketch || c.it.character);
       e.cell = moveBox(c.cellBox, r.dx, r.dy) ?? null;
       // a ring (a circle or an ellipse drawn round it): a link meets its outline, not the corner of its box
       const ring = (c.it.shape === "circle" || c.it.shape === "ellipse") && e.parts.find((q) => q.role === "shape");
@@ -919,9 +920,11 @@ export function compose(board, font) {
       const nib = Math.max(18, (inside ? tb.h - 16 : tb.h) * 0.5);
       const hb = inside ? { x: tb.x + nib / 2 + 8, y: tb.y + 8, w: Math.max(2, tb.w - nib - 16), h: tb.h - 16 } : pad(tb, 6, -2);
       const strokes = {
-        // an item's words are circled; an item in a frame of its own round the frame; a cell, which shares its edges, at its words
-        circle: () => ink.circleAround(p, span ?? (target.cell ? target.labelBox : target.kind === "item" && !target.framed ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb), target.cell && !span ? 8 : 12),
-        underline: () => ink.underline(p, tb.x, tb.y + tb.h + 8, tb.w),
+        // an item of words is circled round its words; one with a picture, or in a frame of its own, round all of it (a circle
+        // round the label alone would cut through the picture above it); a cell, which shares its edges, at its words
+        circle: () => ink.circleAround(p, span ?? (target.cell ? target.labelBox : target.kind === "item" && !target.framed && !target.pictured ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb), target.cell && !span ? 8 : 12),
+        // close under the words, clear of a note below them
+        underline: () => ink.underline(p, tb.x, tb.y + tb.h + 4, tb.w),
         box: () => ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32),
         cross: () => ink.crossOut(p, tb),
         highlight: () => ink.highlight(ink.pen(S(id), { width: nib }), hb),
