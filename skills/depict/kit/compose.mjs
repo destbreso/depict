@@ -1027,12 +1027,16 @@ export function compose(board, font) {
       const spot = guide?.spots.filter((q) => q.region === r.id).at(-1);
       if (spot) own = union(own, spotBox(spot, guide.h));
       const others = [...elements.values()].filter((e) => e.region && e.region !== r.id && !e.joins && e.kind !== "mark" && e.kind !== "guide").map((e) => e.box);
+      // what a shot takes in of the other ideas: a thing of theirs it shows whole counts its size, and one it cuts
+      // through counts twice its whole size, however thin the slice (a cut-off word at the edge reads as a mistake)
       const cost = (f) => {
         const s = pad(f, 40); // the shot is the frame and 40 round it
         return others.reduce((a, b) => {
           const w = Math.min(s.x + s.w, b.x + b.w) - Math.max(s.x, b.x);
           const h = Math.min(s.y + s.h, b.y + b.h) - Math.max(s.y, b.y);
-          return a + (w > 0 && h > 0 ? w * h : 0);
+          if (w <= 0 || h <= 0) return a;
+          const whole = b.x >= s.x && b.y >= s.y && b.x + b.w <= s.x + s.w && b.y + b.h <= s.y + s.h;
+          return a + (whole ? b.w * b.h : 2 * b.w * b.h);
         }, 0);
       };
       const f = r.frame;
