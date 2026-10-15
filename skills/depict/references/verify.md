@@ -21,6 +21,7 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 | focal | warning | A region of two or more items where none is large, a character, a sketch, framed or marked | Draw the thing the region is about as a large sketch, or frame or mark it |
 | sparse | warning under 10% | How much of a region's shot its items cover | Draw the idea as a scene, make the key item large, merge a thin region into another |
 | tangle | warning | Two lines crossing (arrows) | Put the item between the other two, link fewer things, or say the connection in the sentence |
+| through | warning | A link's line running through a third item | Bend it (`bend`), or place the items so the line has a clear way |
 | bridge | warning | A link between regions that are not side by side, or many links between regions | The numbers already give the order: say the connection, or put both items in one region |
 | islands | warning | With the numbers turned off, regions that no link connects | Number the ideas again, or link an item of one region to the next |
 | length | warning over 10 minutes, at the speed the board plays at | The whole board | Two boards |

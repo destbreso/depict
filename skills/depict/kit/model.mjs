@@ -137,6 +137,9 @@ export function normalize(input) {
         item.says = String(it.says);
       }
       if (region.layout === "grid" && !Array.isArray(item.at)) err(`${w}: region ${r.id} lays its items on a grid, so give it at: [column, row]`);
+      if (Array.isArray(item.at) && (item.at.length !== 2 || item.at.some((v) => !Number.isFinite(v) || v < 0))) err(`${w}: at: [column, row] takes two numbers from 0 (0.5 sits between columns 0 and 1)`);
+      // in a matrix, what is written under a cell would land on the cell below it
+      if (region.layout === "cells" && Array.isArray(item.at) && item.note && (r.items ?? []).some((x) => Array.isArray(x.at) && x.at[0] === item.at[0] && x.at[1] === item.at[1] + 1)) err(`${w}: a cell with a cell under it in a matrix takes no note (it would cover the cell below); say it in a beat's note beside the row`);
       if (region.layout === "cells" && it.under == null && (r.items ?? []).some((x) => Array.isArray(x.at) && x.under == null) && !Array.isArray(it.at)) err(`${w}: region ${r.id} is a matrix (its cells have at), so give this cell at: [column, row] too`);
       const celled = region.layout === "cells" || region.layout === "stack";
       if (it.under != null) {

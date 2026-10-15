@@ -405,3 +405,22 @@ test("however it comes alive, the guide ends beside the last idea it presented",
     assert.deepEqual(last.to, [spot.x, spot.y], `with a ${intro} it ends at the last idea`);
   }
 });
+
+test("a node between two columns sits centered over them, and a line through a third thing is flagged", () => {
+  const s = {
+    title: "A small tree",
+    regions: [{ id: "t", title: "A tree", items: [{ id: "root", label: "8", shape: "circle", at: [0.5, 0] }, { id: "l", label: "3", shape: "circle", at: [0, 1] }, { id: "r", label: "9", shape: "circle", at: [1, 1] }] }],
+    links: [{ id: "a", from: "root", to: "l", style: "line" }, { id: "b", from: "root", to: "r", style: "line" }],
+    beats: [{ say: "A root and its two children.", draw: ["title", "t", "root", "l", "r", "a", "b"] }],
+  };
+  const { board, comp, tl } = build(s);
+  assert.ok(Number.isFinite(tl.duration), "the board has a length");
+  const mid = (id) => comp.elements.get(id).box.x + comp.elements.get(id).box.w / 2;
+  assert.ok(Math.abs(mid("root") - (mid("l") + mid("r")) / 2) < 2, "the root is centered over its children");
+  assert.ok(!audit(board, comp, tl).some((f) => f.rule === "through"), "the edges have a clear way");
+  // a straight line from the first cell to the third runs through the second
+  const t = { title: "Three in a row", regions: [{ id: "row", title: "Three", items: [{ id: "x", label: "One", shape: "box" }, { id: "y", label: "Two", shape: "box" }, { id: "z", label: "Three", shape: "box" }] }], links: [{ id: "xz", from: "x", to: "z", bend: 0 }], beats: [{ say: "Three things, and a line over the middle one.", draw: ["title", "row", "x", "y", "z", "xz"] }] };
+  const b2 = build(t);
+  assert.ok(audit(b2.board, b2.comp, b2.tl).some((f) => f.rule === "through"), "the line through the middle one is flagged");
+  assert.match(normalize({ ...s, regions: [{ ...s.regions[0], items: [{ id: "root", label: "8", at: [-1, 0] }] }] }).errors.join("\n"), /two numbers from 0/);
+});

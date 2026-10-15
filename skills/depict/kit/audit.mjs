@@ -2,7 +2,7 @@
 // rule comes from the craft of whiteboard explanations (references/craft.md
 // has the sources) or from the geometry of the board itself. Problems stop
 // the build; warnings are worth a look.
-import { overlaps, pad } from "./geom.mjs";
+import { bounds, overlaps, pad } from "./geom.mjs";
 import { SIZE } from "./compose.mjs";
 import { safeArea } from "./camera.mjs";
 
@@ -157,6 +157,13 @@ export function audit(board, comp, tl) {
   const crossings = [];
   for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) if (cross(lines[i].path, lines[j].path)) crossings.push([lines[i].id, lines[j].id]);
   for (const [a, b] of crossings) warn("tangle", `"${a}" and "${b}" cross; crossing lines read as a tangle: put the item between the other two, link fewer things, or say the connection instead of drawing it`);
+  // a line runs between its two things, never through a third
+  const items = [...els.values()].filter((e) => e.kind === "item");
+  for (const e of lines) {
+    if (e.kind !== "link") continue;
+    const hit = items.find((it) => it.id !== e.from && it.id !== e.to && it.region === e.region && throughBox(e.path, pad(it.box, -8)));
+    if (hit) warn("through", `link "${e.id}" runs through "${hit.id}"; bend it (bend), or place the items so the line has a clear way`);
+  }
 
   // a bridge between regions that are not side by side runs across the board
   // two regions are side by side when they face each other along one side and no other region stands between them
@@ -183,7 +190,12 @@ export function audit(board, comp, tl) {
     const focal = r.items.some((it) => it.size === "large" || it.character || it.sketch || it.shape !== "none" || marked.has(it.id));
     if (r.items.length > 1 && !focal) warn("focal", `region "${r.id}" has no focal point: make the item it is about large, a character or a sketch, give it a frame, or mark it`);
     const frame = comp.regions.find((x) => x.id === r.id).frame;
-    const area = r.items.reduce((a, it) => a + els.get(it.id).box.w * els.get(it.id).box.h, 0);
+    // a tree's or a graph's edges are part of its drawing: the paper between its nodes is not empty
+    let area = r.items.reduce((a, it) => a + els.get(it.id).box.w * els.get(it.id).box.h, 0);
+    for (const e of els.values()) if (e.kind === "link" && !e.bridge && e.region === r.id && e.path) {
+      const b = bounds([e.path]);
+      area += b.w * b.h * 0.4;
+    }
     const fill = area / (frame.w * frame.h);
     if (fill < 0.1) warn("sparse", `region "${r.id}" is mostly empty paper (its items cover ${Math.round(fill * 100)}% of its shot): draw its idea as a scene, a character or a sketch, or make its key item large`);
   }
@@ -244,4 +256,11 @@ export function report(findings) {
   for (const f of warnings) lines.push(`  warning (${f.rule}): ${f.text}`);
   lines.push(problems.length ? `audit failed: ${problems.length} problem${problems.length > 1 ? "s" : ""}, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}` : `audit passed${warnings.length ? ` with ${warnings.length} warning${warnings.length > 1 ? "s" : ""}` : ""}`);
   return { text: lines.join("\n"), ok: !problems.length };
+}
+
+/** Whether a polyline passes inside a box. */
+function throughBox(pts, b) {
+  if (!pts || b.w <= 0 || b.h <= 0) return false;
+  for (let i = 0; i < pts.length; i += 2) if (pts[i] > b.x && pts[i] < b.x + b.w && pts[i + 1] > b.y && pts[i + 1] < b.y + b.h) return true;
+  return false;
 }

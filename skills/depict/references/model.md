@@ -49,7 +49,7 @@ An item is one thing on the board. It has one picture, or none, and words under 
 | `label` | Two or three words, the thing's name. An item needs a picture or a label. A line break (`\n`) puts the rest on a line of its own. |
 | `note` | A short phrase under the label, in grey: a number, a property, a hint. |
 | `shape` | A frame drawn round the item after it: `"none"` (default), `"box"`, `"ellipse"`, `"circle"`, `"cloud"`, `"bubble"`, `"banner"`. Frames cast a grey shadow; a banner is colored in. A `banner` with a label and no picture is a take-away. |
-| `at` | `[column, row]` in a grid region. |
+| `at` | `[column, row]` in a grid region. A place between two columns or rows is a fraction: a tree's root at `[0.5, 0]` sits centered over its children at `[0, 1]` and `[1, 1]`. In a matrix of cells, a cell with a cell under it takes no note (it would cover the cell below). |
 | `under` | In a `cells` region: the cell this item hangs under (a value in a slot, a chain in a bucket). |
 | `figure` | A live part: the path (relative to the board file) or URL of a Dissect page. The item gets a play mark; tapping it opens the running figure. See live.md. |
 

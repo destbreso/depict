@@ -381,24 +381,30 @@ function layoutRegion(board, font, region, S, first, index) {
       y += c.box.h;
     });
   } else {
-    // a grid: columns as wide as their widest card, and each row a ground line of its own
-    const cols = Math.max(...cards.map((c) => c.it.at[0])) + 1;
-    const rows = Math.max(...cards.map((c) => c.it.at[1])) + 1;
+    // a grid: columns as wide as their widest card, and each row a ground line of its own. A place between two
+    // columns or two rows (at: [0.5, 0], a parent over its two children) is centered between them.
+    const cols = Math.max(...cards.map((c) => Math.ceil(c.it.at[0]))) + 1;
+    const rows = Math.max(...cards.map((c) => Math.ceil(c.it.at[1]))) + 1;
     const cw = Array(cols).fill(0);
     const above = Array(rows).fill(0);
     const below = Array(rows).fill(0);
     for (const c of cards) {
       const [ci, ri] = c.it.at;
-      cw[ci] = Math.max(cw[ci], c.box.w);
-      above[ri] = Math.max(above[ri], lift(c));
-      below[ri] = Math.max(below[ri], c.box.h - lift(c));
+      if (Number.isInteger(ci)) cw[ci] = Math.max(cw[ci], c.box.w);
+      if (Number.isInteger(ri)) {
+        above[ri] = Math.max(above[ri], lift(c));
+        below[ri] = Math.max(below[ri], c.box.h - lift(c));
+      }
     }
     const rh = above.map((a, i) => a + below[i]);
     const cx = cw.map((_, i) => cw.slice(0, i).reduce((a, w) => a + w + SIZE.gapRow, 0));
     const ry = rh.map((_, i) => rh.slice(0, i).reduce((a, h) => a + h + SIZE.gapColumn, 0));
+    const between = (v, at) => at(Math.floor(v)) + (at(Math.ceil(v)) - at(Math.floor(v))) * (v - Math.floor(v));
+    const middle = (v) => between(v, (i) => cx[i] + cw[i] / 2);
+    const line = (v) => between(v, (i) => ry[i] + above[i]);
     for (const c of cards) {
       const [ci, ri] = c.it.at;
-      place(c, cx[ci] + (cw[ci] - c.box.w) / 2, ry[ri] + above[ri] - lift(c));
+      place(c, middle(ci) - c.box.w / 2, line(ri) - lift(c));
     }
   }
   const content = cards.reduce((b, c) => union(b, c.box), null);
@@ -425,7 +431,7 @@ function layoutRegion(board, font, region, S, first, index) {
     top = t.box.y + t.box.h + 64;
   }
   // the items sit under the titles
-  for (const c of cards) place(c, c.box.x, c.box.y + top);
+  for (const c of cards) place(c, c.box.x, c.box.y - content.y + top);
   let guide = null;
   if (board.guide && (boardTitle || (board.mode === "slides" && title))) {
     // the guide: the marker that draws every board, standing beside the titles on the line under them,
@@ -440,7 +446,8 @@ function layoutRegion(board, font, region, S, first, index) {
   if (title) box = union(box, title.box);
   if (boardTitle) box = union(box, boardTitle.box);
   if (guide) box = union(box, guide.box);
-  return { region, cards, title, boardTitle, guide, box };
+  const inner = title ? union(cards.reduce((b, c) => union(b, c.box), null), title.box) : cards.reduce((b, c) => union(b, c.box), null);
+  return { region, cards, title, boardTitle, guide, box, inner };
 }
 
 /** A region's number: a disc of the accent with the number in it, in paper, the way the steps of a page are numbered. */
@@ -491,12 +498,16 @@ function freeSpot(r, elements, taken, h, top = 0) {
     }
     return a;
   };
+  // on free paper, and of those the one that widens the region's shot the least (the larger the shot, the smaller its words)
+  const grows = (q) => {
+    const f = fit169(union(r.frame, pad(spotBox(q, h), 30)));
+    return f.w * f.h - r.frame.w * r.frame.h;
+  };
   let best = null;
-  for (const q of cands) {
-    const a = clash(q);
-    if (!best || a < best.a) best = { q, a };
-    if (a === 0) break;
-  }
+  cands.forEach((q, i) => {
+    const score = clash(q) * 1e3 + grows(q) + i; // ties keep the order: beside the title first
+    if (!best || score < best.score) best = { q, score };
+  });
   return { region: r.id, ...best.q };
 }
 
@@ -565,7 +576,7 @@ function placeMural(board, laid) {
     const dx = pos[i][0] - r.box.x;
     const dy = pos[i][1] - r.box.y;
     const slot = moveBox(r.box, dx, dy);
-    return { ...r, frame: frameFor(slot), slot, dx, dy };
+    return { ...r, frame: frameFor(moveBox(r.inner ?? r.box, dx, dy)), slot, dx, dy };
   });
 }
 
@@ -592,6 +603,7 @@ function scaleLaid(r, k) {
   if (r.boardTitle) r.boardTitle = { parts: sparts(r.boardTitle.parts), box: sb(r.boardTitle.box) };
   if (r.guide) r.guide = { feet: [ox + (r.guide.feet[0] - ox) * k, oy + (r.guide.feet[1] - oy) * k], box: sb(r.guide.box) };
   r.box = sb(r.box);
+  r.inner = sb(r.inner);
   r.zoom = k;
 }
 
@@ -626,7 +638,7 @@ function placeRegions(board, laid) {
     const dx = x - r.box.x;
     const dy = y - r.box.y;
     const slot = moveBox(r.box, dx, dy);
-    return { ...r, frame: frameFor(slot), slot, dx, dy };
+    return { ...r, frame: frameFor(moveBox(r.inner ?? r.box, dx, dy)), slot, dx, dy };
   });
 }
 
@@ -749,7 +761,7 @@ export function compose(board, font) {
       guideStart = { region: r.region.id, x: r.guide.feet[0] + r.dx, y: r.guide.feet[1] + r.dy, facing: 1, top: reachAbove(board.cast) };
     }
     // on a slide, the place beside the sheet's title
-    if (r.guide) reserved.set(r.region.id, { region: r.region.id, x: r.guide.feet[0] + r.dx, y: r.guide.feet[1] + r.dy, facing: 1 });
+    if (r.guide && board.mode === "slides") reserved.set(r.region.id, { region: r.region.id, x: r.guide.feet[0] + r.dx, y: r.guide.feet[1] + r.dy, facing: 1 });
     if (r.title) elements.set(r.region.id, { ...element(r.region.id, "region", move(r.title.parts, r.dx, r.dy)), region: r.region.id, zoom: r.zoom ?? 1 });
     for (const c of r.cards) {
       const e = element(c.it.id, "item", move(c.parts, r.dx, r.dy));
@@ -870,6 +882,8 @@ export function compose(board, font) {
     const e = element(l.id, "link", parts);
     e.region = from.region;
     e.joins = [from.region, to.region];
+    e.from = l.from;
+    e.to = l.to;
     e.bridge = bridge;
     e.scale = f;
     e.path = path;
@@ -925,8 +939,9 @@ export function compose(board, font) {
         circle: () => ink.circleAround(p, span ?? (target.cell ? target.labelBox : target.kind === "item" && !target.framed && !target.pictured ? target.wordsBox ?? target.box : target.kind === "item" ? target.box : tb), target.cell && !span ? 8 : 12),
         // close under the words, clear of a note below them
         underline: () => ink.underline(p, tb.x, tb.y + tb.h + 4, tb.w),
-        box: () => ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32),
-        cross: () => ink.crossOut(p, tb),
+        // a box or a cross on one cell is on the cell itself, inside its edges
+        box: () => (target.cell && !span ? ink.box(p, target.cell.x + 6, target.cell.y + 6, target.cell.w - 12, target.cell.h - 12) : ink.box(p, tb.x - 20, tb.y - 16, tb.w + 40, tb.h + 32)),
+        cross: () => ink.crossOut(p, target.cell && !span ? pad(target.cell, -10) : tb),
         highlight: () => ink.highlight(ink.pen(S(id), { width: nib }), hb),
       }[m.kind]();
       const hl = m.kind === "highlight";
@@ -946,7 +961,7 @@ export function compose(board, font) {
     const taken = [...elements.values()].filter((e) => e.kind !== "guide").map((e) => pad(e.box, 18));
     const spots = [guideStart];
     for (const r of regions) {
-      if (r.id === guideStart.region) continue;
+      if (r.id === guideStart.region && board.mode === "slides") continue;
       const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast))) };
       spots.push(spot);
       taken.push(pad(spotBox(spot, h), 10));
@@ -958,7 +973,7 @@ export function compose(board, font) {
   // in slides mode every region is a sheet, and the sheets are all one size
   for (const r of regions) {
     let f = r.frame;
-    for (const e of elements.values()) if (e.region === r.id && !e.joins) f = union(f, pad(e.box, 40));
+    for (const e of elements.values()) if (e.region === r.id && !e.joins && e.kind !== "title" && e.kind !== "guide") f = union(f, pad(e.box, 40));
     const spot = guide?.spots.find((q) => q.region === r.id);
     if (spot) f = union(f, pad(spotBox(spot, guide.h), 30));
     if (f !== r.frame && board.mode !== "slides") r.frame = fit169(f);
