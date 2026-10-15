@@ -424,3 +424,20 @@ test("a node between two columns sits centered over them, and a line through a t
   assert.ok(audit(b2.board, b2.comp, b2.tl).some((f) => f.rule === "through"), "the line through the middle one is flagged");
   assert.match(normalize({ ...s, regions: [{ ...s.regions[0], items: [{ id: "root", label: "8", at: [-1, 0] }] }] }).errors.join("\n"), /two numbers from 0/);
 });
+
+test("a matrix is a table with columns of their own width, and a second note on one side goes past the first", () => {
+  const s = {
+    title: "A table",
+    regions: [{ id: "m", title: "Two columns", layout: "cells", items: [{ id: "a", label: "1", at: [0, 0] }, { id: "b", label: "A long name", at: [1, 0] }, { id: "c", label: "2", at: [0, 1] }, { id: "d", label: "Short", at: [1, 1] }] }],
+    beats: [
+      { say: "A table of two columns.", draw: ["title", "m", "a", "b", "c", "d", { note: "first", near: "d", side: "below" }] },
+      { say: "And one more note under it.", draw: [{ note: "second", near: "d", side: "below" }] },
+    ],
+  };
+  const { comp } = build(s);
+  const [a, b, c] = ["a", "b", "c"].map((id) => comp.elements.get(id).cell);
+  assert.ok(a.w < b.w - 40, `the column of short labels is narrower (${a.w.toFixed(0)} against ${b.w.toFixed(0)})`);
+  assert.ok(Math.abs(b.x - (a.x + a.w)) < 1 && Math.abs(c.y - (a.y + a.h)) < 1, "the cells still share their edges");
+  const [n1, n2] = ["note-1-1", "note-2-1"].map((id) => comp.elements.get(id).box);
+  assert.ok(n2.y >= n1.y + n1.h, "the second note sits below the first");
+});

@@ -246,10 +246,25 @@ function cellCards(board, font, region, S) {
   const order = new Map();
   for (const bt of board.beats) for (const id of bt.draw) if (typeof id === "string" && !order.has(id)) order.set(id, order.size);
   const drawnFirst = (a, b) => (order.get(a.id) ?? Infinity) <= (order.get(b.id) ?? Infinity);
+  // a matrix is a table: each column as wide as its widest cell and each row as tall as its tallest (a column with no
+  // cells in it keeps the widest cell's width, a gap between two groups); a row of cells or a stack keeps them one size
+  const colW = new Map();
+  const rowH = new Map();
+  if (matrix)
+    cellItems.forEach((it, i) => {
+      colW.set(it.at[0], Math.max(colW.get(it.at[0]) ?? 0, labels[i].box.w + 64));
+      rowH.set(it.at[1], Math.max(rowH.get(it.at[1]) ?? 0, labels[i].box.h + 46));
+    });
+  const widthOf = (c) => (matrix ? colW.get(c) ?? cw : cw);
+  const heightOf = (r) => (matrix ? rowH.get(r) ?? ch : ch);
+  const leftOf = (c) => Array.from({ length: c }, (_, k) => widthOf(k)).reduce((a, w) => a + w, 0);
+  const topOf = (r) => Array.from({ length: r }, (_, k) => heightOf(k)).reduce((a, h) => a + h, 0);
   const cells = cellItems.map((it, i) => {
     const [ci, ri] = placeOf(it, i);
-    const x = ci * cw;
-    const y = ri * ch;
+    const cw = widthOf(ci);
+    const ch = heightOf(ri);
+    const x = leftOf(ci);
+    const y = topOf(ri);
     const p = ink.pen(S(`${it.id}.shape`), { width: W.line });
     // its top, right, bottom and left: a side is its own unless the cell across it was drawn before it
     const sides = [[0, -1], [1, 0], [0, 1], [-1, 0]].map(([dx, dy]) => {
@@ -893,6 +908,7 @@ export function compose(board, font) {
   }
 
   // notes and marks, beat by beat
+  const noteStack = new Map(); // the last note on each side of each thing: a second one goes past it, not on it
   board.beats.forEach((bt, bi) => {
     bt.notes.forEach((n, ni) => {
       const id = `note-${bi + 1}-${ni + 1}`;
@@ -907,8 +923,17 @@ export function compose(board, font) {
         right: [tb.x + tb.w + gap + nt.box.w / 2, tb.y + tb.h / 2],
         left: [tb.x - gap - nt.box.w / 2, tb.y + tb.h / 2],
       }[n.side];
+      const key = `${n.near}|${n.side}`;
+      const prev = noteStack.get(key);
+      if (prev) {
+        at[1] = n.side === "above" ? prev.y - 14 * z - nt.box.h / 2 : prev.y + prev.h + 14 * z + nt.box.h / 2;
+        if (n.side === "right") at[0] = prev.x + nt.box.w / 2;
+        if (n.side === "left") at[0] = prev.x + prev.w - nt.box.w / 2;
+      }
       const parts = move([part("text", nt.strokes, { width: W.note * Math.pow(z, 0.6), color: GREY, write: true, size: SIZE.note * z })], at[0] - (nt.box.x + nt.box.w / 2), at[1] - (nt.box.y + nt.box.h / 2));
-      if (n.arrow) {
+      noteStack.set(key, bounds(parts[0].strokes));
+      // a note stacked past another goes on from it, with no arrow of its own across the first
+      if (n.arrow && !prev) {
         const nb = bounds(parts[0].strokes);
         const [ax, ay] = exitPoint(nb, tb.x + tb.w / 2, tb.y + tb.h / 2, 8);
         const [bx, by] = exitPoint(tb, nb.x + nb.w / 2, nb.y + nb.h / 2, 10);
@@ -931,7 +956,7 @@ export function compose(board, font) {
       const p = ink.pen(S(id), { width: W.mark * Math.pow(z, 0.6) });
       // a highlight runs a little past the words it marks; over cells or frames it stays inside them, clear of their edges and of the next ones
       const inside = !!many && many.every((e) => e.framed);
-      const nib = Math.max(18, (inside ? tb.h - 16 : tb.h) * 0.5);
+      const nib = Math.max(18, (inside ? Math.min(tb.w, tb.h) - 16 : tb.h) * 0.5); // a column of cells is painted with the width of a cell
       const hb = inside ? { x: tb.x + nib / 2 + 8, y: tb.y + 8, w: Math.max(2, tb.w - nib - 16), h: tb.h - 16 } : pad(tb, 6, -2);
       const strokes = {
         // an item of words is circled round its words; one with a picture, or in a frame of its own, round all of it (a circle
