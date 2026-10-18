@@ -502,17 +502,17 @@
     outroLayer.style.transition = "";
     outroLayer.style.opacity = "";
   }
-  // where the film was, while it plays: a page reloaded under the viewer (a preview refreshing as the file is
-  // rebuilt) picks up where it was instead of starting over. Best effort: storage may be missing or blocked.
+  // where the film was, while it plays, kept every frame: a page reloaded under the viewer (a preview that
+  // refreshes whenever a file in its folder changes) goes on from the very frame it was showing, neither
+  // starting over nor showing a moment again. Best effort: storage may be missing or blocked.
   const KEY = `depict:${location.pathname}`;
-  let saved = 0;
   function remember() {
-    if (capture || performance.now() - saved < 250) return;
-    saved = performance.now();
+    if (capture) return;
     try {
       sessionStorage.setItem(KEY, JSON.stringify({ t: now, at: Date.now() }));
     } catch {}
   }
+  addEventListener("pagehide", () => playing && remember());
   function forget() {
     try {
       sessionStorage.removeItem(KEY);
