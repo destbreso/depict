@@ -143,6 +143,8 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .capture .dp-frame{width:100vw;height:100vh;border-radius:0;box-shadow:none}
 .capture .dp-bar,.capture .dp-under{display:none!important}
 .embed,.embed body{background:transparent}
+.nostart .dp-start{display:none!important}
+.embed .dp.fresh .dp-board,.embed .dp.fresh .dp-stage,.embed .dp.playing .dp-board,.embed .dp.playing .dp-stage{touch-action:pan-y}
 @media (max-width:640px){.dp-time{display:none}.dp-speed{display:none}}
 `;
 
@@ -161,7 +163,7 @@ export function page(board, scene) {
 <meta name="description" content="${esc(board.beats.map((b) => b.say).join(" ").slice(0, 280))}">
 <meta name="generator" content="depict">
 <style>${css}</style>
-<script>{const q=new URLSearchParams(location.search);if(q.has("capture"))document.documentElement.classList.add("capture");if(q.has("embed"))document.documentElement.classList.add("embed")}</script>
+<script>{const q=new URLSearchParams(location.search);if(q.has("capture"))document.documentElement.classList.add("capture");if(q.has("embed"))document.documentElement.classList.add("embed");if(q.has("nostart"))document.documentElement.classList.add("nostart")}</script>
 </head>
 <body>
 <div class="dp${board.audience === "child" ? " child" : ""}" tabindex="0">

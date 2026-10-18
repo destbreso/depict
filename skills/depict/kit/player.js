@@ -624,12 +624,57 @@
     },
     { passive: false },
   );
+  // one finger (or the mouse) drags the board; two fingers pinch it, zooming about the point between them
   let drag = null;
+  let pinch = null;
+  let gesture = false; // a drag or a pinch is going on: lifting the fingers is not a tap
+  const fingers = new Map();
+  const toSvg = (px, py) => {
+    const r = svg.getBoundingClientRect();
+    return [((px - r.left) / r.width) * VW, ((py - r.top) / r.height) * VH];
+  };
+  const pair = () => {
+    const [a, b] = [...fingers.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  };
   svg.addEventListener("pointerdown", (ev) => {
-    drag = { x: ev.clientX, y: ev.clientY, shot: shotNow, moved: false };
+    fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     svg.setPointerCapture(ev.pointerId);
+    if (fingers.size === 2) {
+      const p = pair();
+      const [sx, sy] = toSvg(p.mx, p.my);
+      const k = shotNow[2] / VW;
+      // the point of the board between the fingers stays between them
+      pinch = { d: p.d, bx: shotNow[0] + (sx - VW / 2) * k, by: shotNow[1] + (sy - VH / 2) * k, w: shotNow[2] };
+      drag = null;
+      gesture = true;
+      pause();
+      return;
+    }
+    if (fingers.size === 1) {
+      drag = { x: ev.clientX, y: ev.clientY, shot: shotNow, moved: false };
+      gesture = false;
+    }
+  });
+  const lift = (ev) => {
+    fingers.delete(ev.pointerId);
+    if (fingers.size < 2) pinch = null;
+  };
+  svg.addEventListener("pointercancel", (ev) => {
+    lift(ev);
+    drag = null;
   });
   svg.addEventListener("pointermove", (ev) => {
+    if (fingers.has(ev.pointerId)) fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pinch && fingers.size >= 2) {
+      const p = pair();
+      const w = Math.min(S.overview[2] * 1.6, Math.max(300, (pinch.w * pinch.d) / p.d));
+      const [sx, sy] = toSvg(p.mx, p.my);
+      const k = w / VW;
+      view = [pinch.bx - (sx - VW / 2) * k, pinch.by - (sy - VH / 2) * k, w];
+      setCam(view);
+      return;
+    }
     if (drag) {
       const r = svg.getBoundingClientRect();
       const k = drag.shot[2] / r.width;
@@ -637,6 +682,7 @@
       const dy = (ev.clientY - drag.y) * k;
       if (Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y) > 4) {
         drag.moved = true;
+        gesture = true;
         pause();
         view = [drag.shot[0] - dx, drag.shot[1] - dy, drag.shot[2]];
         setCam(view);
@@ -655,9 +701,14 @@
     } else hoverBox.style.display = "none";
   });
   svg.addEventListener("pointerup", (ev) => {
-    const d = drag;
+    lift(ev);
     drag = null;
-    if (d && d.moved) return;
+    // the last finger of a drag or a pinch lifts: no tap
+    if (gesture) {
+      if (!fingers.size) gesture = false;
+      return;
+    }
+    if (fingers.size) return;
     if (playing) return pause();
     // the guide answers a tap with a hop and a wave
     const [bx, by] = toBoard(ev);
@@ -803,9 +854,14 @@
     const w = want();
     told = JSON.stringify(w);
     tell("ready", w);
-    // a host that was not listening yet (its own page still starting) says hello, and hears ready again
+    // a host that was not listening yet (its own page still starting) says hello, and hears ready again; a host
+    // can also start the film and pause it (its own play button, over the board)
     addEventListener("message", (e) => {
-      if (e.source === window.parent && e.data && e.data.depict === "hello") tell("ready", want());
+      if (e.source !== window.parent || !e.data) return;
+      const say = e.data.depict;
+      if (say === "hello") tell("ready", want());
+      else if (say === "play" && !playing) play();
+      else if (say === "pause" && playing) pause();
     });
   }
 })();
