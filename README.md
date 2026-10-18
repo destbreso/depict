@@ -21,10 +21,10 @@
 </p>
 
 <p align="center">
-  <a href="skills/depict/examples/cpu-cache/cpu-cache.html"><img src="assets/drawing.gif" width="800" alt="A hand-drawn board being drawn: the guide, a cartoon marker with a red cap, glasses, a bow tie and a teacher\'s pointer, is drawn stroke by stroke beside the title How a CPU cache works, comes alive its own way and presents the title as it is written over a yellow highlighter swash; then the first idea, numbered 1 in a red disc, Where data lives, and a green CPU chip drawn pin by pin, while a caption under the board says each sentence."></a>
+  <a href="skills/depict/examples/cpu-cache/cpu-cache.html"><img src="assets/cpu-cache.gif" width="800" alt="The whole board How a CPU cache works, drawn from the first stroke to the goodbye: the guide, a cartoon marker with a red cap, glasses, a bow tie and a teacher's pointer, is drawn beside the title, comes alive and presents the title as it is written over a yellow highlighter swash; then 1 Where data lives (a green CPU chip drawn pin by pin, a yellow cache block with a bolt, two memory sticks set far off and circled, a yellow arrow of 1 ns and a dashed one of 100 ns), 2 Hit or miss (the cache's lines with a check, an hourglass for a miss from memory) and 3 Why it pays off (a yellow loop arrow for reuse, a row of memory with its neighbors colored in, a banner Most reads hit), the camera flying from idea to idea and pulling back to the whole board, and the guide saying goodbye as a circle closes on it and the title is written on the dark."></a>
 </p>
 
-<p align="center"><sub><code>skills/depict/examples/cpu-cache</code>: the opening of a one-minute board. Every letter is written in pen order; the pen follows the tip; the guide is drawn, then performs.</sub></p>
+<p align="center"><sub><code>skills/depict/examples/cpu-cache</code>: the whole one-minute board, from the first stroke to the goodbye. Every letter is written in pen order; the pen follows the tip; the guide is drawn, then performs; the camera flies from idea to idea and ends on the whole board.</sub></p>
 
 ## Quick start
 
