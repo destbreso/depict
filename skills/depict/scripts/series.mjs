@@ -17,7 +17,12 @@
 //   };
 // Each board is built with the audit into <folder>/site/<id>.html; the check
 // pictures every beat into <folder>/shots/<id>/ and its closing overview
-// becomes site/<id>.png. site/report.json keeps what every build said (put
+// becomes site/<id>.png, and its cover site/<id>-cover.png: a frame of its own
+// film, the end of the beat where its first picture is complete and the camera
+// still holds on it (the beat that ends as the camera first flies on), the guide
+// beside it; a board's meta can name another beat (`cover: 4`). A whole board is
+// too small to read on a tile; its first picture, close, is what a child picks.
+// site/report.json keeps what every build said (put
 // together when it is written, so two builds running at once both keep theirs)
 // and site/index.html is the gallery. Fails when any board fails.
 import fs from "node:fs";
@@ -80,8 +85,25 @@ for (const id of ids) {
       failed++;
       report[id].ok = false;
       console.log(`     check failed:\n${c.stdout}${c.stderr}`);
-    } else fs.copyFileSync(path.join(shots, `${id}-overview.png`), path.join(site, `${id}.png`));
+    } else {
+      fs.copyFileSync(path.join(shots, `${id}-overview.png`), path.join(site, `${id}.png`));
+      const beat = coverBeat(out, metas.get(id).meta);
+      const shot = beat && path.join(shots, `${id}-beat-${String(beat).padStart(2, "0")}.png`);
+      if (shot && fs.existsSync(shot)) fs.copyFileSync(shot, path.join(site, `${id}-cover.png`));
+    }
   }
+}
+
+/** The beat whose last frame is a board's cover: its meta's `cover`, or the last beat that ends before the camera's second flight. */
+function coverBeat(page, meta) {
+  if (meta?.cover) return meta.cover;
+  const line = fs.readFileSync(page, "utf8").split("\n").find((l) => l.startsWith("const SCENE = "));
+  if (!line) return null;
+  const scene = JSON.parse(line.slice("const SCENE = ".length).replace(/;\s*$/, ""));
+  const flights = scene.camera.map((k) => k.t0).sort((a, b) => a - b);
+  if (flights.length < 2) return null;
+  const i = scene.beats.findLastIndex((b) => b.t1 <= flights[1] + 1e-6);
+  return i >= 0 ? i + 1 : null;
 }
 
 // other builds may have written meanwhile: put only what this one built over what is there now
@@ -112,7 +134,7 @@ function gallery(boards) {
     const link = cfg.link?.(metaOf(b));
     if (pick)
       return `<a class="tile${b.ok ? "" : " bad"}" href="${esc(b.id)}.html">
-  <img src="${esc(b.id)}.png" alt="" loading="lazy">
+  <img src="${esc(b.id)}${fs.existsSync(path.join(site, `${b.id}-cover.png`)) ? "-cover" : ""}.png" alt="" loading="lazy">
   <span class="name">${esc(metaOf(b).title ?? b.title)}</span>
   <span class="note">${esc(note(b))}</span>
 </a>`;

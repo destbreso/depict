@@ -5,6 +5,7 @@
 - A board on a site: `?embed` makes the page's room transparent, so it sits on the site's own page, and the page tells its host what the film does (`ready`, `play`, `pause`, `ended`), how tall it wants to be for its width and where the board sits in it (`size`), with `postMessage`; a host that starts listening late says hello and hears `ready` again. SKILL.md says how.
 - Every length a page shows is the time it takes at the board's own speed: a child's board, at half speed, says "Watch it drawn · 5:09" for a film of 2:34, and its clock ends there; the build and a series' report give the same length. The speed menu's 1x is the board's own speed, and before the film has played its clock reads from 0:00.
 - A child's board has controls big enough for small fingers: 44 pixel buttons, with the paper under the board to fit them.
+- A series gives each board a cover, `site/<id>-cover.png`: the frame of its own film where its first picture is complete and the camera holds on it, the guide beside it (`meta.cover` names another beat). The gallery's tiles for a child show it: a whole board shrunk to a tile is too small to read.
 
 ## 0.4.0
 
