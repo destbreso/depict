@@ -10,18 +10,23 @@
 :root{--dp-paper:#fbfaf7;--dp-ink:#1b1b19;--dp-room:#e9e6dd;--dp-muted:#6b6a64;--dp-accent:#c43f0a;color-scheme:light}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-.dp{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px;outline:none}
-.dp-frame{position:relative;width:min(100%,calc((100vh - 200px)*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
+.dp{--dp-reserve:200px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px;outline:none}
+.dp-frame{position:relative;width:min(100%,calc((100vh - var(--dp-reserve))*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
 .dp-board,.dp-stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none}
 .dp-paper{fill:var(--dp-paper)}
 .slides .dp-paper{fill:var(--dp-room)}
 .dp-sheet{fill:var(--dp-paper);stroke:rgba(40,36,24,.12);stroke-width:2}
 .dp-hover{fill:rgba(242,201,76,.16);stroke:rgba(196,63,10,.35);stroke-width:2;stroke-dasharray:8 6;pointer-events:none}
-.dp-under{width:min(100%,calc((100vh - 200px)*16/9));min-height:calc(2 * 1.35 * clamp(15px,1.7vw,24px) + 12px);display:flex;align-items:flex-start;justify-content:center;text-align:center}
+.dp-under{width:min(100%,calc((100vh - var(--dp-reserve))*16/9));min-height:calc(2 * 1.35 * clamp(15px,1.7vw,24px) + 12px);display:flex;align-items:flex-start;justify-content:center;text-align:center}
 .child .dp-under{min-height:calc(2 * 1.35 * clamp(17px,2.1vw,30px) + 12px)}
 .dp-caption{max-width:46em;padding:2px 8px;color:var(--dp-ink);font-size:clamp(15px,1.7vw,24px);line-height:1.35;opacity:0;transition:opacity .25s;text-wrap:balance}
 .dp-caption.on{opacity:1}
 .child .dp-caption{font-size:clamp(17px,2.1vw,30px)}
+.child{--dp-reserve:212px}
+.child .dp-bar{gap:12px}
+.child .dp-bar button,.child .dp-bar select{height:44px;min-width:44px;border-radius:12px;font-size:17px}
+.child .dp-track{height:44px}
+.child .dp-start button{font-size:clamp(16px,1.6vw,21px)}
 .dp.fresh .dp-caption,.dp.ended .dp-caption{display:none}
 .dp-start{display:none}
 .dp.fresh .dp-start{display:flex}
@@ -29,7 +34,7 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .dp-start button::before{content:"";width:0;height:0;border-left:.8em solid currentColor;border-top:.5em solid transparent;border-bottom:.5em solid transparent}
 .dp-hint{display:none;padding-top:4px;color:var(--dp-muted);font-size:clamp(13px,1.2vw,16px)}
 .dp.ended:not(.fresh) .dp-hint{display:block}
-.dp-bar{display:flex;align-items:center;gap:10px;width:min(100%,calc((100vh - 200px)*16/9));padding:6px 4px}
+.dp-bar{display:flex;align-items:center;gap:10px;width:min(100%,calc((100vh - var(--dp-reserve))*16/9));padding:6px 4px}
 .dp-bar button,.dp-bar select{height:34px;min-width:34px;border:1px solid rgba(40,36,24,.18);border-radius:8px;background:var(--dp-paper);color:var(--dp-ink);font:inherit;cursor:pointer}
 .dp-bar button:focus-visible,.dp-bar select:focus-visible,.dp-scrub:focus-visible{outline:2px solid var(--dp-accent);outline-offset:2px}
 .dp-play::before{content:"";display:inline-block;border-left:11px solid currentColor;border-top:7px solid transparent;border-bottom:7px solid transparent;margin-left:3px}
@@ -48,9 +53,10 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .capture .dp{padding:0}
 .capture .dp-frame{width:100vw;height:100vh;border-radius:0;box-shadow:none}
 .capture .dp-bar,.capture .dp-under{display:none!important}
+.embed,.embed body{background:transparent}
 @media (max-width:640px){.dp-time{display:none}.dp-speed{display:none}}
 </style>
-<script>if(new URLSearchParams(location.search).has("capture"))document.documentElement.classList.add("capture")</script>
+<script>{const q=new URLSearchParams(location.search);if(q.has("capture"))document.documentElement.classList.add("capture");if(q.has("embed"))document.documentElement.classList.add("embed")}</script>
 </head>
 <body>
 <div class="dp" tabindex="0">
@@ -433,6 +439,8 @@ function hosePath(sh, bow, hand, wobble) {
   const NS = "http://www.w3.org/2000/svg";
   const q = new URLSearchParams(location.search);
   const capture = q.has("capture");
+  // on a site, in a frame (?embed): the page tells its host what the film does, and how tall it wants to be
+  const embedded = q.has("embed") && window.parent !== window;
   const reduced = !capture && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const root = document.querySelector(".dp");
 
@@ -869,9 +877,10 @@ function hosePath(sh, bow, hand, wobble) {
     caption.classList.toggle("on", !!b);
   }
 
-  // playing
+  // playing: the board's own speed is 1x (a child's board, half the film's speed), and the menu goes either way from it
+  const own = S.speed || 1;
   let playing = false;
-  let speed = S.speed || 1;
+  let speed = own;
   let last = 0;
   let failed = false;
   const tick = (ms) => {
@@ -897,6 +906,7 @@ function hosePath(sh, bow, hand, wobble) {
     requestAnimationFrame(tick);
   };
   function play() {
+    if (!playing) tell("play");
     unfade();
     // from the end, or from the board at rest after it, the film starts again from the beginning
     if (now >= T || root.classList.contains("ended")) seek(0);
@@ -909,6 +919,7 @@ function hosePath(sh, bow, hand, wobble) {
     requestAnimationFrame(tick);
   }
   function pause() {
+    if (playing) tell("pause");
     playing = false;
     root.classList.remove("playing");
     forget();
@@ -931,6 +942,7 @@ function hosePath(sh, bow, hand, wobble) {
     if (S.explore != null) render(S.explore);
     root.classList.add("ended");
     forget();
+    tell("ended");
   }
   function unfade() {
     if (!fading) return;
@@ -974,7 +986,9 @@ function hosePath(sh, bow, hand, wobble) {
   };
   function updateBar() {
     scrub.value = String(now);
-    clock.textContent = `${fmt(now)} / ${fmt(T)}`;
+    // the clock runs at the board's own speed: it ends at the length the start button promised; before the film
+    // has played, while the whole board waits behind the start button, it reads from the beginning
+    clock.textContent = `${fmt(root.classList.contains("fresh") ? 0 : now / own)} / ${fmt(T / own)}`;
     playBtn.setAttribute("aria-label", playing ? "Pause" : now >= T || root.classList.contains("ended") ? "Replay" : "Play");
   }
   playBtn.addEventListener("click", () => (playing ? pause() : play()));
@@ -991,7 +1005,7 @@ function hosePath(sh, bow, hand, wobble) {
   };
   bar.querySelector(".dp-prev").addEventListener("click", () => step(-1));
   bar.querySelector(".dp-next").addEventListener("click", () => step(1));
-  bar.querySelector(".dp-speed").addEventListener("change", (e) => (speed = Number(e.target.value)));
+  bar.querySelector(".dp-speed").addEventListener("change", (e) => (speed = own * Number(e.target.value)));
   root.addEventListener("keydown", (e) => {
     if (e.target.closest("select")) return;
     if (e.key === " " || e.key === "k") {
@@ -1168,6 +1182,31 @@ function hosePath(sh, bow, hand, wobble) {
   }
 
   window.depict = { render, seek, play, pause, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
+  // the host of an embedded page hears ready, play, pause and ended, and size whenever the height the page
+  // wants (the board as wide as the frame, with its bar and caption under it) or the board's place in it changes:
+  // `box`, [x, y, width, height] of the board in the frame, so a host can lay a picture exactly over it
+  function tell(event, more) {
+    if (!embedded) return;
+    try {
+      window.parent.postMessage({ depict: { event, t: now, duration: T, speed: own, title: S.title, ...more } }, "*");
+    } catch {}
+  }
+  let told = "";
+  const want = () => {
+    const cs = getComputedStyle(root);
+    const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const r = root.querySelector(".dp-frame").getBoundingClientRect();
+    return { height: Math.ceil(((innerWidth - pad) * 9) / 16 + (parseFloat(cs.getPropertyValue("--dp-reserve")) || 200)), box: [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 10) / 10) };
+  };
+  if (embedded)
+    addEventListener("resize", () => {
+      const w = want();
+      const key = JSON.stringify(w);
+      if (key !== told) {
+        told = key;
+        tell("size", w);
+      }
+    });
   hoverBox.style.display = "none";
   const at = q.get("t");
   let resume = null;
@@ -1181,9 +1220,21 @@ function hosePath(sh, bow, hand, wobble) {
     play();
   } else {
     render(at != null ? Number(at) : capture ? 0 : S.explore ?? T);
-    if (!capture && at == null) root.classList.add("ended", "fresh");
+    if (!capture && at == null) {
+      root.classList.add("ended", "fresh");
+      updateBar();
+    }
   }
   document.documentElement.dataset.ready = "1";
+  if (embedded) {
+    const w = want();
+    told = JSON.stringify(w);
+    tell("ready", w);
+    // a host that was not listening yet (its own page still starting) says hello, and hears ready again
+    addEventListener("message", (e) => {
+      if (e.source === window.parent && e.data && e.data.depict === "hello") tell("ready", want());
+    });
+  }
 })();
 
 document.querySelector(".dp-go").addEventListener("click", () => { document.querySelector(".dp").classList.remove("fresh"); depict.seek(0); depict.play(); });

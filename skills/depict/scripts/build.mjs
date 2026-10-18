@@ -56,7 +56,8 @@ const fmt = (s) => {
   const r = Math.round(s);
   return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`;
 };
-console.log(`${path.relative(process.cwd(), out)}: ${board.beats.length} beats, ${fmt(tl.duration)}, ${tl.strokes.length} strokes, ${(html.length / 1024).toFixed(0)} KB`);
+// its length is how long it takes to watch, at its own speed
+console.log(`${path.relative(process.cwd(), out)}: ${board.beats.length} beats, ${fmt(tl.duration / (board.speed ?? 1))}, ${tl.strokes.length} strokes, ${(html.length / 1024).toFixed(0)} KB`);
 if (args.includes("--audit") || !verdict.ok) {
   console.log(verdict.text);
   if (args.includes("--audit") && !verdict.ok) process.exit(1);

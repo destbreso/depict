@@ -10,7 +10,7 @@
       "name": "depict",
       "source": "./",
       "description": "Explain a concept by drawing it: a hand-drawn board with an animated guide character, pitched to its viewer, that stays explorable when it ends; and a drawing made into a character.",
-      "version": "0.4.0"
+      "version": "0.5.0"
     }
   ]
 }

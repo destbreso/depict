@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- A board on a site: `?embed` makes the page's room transparent, so it sits on the site's own page, and the page tells its host what the film does (`ready`, `play`, `pause`, `ended`), how tall it wants to be for its width and where the board sits in it (`size`), with `postMessage`; a host that starts listening late says hello and hears `ready` again. SKILL.md says how.
+- Every length a page shows is the time it takes at the board's own speed: a child's board, at half speed, says "Watch it drawn · 5:09" for a film of 2:34, and its clock ends there; the build and a series' report give the same length. The speed menu's 1x is the board's own speed, and before the film has played its clock reads from 0:00.
+- A child's board has controls big enough for small fingers: 44 pixel buttons, with the paper under the board to fit them.
+
 ## 0.4.0
 
 - Characters: the guide is a character, `guide: { character }`. The marker stays the default; Stuart, a fuzzy pink brain with round glasses created by Niki, age 7, ships beside it, with his own costumes from her drawings (an elf hat and mittens, and a spider for Halloween) worn as outfits; a board can also bring a character module of its own. Each character has its look, its measures and poses for its own body, places for the shared costumes, what it can wear and its skins, its material (how much it squashes and stretches, how it wobbles, whether its top sways over its feet like a jelly) and its personality (its own ways to arrive and leave, chosen by the seed, and its quirks: Stuart pushes his glasses up in a quiet moment). Soft bodies arrive with a `bounce` or a `jiggle` and leave with a `bounce`.

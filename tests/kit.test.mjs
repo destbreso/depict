@@ -8,7 +8,7 @@ import { hand } from "../skills/depict/kit/fonts.mjs";
 import { measure, wrap, write } from "../skills/depict/kit/hand.mjs";
 import { flight, pan, shotOf } from "../skills/depict/kit/camera.mjs";
 import { flattenPath, shapeLines } from "../skills/depict/kit/svgpath.mjs";
-import { sceneOf } from "../skills/depict/kit/page.mjs";
+import { page, sceneOf } from "../skills/depict/kit/page.mjs";
 import { audit } from "../skills/depict/kit/audit.mjs";
 import { bounds } from "../skills/depict/kit/geom.mjs";
 
@@ -321,6 +321,19 @@ test("a mark can span several things, and a child's board plays at half speed", 
   assert.equal(kid.board.speed, 0.5);
   assert.equal(sceneOf(kid.board, kid.comp, kid.tl).speed, 0.5);
   assert.equal(tl.beats.length, kid.tl.beats.length);
+});
+
+test("a page tells how long it takes at its own speed, its 1x is that speed, and it can sit on a site", () => {
+  const kid = build({ ...tiny(), audience: "child" });
+  const scene = sceneOf(kid.board, kid.comp, kid.tl);
+  const html = page(kid.board, scene);
+  const whole = Math.round(scene.duration / 0.5);
+  assert.ok(html.includes(`Watch it drawn · ${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`), "the start button promises the time it takes at half speed");
+  assert.match(html, /<option value="1" selected>1&times;<\/option>/, "the speed menu starts at the board's own speed, shown as 1x");
+  assert.ok(!/<option value="0.5" selected>/.test(html));
+  assert.ok(html.includes("--dp-reserve:212px"), "a child's controls are big enough for small fingers");
+  assert.ok(html.includes('q.has("embed")') && html.includes(".embed,.embed body{background:transparent}"), "?embed lets the host's page show round the board");
+  assert.ok(html.includes("postMessage({ depict: { event"), "and tells the host what the film does");
 });
 
 test("cells with places make a matrix, and a line link is an edge with no head", () => {

@@ -1,6 +1,6 @@
 {
   "name": "depict",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Explain a concept by drawing it: a hand-drawn board that builds stroke by stroke, one sentence at a time, presented by an animated character, pitched to its viewer from a young child to an expert, and explorable when the explanation ends. Turns a drawing into a character of your own.",
   "author": {
     "name": "David Estévez",

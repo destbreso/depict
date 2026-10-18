@@ -4,7 +4,7 @@ description: Explain any concept by drawing it: a hand-drawn whiteboard that bui
 license: MIT
 compatibility: Written for Claude Code; also runs in Codex, OpenCode and Antigravity. Needs Node.js 20.10+ (built-in modules only), Chrome or Chromium for the checks, and ffmpeg for a video.
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   author: "David Estévez"
   repository: "https://github.com/destbreso/depict"
 ---
@@ -112,6 +112,10 @@ You are composing a picture, not filling a form.
 ## A course or a series
 
 Boards that belong together (a course, a set of lessons, one board per article) live in one folder: `boards/<id>/board.mjs`, each a board script that may also export `meta` (its place, its group, a link). `node scripts/series.mjs <folder>` builds and audits every board into `<folder>/site/`, runs the check on each, keeps what every build said in `site/report.json` and writes `site/index.html`, the gallery: big tiles to pick from (for a child) or cards with what the audit found (for review). An optional `<folder>/series.mjs` says how the gallery reads: its title, its order, its groups, the line under each title, a link. Keep the series' own rules (its level, its sources, its character) in the series' README, and anything that holds for every board here, in the skill.
+
+## A board on a site
+
+A built page stands on its own: link to it, or put it in an iframe of a site's own page with `?embed` (`<iframe src="lesson.html?embed" allow="fullscreen">`). Embedded, the page's room is transparent, so the site's page shows round the board, and the page tells its host what the film does with `postMessage`: `{ depict: { event, t, duration, speed, title, height } }`, where `event` is `ready`, `play`, `pause`, `ended` or `size`, `height` (on `ready` and `size`) is how tall the frame wants to be for its width, the board as wide as the frame with its bar and caption under it, and `box` is where the board sits in the frame, `[x, y, width, height]`, to lay a picture of it (its closing overview) exactly over it while it loads. A host that starts listening after the page has loaded posts `{ depict: "hello" }` to the frame and hears `ready` again. A host of the same origin can also call the page's `window.depict` (`play`, `pause`, `seek`, `render`, `duration`, `speed`, `time`). Every length the page shows (the start button, the bar's clock) is the time it takes at the board's own speed, and its speed menu's 1x is that speed; a child's board has controls big enough for small fingers.
 
 ## The board script
 

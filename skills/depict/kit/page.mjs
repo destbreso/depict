@@ -99,18 +99,23 @@ const CSS = `
 :root{--dp-paper:#fbfaf7;--dp-ink:#1b1b19;--dp-room:#e9e6dd;--dp-muted:#6b6a64;--dp-accent:ACCENT;color-scheme:light}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-.dp{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px;outline:none}
-.dp-frame{position:relative;width:min(100%,calc((100vh - 200px)*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
+.dp{--dp-reserve:200px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px;outline:none}
+.dp-frame{position:relative;width:min(100%,calc((100vh - var(--dp-reserve))*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
 .dp-board,.dp-stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none}
 .dp-paper{fill:var(--dp-paper)}
 .slides .dp-paper{fill:var(--dp-room)}
 .dp-sheet{fill:var(--dp-paper);stroke:rgba(40,36,24,.12);stroke-width:2}
 .dp-hover{fill:rgba(242,201,76,.16);stroke:rgba(196,63,10,.35);stroke-width:2;stroke-dasharray:8 6;pointer-events:none}
-.dp-under{width:min(100%,calc((100vh - 200px)*16/9));min-height:calc(2 * 1.35 * clamp(15px,1.7vw,24px) + 12px);display:flex;align-items:flex-start;justify-content:center;text-align:center}
+.dp-under{width:min(100%,calc((100vh - var(--dp-reserve))*16/9));min-height:calc(2 * 1.35 * clamp(15px,1.7vw,24px) + 12px);display:flex;align-items:flex-start;justify-content:center;text-align:center}
 .child .dp-under{min-height:calc(2 * 1.35 * clamp(17px,2.1vw,30px) + 12px)}
 .dp-caption{max-width:46em;padding:2px 8px;color:var(--dp-ink);font-size:clamp(15px,1.7vw,24px);line-height:1.35;opacity:0;transition:opacity .25s;text-wrap:balance}
 .dp-caption.on{opacity:1}
 .child .dp-caption{font-size:clamp(17px,2.1vw,30px)}
+.child{--dp-reserve:212px}
+.child .dp-bar{gap:12px}
+.child .dp-bar button,.child .dp-bar select{height:44px;min-width:44px;border-radius:12px;font-size:17px}
+.child .dp-track{height:44px}
+.child .dp-start button{font-size:clamp(16px,1.6vw,21px)}
 .dp.fresh .dp-caption,.dp.ended .dp-caption{display:none}
 .dp-start{display:none}
 .dp.fresh .dp-start{display:flex}
@@ -118,7 +123,7 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .dp-start button::before{content:"";width:0;height:0;border-left:.8em solid currentColor;border-top:.5em solid transparent;border-bottom:.5em solid transparent}
 .dp-hint{display:none;padding-top:4px;color:var(--dp-muted);font-size:clamp(13px,1.2vw,16px)}
 .dp.ended:not(.fresh) .dp-hint{display:block}
-.dp-bar{display:flex;align-items:center;gap:10px;width:min(100%,calc((100vh - 200px)*16/9));padding:6px 4px}
+.dp-bar{display:flex;align-items:center;gap:10px;width:min(100%,calc((100vh - var(--dp-reserve))*16/9));padding:6px 4px}
 .dp-bar button,.dp-bar select{height:34px;min-width:34px;border:1px solid rgba(40,36,24,.18);border-radius:8px;background:var(--dp-paper);color:var(--dp-ink);font:inherit;cursor:pointer}
 .dp-bar button:focus-visible,.dp-bar select:focus-visible,.dp-scrub:focus-visible{outline:2px solid var(--dp-accent);outline-offset:2px}
 .dp-play::before{content:"";display:inline-block;border-left:11px solid currentColor;border-top:7px solid transparent;border-bottom:7px solid transparent;margin-left:3px}
@@ -137,13 +142,15 @@ html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);fon
 .capture .dp{padding:0}
 .capture .dp-frame{width:100vw;height:100vh;border-radius:0;box-shadow:none}
 .capture .dp-bar,.capture .dp-under{display:none!important}
+.embed,.embed body{background:transparent}
 @media (max-width:640px){.dp-time{display:none}.dp-speed{display:none}}
 `;
 
 /** The whole page, as a string. */
 export function page(board, scene) {
   const css = CSS.replace("ACCENT", board.accent);
-  const whole = Math.round(scene.duration);
+  // how long it takes to watch, at the board's own speed (a child's board plays at half speed: twice as long)
+  const whole = Math.round(scene.duration / (scene.speed || 1));
   const mins = `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
   return `<!doctype html>
 <html lang="${esc(board.lang ?? "en")}">
@@ -154,7 +161,7 @@ export function page(board, scene) {
 <meta name="description" content="${esc(board.beats.map((b) => b.say).join(" ").slice(0, 280))}">
 <meta name="generator" content="depict">
 <style>${css}</style>
-<script>if(new URLSearchParams(location.search).has("capture"))document.documentElement.classList.add("capture")</script>
+<script>{const q=new URLSearchParams(location.search);if(q.has("capture"))document.documentElement.classList.add("capture");if(q.has("embed"))document.documentElement.classList.add("embed")}</script>
 </head>
 <body>
 <div class="dp${board.audience === "child" ? " child" : ""}" tabindex="0">
@@ -168,7 +175,7 @@ export function page(board, scene) {
     <button type="button" class="dp-next" aria-label="Next sentence">&#8250;</button>
     <div class="dp-track"><div class="dp-ticks"></div><input class="dp-scrub" type="range" min="0" step="0.01" value="0" aria-label="Time"></div>
     <span class="dp-time"></span>
-    <select class="dp-speed" aria-label="Speed">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((v) => `<option value="${v}"${v === (board.speed ?? 1) ? " selected" : ""}>${v}&times;</option>`).join("")}</select>
+    <select class="dp-speed" aria-label="Speed">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((v) => `<option value="${v}"${v === 1 ? " selected" : ""}>${v}&times;</option>`).join("")}</select>
   </div>
   <div class="dp-under">
     <div class="dp-caption" aria-live="polite"></div>

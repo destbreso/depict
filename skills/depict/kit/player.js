@@ -12,6 +12,8 @@
   const NS = "http://www.w3.org/2000/svg";
   const q = new URLSearchParams(location.search);
   const capture = q.has("capture");
+  // on a site, in a frame (?embed): the page tells its host what the film does, and how tall it wants to be
+  const embedded = q.has("embed") && window.parent !== window;
   const reduced = !capture && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const root = document.querySelector(".dp");
 
@@ -448,9 +450,10 @@
     caption.classList.toggle("on", !!b);
   }
 
-  // playing
+  // playing: the board's own speed is 1x (a child's board, half the film's speed), and the menu goes either way from it
+  const own = S.speed || 1;
   let playing = false;
-  let speed = S.speed || 1;
+  let speed = own;
   let last = 0;
   let failed = false;
   const tick = (ms) => {
@@ -476,6 +479,7 @@
     requestAnimationFrame(tick);
   };
   function play() {
+    if (!playing) tell("play");
     unfade();
     // from the end, or from the board at rest after it, the film starts again from the beginning
     if (now >= T || root.classList.contains("ended")) seek(0);
@@ -488,6 +492,7 @@
     requestAnimationFrame(tick);
   }
   function pause() {
+    if (playing) tell("pause");
     playing = false;
     root.classList.remove("playing");
     forget();
@@ -510,6 +515,7 @@
     if (S.explore != null) render(S.explore);
     root.classList.add("ended");
     forget();
+    tell("ended");
   }
   function unfade() {
     if (!fading) return;
@@ -553,7 +559,9 @@
   };
   function updateBar() {
     scrub.value = String(now);
-    clock.textContent = `${fmt(now)} / ${fmt(T)}`;
+    // the clock runs at the board's own speed: it ends at the length the start button promised; before the film
+    // has played, while the whole board waits behind the start button, it reads from the beginning
+    clock.textContent = `${fmt(root.classList.contains("fresh") ? 0 : now / own)} / ${fmt(T / own)}`;
     playBtn.setAttribute("aria-label", playing ? "Pause" : now >= T || root.classList.contains("ended") ? "Replay" : "Play");
   }
   playBtn.addEventListener("click", () => (playing ? pause() : play()));
@@ -570,7 +578,7 @@
   };
   bar.querySelector(".dp-prev").addEventListener("click", () => step(-1));
   bar.querySelector(".dp-next").addEventListener("click", () => step(1));
-  bar.querySelector(".dp-speed").addEventListener("change", (e) => (speed = Number(e.target.value)));
+  bar.querySelector(".dp-speed").addEventListener("change", (e) => (speed = own * Number(e.target.value)));
   root.addEventListener("keydown", (e) => {
     if (e.target.closest("select")) return;
     if (e.key === " " || e.key === "k") {
@@ -747,6 +755,31 @@
   }
 
   window.depict = { render, seek, play, pause, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
+  // the host of an embedded page hears ready, play, pause and ended, and size whenever the height the page
+  // wants (the board as wide as the frame, with its bar and caption under it) or the board's place in it changes:
+  // `box`, [x, y, width, height] of the board in the frame, so a host can lay a picture exactly over it
+  function tell(event, more) {
+    if (!embedded) return;
+    try {
+      window.parent.postMessage({ depict: { event, t: now, duration: T, speed: own, title: S.title, ...more } }, "*");
+    } catch {}
+  }
+  let told = "";
+  const want = () => {
+    const cs = getComputedStyle(root);
+    const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const r = root.querySelector(".dp-frame").getBoundingClientRect();
+    return { height: Math.ceil(((innerWidth - pad) * 9) / 16 + (parseFloat(cs.getPropertyValue("--dp-reserve")) || 200)), box: [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 10) / 10) };
+  };
+  if (embedded)
+    addEventListener("resize", () => {
+      const w = want();
+      const key = JSON.stringify(w);
+      if (key !== told) {
+        told = key;
+        tell("size", w);
+      }
+    });
   hoverBox.style.display = "none";
   const at = q.get("t");
   let resume = null;
@@ -760,7 +793,19 @@
     play();
   } else {
     render(at != null ? Number(at) : capture ? 0 : S.explore ?? T);
-    if (!capture && at == null) root.classList.add("ended", "fresh");
+    if (!capture && at == null) {
+      root.classList.add("ended", "fresh");
+      updateBar();
+    }
   }
   document.documentElement.dataset.ready = "1";
+  if (embedded) {
+    const w = want();
+    told = JSON.stringify(w);
+    tell("ready", w);
+    // a host that was not listening yet (its own page still starting) says hello, and hears ready again
+    addEventListener("message", (e) => {
+      if (e.source === window.parent && e.data && e.data.depict === "hello") tell("ready", want());
+    });
+  }
 })();
