@@ -45,7 +45,7 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 ## What you get
 
 - **A page that plays like a video.** One standalone HTML file, no network. A pen draws each shape and writes each word in the order a hand would, and each sentence is written under the board as it is said, never over the drawing. Pause, scrub, step sentence by sentence, change the speed.
-- **A guide with a face, and a cast to choose from.** Every board is presented by a character: depict's own marker by default (a felt marker with its cap in the board's accent), the brain (a fuzzy pink brain with round glasses, created by Niki, age 7), or one made from any drawing you give it. Each has its own look, its own way of moving (the marker is stiff; the brain is soft and wobbles like a jelly when it lands) and its own personality (how it arrives and leaves, what it does on its own). It is drawn first, then comes alive its own way, points at each new thing as the pen draws it (only along a clear line: when something is in the way it steps aside to see it, or only looks), follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops to the next idea and says goodbye at the end. It is dressed for the subject: a mortarboard and a book, a hard hat and a wrench, glasses and a pointer, headphones, a crown, a ruler, a coin, a clock, the brain's elf hat and mittens. It blinks and breathes while you explore, and waves back when you tap it.
+- **A guide with a face, and a cast to choose from.** Every board is presented by a character: depict's own marker by default (a felt marker with its cap in the board's accent), Stuart (a fuzzy pink brain with round glasses, created by Niki, age 7), or one made from any drawing you give it. Each has its own look, its own way of moving (the marker is stiff; Stuart is soft and wobbles like a jelly when he lands) and its own personality (how it arrives and leaves, what it does on its own). It is drawn first, then comes alive its own way, points at each new thing as the pen draws it (only along a clear line: when something is in the way it steps aside to see it, or only looks), never leaves the picture, follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops to the next idea and says goodbye at the end. It is dressed for the subject: a mortarboard and a book, a hard hat and a wrench, glasses and a pointer, headphones, a crown, a ruler, a coin, a clock, Stuart's elf hat and mittens, and his Halloween spider. It blinks and breathes while you explore, and waves back when you tap it.
 - **Pitched to its viewer.** It decides from what you ask and what the subject is whether the board is for a young child, a beginner, an adult or an expert, and sets the pace, the words, how concrete the example is and how deep it goes: real blocks and coins and half speed for a seven-year-old, the field's own terms and the internals for a design review.
 - **A character from a drawing.** Give it a drawing (a child's drawing, a sketch; one picture or several of the same character) and it makes it a guide: the drawing's proportions, colors and details kept, the lines evened, every feeling and pose added, a material and a personality chosen, and a model sheet and three test boards to look at before any board uses it.
 - **Numbered ideas, read as a page.** Each idea is numbered in the order it is told and the ideas are laid out as a page is read, left to right in balanced rows, so three or ten compose into one 16:9 poster with no empty corner.
@@ -83,9 +83,18 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 
 ### Characters
 
-<p align="center"><img src="assets/brain-sheet.png" width="800" alt="The brain's model sheet: a fuzzy pink brain with round glasses far apart on a long bridge, rosy cheeks, a little w of a mouth, short salmon arms and legs and big black shoes, drawn eight times with its feelings (happy, excited, surprised with its mouth open, worried, thinking, proud, winking, sad), nine times in its poses (resting, pointing, presenting, waving, cheering, shrugging, scratching its head, saluting, pushing its glasses up) and seven times in costumes (its own green elf hat with a white pompom and green mittens, a mortarboard, a hard hat with a book, headphones, a party hat, a bow tie with a pencil, a pointer)."></p>
+<table>
+  <tr>
+    <td width="50%"><a href="skills/depict/examples/characters/stuart/stuart-test-1.html"><img src="assets/meet-stuart.gif" alt="Stuart, a fuzzy pink brain with round glasses, short salmon arms and legs and black shoes, is drawn beside the words Meet Stuart, bounces to life, presents the title, hops to the next idea and lands with a jelly wobble; then he shakes himself awake in a green elf hat and green mittens, hops with a black spider on his head, and says goodbye with two bounces as a circle closes on him and Meet Stuart is written on the dark."></a></td>
+    <td width="50%"><a href="skills/depict/examples/characters/marker/marker-test-1.html"><img src="assets/meet-the-marker.gif" alt="The marker, a felt marker with a red cap, big eyes, white gloves and black shoes, is drawn beside the words Meet the marker, waves, presents the title and hops to the next idea; then it hops in a mortarboard holding a book, spins in a chef's hat holding a ruler, and waves goodbye as a circle closes on it and Meet the marker is written on the dark."></a></td>
+  </tr>
+  <tr>
+    <td><b>Stuart</b>, created by Niki, age 7: a fuzzy pink brain, soft and bouncy, who wobbles like a jelly when he lands and pushes his glasses up before he explains; here as she drew him, as he is, in his winter outfit and with his Halloween spider. <a href="skills/depict/examples/characters/stuart/stuart-sheet.png">His model sheet</a>.</td>
+    <td><b>The marker</b>, depict's own guide and the default: a stiff barrel that hops and lands with a firm squash and can tip its cap. <a href="skills/depict/examples/characters/marker/marker-sheet.png">Its model sheet</a>.</td>
+  </tr>
+</table>
 
-<p align="center"><sub><b>The brain</b>, created by Niki, age 7, beside depict's own marker: soft and bouncy, it wobbles like a jelly when it lands. Its model sheet is written by <code>scripts/character.mjs</code>, the same check any character made from a drawing goes through.</sub></p>
+<p align="center"><sub>Each is the presentation <code>scripts/character.mjs</code> writes for a character: its model sheet and three short boards it presents, the same check any character made from a drawing goes through. The GIFs are moments of those boards, made with <code>scripts/gif.mjs</code>.</sub></p>
 
 ## Install
 
@@ -108,7 +117,7 @@ Ask in your own words; the skill triggers on explaining, teaching, sketching out
 /depict why the sky is blue, as slides, with a video for LinkedIn
 /depict how a hash table works, for someone who just learned arrays
 /depict telling time to the nearest five minutes, for my 7-year-old
-/depict make a character from my daughter's drawings: brain-1.jpg brain-2.jpg
+/depict make a character from my daughter's drawings: drawing-1.jpg drawing-2.jpg
 ```
 
 Open a page in a browser, straight from the file. A preview that reloads the page whenever a file in its folder changes (VS Code's Live Server or Live Preview) stops the film at every reload.
@@ -143,6 +152,7 @@ The kit does the rest, in Node, with nothing but its own modules:
 - **The check**, `scripts/check.mjs board.html`: pictures every beat, the overview and the page in headless Chrome and fails on any page error. The agent reads the pictures before handing anything over.
 - **A character**, `scripts/character.mjs <character> --out <folder>`: checks a character module, every field, and writes its model sheet (every feeling, pose and costume) and three test boards it presents.
 - **A series**, `scripts/series.mjs <folder>`: builds, audits and checks every board under `boards/`, keeps one report and writes the gallery.
+- **A GIF**, `scripts/gif.mjs board.html@from-to ... --out file.gif`: moments of one or more boards as an animated GIF, for a README or a post that cannot play the page.
 - **The video**, `scripts/video.mjs board.html`: 1920 x 1080 at 30 frames a second, H.264 in studio-range color with Rec. 709 tags, a silent audio track and the index first.
 
 `skills/depict/references/craft.md` gives the rules of the genre and where each comes from.
@@ -165,7 +175,7 @@ The page itself needs only a browser.
 - The icons are [Lucide](https://lucide.dev) (ISC; icons from Feather, MIT).
 - The camera's flights are van Wijk and Nuij's "Smooth and efficient zooming and panning" (InfoVis 2003).
 - Live parts open figures made with [Dissect](https://github.com/destbreso/dissect).
-- The brain was created by Niki, age 7, who drew it in three pictures.
+- Stuart was created by Niki, age 7, who drew him in three pictures.
 
 ## License
 

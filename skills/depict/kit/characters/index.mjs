@@ -3,9 +3,9 @@
 // references/characters.md describes (from a drawing, as often as not). A
 // board can also bring its own: `guide: { character: <a module like these> }`.
 import marker from "./marker.mjs";
-import brain from "./brain.mjs";
+import stuart from "./stuart.mjs";
 
-export const CHARACTERS = { marker, brain };
+export const CHARACTERS = { marker, stuart };
 
 /** The character a cast names: a built-in one by its id, one a board brings, or the marker. */
 export function characterOf(cast = {}) {
@@ -36,6 +36,8 @@ export function checkCharacter(c) {
   need("wear", Array.isArray(c.wear), "lists the shared costumes it can wear");
   need("skins", Array.isArray(c.skins) && c.skins.includes("plain"), "lists its skins, plain among them");
   need("hands", typeof c.hands === "function", "returns its hands' shapes for what it wears");
+  const wearable = [...(c.wear ?? []), ...Object.keys(c.costumes ?? {})];
+  for (const o of c.outfits ?? []) need(`outfits.${o.name}`, o.name && Array.isArray(o.wear) && o.wear.every((w) => wearable.includes(w)), "is a name and things it can wear");
   need("draw", typeof c.draw === "function", "draws its body and face and returns its eyes");
   return out;
 }

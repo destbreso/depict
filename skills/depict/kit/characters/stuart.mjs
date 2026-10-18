@@ -1,11 +1,12 @@
-// The brain: created by Niki, age 7, who drew it in three pictures (in its
-// green elf hat and mittens, waving with its arms out, and surprised with its
-// mouth open). A fuzzy pink brain with round glasses, rosy cheeks, a little
-// "w" of a mouth, short salmon arms and legs and black shoes. Drawn here as
-// she drew it, its lines made even and its face given every feeling a guide
-// needs. It is soft: it squashes deep when it lands, bounces, and wobbles on
-// like a jelly. Drawn in its own frame: u across, v down from the top of its
-// head (its feet at 0.99), both in units of its height.
+// Stuart: created by Niki, age 7, who drew him in three pictures: in his
+// green elf hat and mittens, waving with his arms out, and with a spider on
+// his head for Halloween, his mouth open. A fuzzy pink brain with round
+// glasses, rosy cheeks, a little "w" of a mouth, short salmon arms and legs and
+// black shoes, drawn here as she drew him: his lines made even and his face
+// given every feeling a guide needs. He is soft: he squashes deep when he
+// lands, bounces, and wobbles on like a jelly. Drawn in his own frame: u
+// across, v down from the top of his head (his feet at 0.99), both in units of
+// his height.
 
 const BRAIN = "#d27ad5"; // its pink, from her drawing
 const LIGHT = "#ecb5ee";
@@ -17,17 +18,17 @@ const BAND = "#c0392b";
 
 /** Where its hands go in each pose, facing right, in units of its height: its arms are short and come out of its sides. */
 const POSES = {
-  rest: { front: { hand: [0.555, 0.64], bow: [0.535, 0.55], glove: "fist" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
-  present: { front: { hand: [0.66, 0.42], bow: [0.565, 0.5], glove: "point" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
-  wave: { front: { hand: [0.6, 0.27], bow: [0.62, 0.42], glove: "open" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
+  rest: { front: { hand: [0.505, 0.665], bow: [0.51, 0.575], glove: "fist" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
+  present: { front: { hand: [0.66, 0.42], bow: [0.565, 0.5], glove: "point" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
+  wave: { front: { hand: [0.6, 0.27], bow: [0.62, 0.42], glove: "open" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
   cheer: { front: { hand: [0.59, 0.27], bow: [0.63, 0.42], glove: "open" }, back: { hand: [-0.59, 0.27], bow: [-0.63, 0.42], glove: "open" } },
   shrug: { front: { hand: [0.665, 0.44], bow: [0.565, 0.54], glove: "open" }, back: { hand: [-0.665, 0.44], bow: [-0.565, 0.54], glove: "open" } },
-  scratch: { front: { hand: [0.46, 0.24], bow: [0.6, 0.38], glove: "fist" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
-  salute: { front: { hand: [0.4, 0.31], bow: [0.585, 0.42], glove: "open" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
-  tip: { front: { hand: [0.42, 0.16], bow: [0.6, 0.34], glove: "fist" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
-  point: { front: { hand: [0.67, 0.46], bow: [0.565, 0.51], glove: "point" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
+  scratch: { front: { hand: [0.46, 0.24], bow: [0.6, 0.38], glove: "fist" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
+  salute: { front: { hand: [0.4, 0.31], bow: [0.585, 0.42], glove: "open" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
+  tip: { front: { hand: [0.42, 0.16], bow: [0.6, 0.34], glove: "fist" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
+  point: { front: { hand: [0.67, 0.46], bow: [0.565, 0.51], glove: "point" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
   // its own: one finger pushing its glasses up by the rim, before it explains
-  glasses: { front: { hand: [0.37, 0.39], bow: [0.56, 0.49], glove: "point" }, back: { hand: [-0.555, 0.64], bow: [-0.535, 0.55], glove: "fist" } },
+  glasses: { front: { hand: [0.37, 0.39], bow: [0.56, 0.49], glove: "point" }, back: { hand: [-0.505, 0.665], bow: [-0.51, 0.575], glove: "fist" } },
 };
 
 /** The outline of its brain, as Niki drew it: round, about as wide as the whole figure is tall, three quarters of its height, a little flatter underneath and fuzzy all round, as (u, v) points. */
@@ -55,11 +56,13 @@ const MITTENS = {
 };
 
 export default {
-  id: "brain",
-  name: "the brain",
-  about: "A fuzzy pink brain with round glasses, rosy cheeks, a little w of a mouth, short salmon arms and legs and black shoes: soft, bouncy and curious. Created by Niki, age 7.",
-  credit: { by: "Niki", age: 7, note: "Created by Niki, age 7, who drew it in three pictures: in its green elf hat and mittens, waving with its arms out, and surprised with its mouth open." },
-  measures: { back: 0.62, front: 0.62, reach: 0.84 },
+  id: "stuart",
+  name: "Stuart",
+  about: "Stuart, a fuzzy pink brain with round glasses, rosy cheeks, a little w of a mouth, short salmon arms and legs and black shoes: soft, bouncy and curious. Created by Niki, age 7.",
+  credit: { by: "Niki", age: 7, note: "Created by Niki, age 7, who drew him in three pictures: in his green elf hat and mittens, waving with his arms out, and with a spider on his head for Halloween." },
+  // his size beside the marker: as wide as he is tall, he stands a little shorter so he takes about as much paper as he needs
+  size: 0.76,
+  measures: { back: 0.57, front: 0.57, reach: 0.84 },
   shoulders: { front: [0.445, 0.5], back: [-0.445, 0.5] },
   // its arms are limbs with a color of their own: an ink outline, salmon inside
   arm: { width: 2.7, fill: LIMB, fillWidth: 1.85 },
@@ -104,8 +107,33 @@ export default {
         for (const u of [-0.13, -0.075, -0.02, 0.035, 0.09, 0.14]) line("hat", [[u, 0.03], [u + 0.006, 0.075]], fine * 0.9, colors.INK, H);
       },
     },
-    mittens: { draw: () => {} }, // its hands become green mittens (see hands)
+    mittens: { draw: () => {} }, // his hands become green mittens (see hands)
+    // a spider sitting on his head, for Halloween: a round black body, two eyes and eight bent legs
+    spider: {
+      hat: true,
+      top: 0.05,
+      draw: ({ h, shape, line, slot, fine, colors, ink, add, p }) => {
+        const H = slot("hat");
+        const [cx, cy] = [0.15, 0.0];
+        for (const s of [-1, 1])
+          for (let k = 0; k < 4; k++)
+            line("hat", [[cx + s * 0.035, cy - 0.016 + k * 0.012], [cx + s * 0.085, cy - 0.05 + k * 0.022], [cx + s * 0.108, cy + 0.022 + k * 0.02]], fine * 1.25, colors.INK, H);
+        const body = Array.from({ length: 22 }, (_, k) => [cx + 0.052 * Math.cos((2 * Math.PI * k) / 22), cy + 0.047 * Math.sin((2 * Math.PI * k) / 22)]);
+        shape("hat", body, colors.INK, { T: H, nib: h * 0.03, opacity: 1 });
+        for (const u of [-0.016, 0.016]) {
+          const eye = ink.dab(p, ...H(cx + u - 0.002, cy - 0.008), ...H(cx + u + 0.002, cy - 0.008), h * 0.026);
+          add("hat", "color", eye.strokes, eye.width, colors.PAPER, "under", 1);
+          const dot = ink.dab(p, ...H(cx + u, cy - 0.006), ...H(cx + u + 0.001, cy - 0.006), h * 0.011);
+          add("hat", "outline", dot.strokes, dot.width, colors.INK);
+        }
+      },
+    },
   },
+  // the costumes of each of Niki's other drawings, worn together: what his presentations wear
+  outfits: [
+    { name: "winter", wear: ["elf-hat", "mittens"] },
+    { name: "Halloween", wear: ["spider"] },
+  ],
   hands: (wear = [], colors) =>
     wear.includes("mittens")
       ? { size: 0.056, shapes: MITTENS, cuffs: true, knuckle: false, fill: ELF }

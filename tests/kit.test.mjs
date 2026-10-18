@@ -525,17 +525,23 @@ test("the guide's hand never crosses one thing to point at another: it steps whe
   assert.ok(guide.track.moves.some((m) => m.step) || guide.blocked.length, "it stepped or looked where its hand would have crossed");
 });
 
-test("each character is its own: the brain wears its own costumes, refuses what it does not have, and the marker stays the default", async () => {
-  const { tl } = build({ ...tiny(), guide: { character: "brain", wear: ["elf-hat", "mittens"], hold: "pencil" } });
+test("each character is its own: Stuart wears his own costumes, refuses what he does not have, and the marker stays the default", async () => {
+  const { tl } = build({ ...tiny(), guide: { character: "stuart", wear: ["elf-hat", "mittens"], hold: "pencil" } });
   const [g] = tl.actors;
-  assert.equal(g.rig.character, "brain");
+  assert.equal(g.rig.character, "stuart");
   assert.ok(g.rig.strokes.some((s) => s.part === "hat"), "its elf hat is drawn");
   assert.equal(g.rig.gloveFill, "#4fa65d", "its hands are green mittens");
   assert.ok(g.rig.arm.fill, "its arms are limbs with a color of their own");
-  const bad = normalize({ ...tiny(), guide: { character: "brain", wear: ["glasses", "scarf"], skin: "dots", intro: "tip" } }).errors.join("\n");
-  for (const m of [/the brain wears "glasses"/, /the brain wears "scarf"/, /skin "dots"/, /intro "tip"/]) assert.match(bad, m);
-  assert.match(normalize({ ...tiny(), guide: { character: "dragon" } }).errors.join("\n"), /use marker, brain/);
-  assert.match(normalize({ ...tiny(), guide: { character: "brain", wear: ["elf-hat", "crown"] } }).errors.join("\n"), /one hat at a time/);
+  const bad = normalize({ ...tiny(), guide: { character: "stuart", wear: ["glasses", "scarf"], skin: "dots", intro: "tip" } }).errors.join("\n");
+  for (const m of [/Stuart wears "glasses"/, /Stuart wears "scarf"/, /skin "dots"/, /intro "tip"/]) assert.match(bad, m);
+  assert.match(normalize({ ...tiny(), guide: { character: "dragon" } }).errors.join("\n"), /use marker, stuart/);
+  assert.match(normalize({ ...tiny(), guide: { character: "stuart", wear: ["elf-hat", "crown"] } }).errors.join("\n"), /one hat at a time/);
+  assert.match(normalize({ ...tiny(), guide: { character: "stuart", wear: ["spider", "elf-hat"] } }).errors.join("\n"), /one hat at a time/, "the spider sits where a hat would");
+  // his outfits are his drawings' costumes, each one his to wear
+  const S = (await import("../skills/depict/kit/characters/index.mjs")).CHARACTERS.stuart;
+  for (const o of S.outfits) assert.deepEqual(normalize({ ...tiny(), guide: { character: "stuart", wear: o.wear } }).errors, [], o.name);
+  const spider = build({ ...tiny(), guide: { character: "stuart", wear: ["spider"] } }).tl.actors[0];
+  assert.ok(spider.rig.strokes.some((st) => st.part === "hat"), "the spider is drawn on his head");
   assert.equal(build(tiny()).tl.actors[0].rig.character, "marker", "the marker, when the board does not say");
 });
 
@@ -547,12 +553,12 @@ test("a soft body squashes deeper and sways over its feet after it lands; a stif
     s.beats = [...s.beats, { say: "And a second idea.", draw: ["r2", "c"] }];
     return build(s).tl.actors[0];
   };
-  for (const [character, soft] of [["brain", true], ["marker", false]]) {
+  for (const [character, soft] of [["stuart", true], ["marker", false]]) {
     const g = two(character);
     const trip = g.track.moves.find((m) => !m.step && m.from[0] !== m.to[0]);
     assert.ok(trip, `${character} hops to the second idea`);
     const sway = Math.max(...[0.1, 0.2, 0.3, 0.4, 0.5].map((d) => Math.abs(actorAt(g, trip.t1 + d).skew)));
-    if (soft) assert.ok(sway > 2, `the brain sways after it lands (${sway.toFixed(1)} degrees)`);
+    if (soft) assert.ok(sway > 2, `Stuart sways after he lands (${sway.toFixed(1)} degrees)`);
     else assert.equal(sway, 0, "the marker does not sway");
   }
 });
@@ -560,11 +566,11 @@ test("a soft body squashes deeper and sways over its feet after it lands; a stif
 test("a character module is checked whole, every problem at once", async () => {
   const { checkCharacter, CHARACTERS } = await import("../skills/depict/kit/characters/index.mjs");
   for (const c of Object.values(CHARACTERS)) assert.deepEqual(checkCharacter(c), [], `${c.id} is complete`);
-  const half = { ...CHARACTERS.brain, poses: { rest: CHARACTERS.brain.poses.rest }, measures: { back: 0.5 }, draw: null };
+  const half = { ...CHARACTERS.stuart, poses: { rest: CHARACTERS.stuart.poses.rest }, measures: { back: 0.5 }, draw: null, outfits: [{ name: "odd", wear: ["cape"] }] };
   const problems = checkCharacter(half);
-  for (const m of [/poses\.point/, /measures/, /"draw"/]) assert.ok(problems.some((p) => m.test(p)), `it names ${m}`);
+  for (const m of [/poses\.point/, /measures/, /"draw"/, /outfits\.odd/]) assert.ok(problems.some((p) => m.test(p)), `it names ${m}`);
   // a board can bring its own character module
-  const mine = { ...CHARACTERS.brain, id: "mine", name: "mine" };
+  const mine = { ...CHARACTERS.stuart, id: "mine", name: "mine" };
   const { board, errors } = normalize({ ...structuredClone(tiny()), guide: { character: mine } });
   assert.deepEqual(errors, []);
   const tl = time(board, compose(board, hand(board.hand)));
@@ -591,4 +597,18 @@ test("a series builds every board, keeps one report and writes its gallery", asy
   assert.match(index, /A tiny course/);
   assert.match(index, /class="group">Things/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the guide is whole in the picture whenever the camera holds still, and the audit fails a board where it is not", () => {
+  // every example passes its audit (above), this rule included; a board as the kit builds it keeps its guide in the picture
+  const { board, comp, tl } = build(tiny());
+  assert.ok(!audit(board, comp, tl).some((f) => f.rule === "guide"));
+  // a camera that looks away from the guide: the audit names the moment and the side
+  for (const k of tl.camera) {
+    k.from = [k.from[0] + 4000, k.from[1], k.from[2]];
+    k.to = [k.to[0] + 4000, k.to[1], k.to[2]];
+  }
+  const f = audit(board, comp, tl).find((x) => x.rule === "guide");
+  assert.ok(f && f.level === "problem", "a guide out of the picture is a problem");
+  assert.match(f.text, /cut by the left of the picture/);
 });

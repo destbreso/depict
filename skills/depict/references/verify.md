@@ -18,6 +18,7 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 | note | warning over 9 words | Notes are a phrase | Shorten, or say it |
 | load | warning over 4 things | New things in one beat | Split the beat |
 | hook | warning over 7 s (10 s with the guide, whose hello counts as the opening picture) | The first beat's drawing time | Open with a picture; move a long title or a second item to the next beat |
+| guide | problem | The guide whole inside the picture whenever the camera holds still, its hat and its hops included, from when it appears to when the circle closes on it (the kit keeps it so: it lands as the camera arrives, never hops higher than the shot has room for, and steps only to free paper inside the shot and on the board) | Give the idea it stands beside more room, or fewer things at that edge |
 | focal | warning | A region of two or more items where none is large, a character, a sketch, framed or marked | Draw the thing the region is about as a large sketch, or frame or mark it |
 | sparse | warning under 10% | How much of a region's shot its drawing covers: its items, each line as the band of paper it marks, and a drawing of two or more linked things (a tree, a graph) as the paper it spans | Draw the idea as a scene, make the key item large, merge a thin region into another |
 | tangle | warning | Two lines crossing (arrows) | Put the item between the other two, link fewer things, or say the connection in the sentence |

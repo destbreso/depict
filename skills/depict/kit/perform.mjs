@@ -72,29 +72,56 @@ export function perform(board, comp, tl, appear) {
     const [sx, sy] = shoulder(q, facingTo(q, cx));
     const te = els.get(tid);
     const table = layoutOf.get(te?.region) === "cells" || layoutOf.get(te?.region) === "stack";
-    const others = solid.filter(([id, o]) => id !== tid && shownBy(id, until) && !holds(o.box, tbox) && !(table && o.region === te.region && o.kind !== "region"));
+    // a note and the thing it is on read as one: a hand toward either may cross the other
+    const own = (id, o) => (o.kind === "note" && o.near === tid) || (te?.kind === "note" && te.near === id);
+    const others = solid.filter(([id, o]) => id !== tid && shownBy(id, until) && !holds(o.box, tbox) && !own(id, o) && !(table && o.region === te.region && o.kind !== "region"));
     const d = Math.hypot(cx - sx, cy - sy) || 1;
     for (let r = 0; r < d; r += 6) {
       const [x, y] = [sx + ((cx - sx) * r) / d, sy + ((cy - sy) * r) / d];
-      if (near(tbox, x, y, 6)) return null;
+      if (near(tbox, x, y, 6)) break;
       const o = others.find(([, b]) => near(b.box, x, y, 6));
+      if (o) return o[0];
+    }
+    // a thing out of reach: the finger stops in the air, and the eye follows it to the first thing ahead. A finger that
+    // stops beside another thing, or has another thing ahead of it, within a narrow cone, before the one it means,
+    // seems to point at that one
+    const full = g.rig.reach * g.h + tip;
+    if (d > full) {
+      const [ux, uy] = [(cx - sx) / d, (cy - sy) / d];
+      const [x, y] = [sx + ux * full, sy + uy * full];
+      const ahead = (b) => {
+        if (near(b, x, y, 0.12 * g.h)) return true;
+        const px = b.x + b.w / 2 - x;
+        const py = b.y + b.h / 2 - y;
+        const along = px * ux + py * uy;
+        const across = Math.abs(px * uy - py * ux);
+        return along > 0 && along < d - full && across < 0.21 * along + Math.hypot(b.w, b.h) / 2;
+      };
+      const o = others.find(([, b]) => ahead(b.box));
       if (o) return o[0];
     }
     return null;
   };
 
-  // its trips: when the camera flies to another idea, the guide hops there, landing as the camera arrives
+  // its trips: when the camera flies to another idea, the guide hops there, landing as the camera arrives, never
+  // higher than the shot it lands in has room for: once the camera holds still, all of it is in the picture
+  const room = (to, shot) => {
+    const top = shot[1] - (shot[2] * 9) / 32 + 24;
+    return Math.max(40, to.y - g.h * (1 + reachAbove(board.cast)) - top);
+  };
   let here = start;
   for (const k of tl.camera) {
     const to = k.region != null ? spotOf.get(k.region) : null;
     if (!to || to === here) continue;
     const dx = to.x - here.x;
     const dist = Math.hypot(dx, to.y - here.y);
-    // a few big leaps rather than many small ones, timed to land just as the camera arrives
-    const hops = Math.max(1, Math.min(3, Math.round(dist / 650)));
+    // a few big leaps rather than many small ones, as many as the camera's flight has time for, timed to land just as
+    // the camera arrives
     const t0 = k.t0 + 0.08;
-    const t1 = Math.max(t0 + 0.42 * hops, k.t1 + 0.2);
-    track.moves.push({ t0, t1, from: [here.x, here.y], to: [to.x, to.y], hops, height: Math.min(340, 80 + (0.18 * dist) / hops), facing: Math.sign(dx) || here.facing, land: to.facing });
+    const hops = Math.max(1, Math.min(3, Math.round(dist / 650), Math.floor((k.t1 - t0) / 0.42)));
+    const t1 = Math.max(t0 + 0.42 * hops, k.t1);
+    const ceiling = room(to, k.to);
+    track.moves.push({ t0, t1, from: [here.x, here.y], to: [to.x, to.y], hops, height: Math.min(340, ceiling, 80 + (0.18 * dist) / hops), ceiling, facing: Math.sign(dx) || here.facing, land: to.facing });
     track.bounces.push([t0 - 0.1, -0.7]); // it crouches before it jumps
     track.bounces.push([t1, 0.85]);
     track.arms.push([t0 - 0.12, "cheer"]);
@@ -182,19 +209,29 @@ export function perform(board, comp, tl, appear) {
       const floor = view.y + view.h - m;
       for (const dx of [-0.5, 0.5]) qs.push({ x: tbox.x + tbox.w / 2 + dx * g.h, y: floor, facing: dx < 0 ? 1 : -1, top });
     }
+    // free paper, inside the shot, and on the board: the closing picture of the whole board holds it too
     return qs.filter((q) => {
       const b = spotBox(q, g.h, M);
-      return taken.every((o) => !overlaps(b, o)) && (!view || holds(pad(view, -20), b));
+      return taken.every((o) => !overlaps(b, o)) && (!view || holds(pad(view, -20), b)) && holds(pad(comp.extent, -10), b);
     });
   };
+  // how well a place serves a gesture: best when its finger reaches the thing along a clear line, still good when the
+  // thing is out of reach but nothing is in the way, no good when something is
+  const within = (q, tbox) => {
+    const [sx, sy] = shoulder(q, facingTo(q, tbox.x + tbox.w / 2));
+    const dx = Math.max(tbox.x - sx, 0, sx - (tbox.x + tbox.w));
+    const dy = Math.max(tbox.y - sy, 0, sy - (tbox.y + tbox.h));
+    return Math.hypot(dx, dy) <= g.rig.reach * g.h + tip;
+  };
+  const serves = (q, x) => (inTheWay(q, x.tid, x.tbox, x.until) ? 0 : within(q, x.tbox) ? 2 : 1);
   let lastStep = -Infinity;
   board.beats.forEach((bt, bi) => {
     const gs = gesturesOf(bt, bi).filter((x) => x.hands);
     if (!gs.length) return;
     const at = settledAt(gs[0].t);
-    const sees = (q) => gs.filter((x) => !inTheWay(q, x.tid, x.tbox, x.until)).length;
+    const sees = (q) => gs.reduce((a, x) => a + serves(q, x), 0);
     const here = sees(at);
-    if (here === gs.length) return;
+    if (here === 2 * gs.length) return;
     const t1 = gs[0].t - 0.05;
     const t0 = t1 - STEP.time;
     const prev = tl.beats[bi - 1];
@@ -210,7 +247,9 @@ export function perform(board, comp, tl, appear) {
     }
     if (!best) return;
     const { q, d } = best;
-    track.moves.push({ t0, t1, from: [at.x, at.y], to: [q.x, q.y], hops: 1, height: Math.min(110, 45 + 0.1 * d), facing: Math.sign(q.x - at.x) || at.facing, land: q.facing, step: true });
+    const shot = shotAt(t1);
+    const ceiling = shot ? room(q, shot) : 110;
+    track.moves.push({ t0, t1, from: [at.x, at.y], to: [q.x, q.y], hops: 1, height: Math.min(110, ceiling, 45 + 0.1 * d), facing: Math.sign(q.x - at.x) || at.facing, land: q.facing, step: true });
     track.bounces.push([t0 - 0.06, -0.45], [t1, 0.6]);
     lastStep = t0;
   });
@@ -227,7 +266,7 @@ export function perform(board, comp, tl, appear) {
     if (!m.step && (m.from[0] !== was[0] || m.from[1] !== was[1])) {
       const dist = Math.hypot(m.to[0] - was[0], m.to[1] - was[1]);
       m.hops = Math.max(1, Math.min(3, Math.round(dist / 650)));
-      m.height = Math.min(340, 80 + (0.18 * dist) / m.hops);
+      m.height = Math.min(340, m.ceiling ?? 340, 80 + (0.18 * dist) / m.hops);
       m.facing = Math.sign(m.to[0] - was[0]) || m.facing;
       m.from = [...was];
     }
@@ -267,8 +306,8 @@ export function perform(board, comp, tl, appear) {
     track.look.push([Math.max(beat.draw1 + 0.5, beat.t1 - 0.8), null]);
   });
 
-  // its quirks: what its personality has it do on its own, in a quiet moment now and then (the brain pushes its
-  // glasses up before it explains): when its hands are at rest, nothing is pointed at and it is not on its way
+  // its quirks: what its personality has it do on its own, in a quiet moment now and then (Stuart pushes his
+  // glasses up before he explains): when its hands are at rest, nothing is pointed at and it is not on its way
   const quirks = g.rig.personality?.quirks ?? [];
   if (quirks.includes("glasses") && g.rig.poses.glasses) {
     const rq = splitmix32((board.seed * 40503 + 7) >>> 0);

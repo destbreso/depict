@@ -4,7 +4,9 @@
 // the build; warnings are worth a look.
 import { bounds, lengthOf, overlaps, pad, union } from "./geom.mjs";
 import { SIZE } from "./compose.mjs";
-import { safeArea } from "./camera.mjs";
+import { cameraAt, safeArea } from "./camera.mjs";
+import { actorAt } from "./act.mjs";
+import { reachAbove } from "./rig.mjs";
 
 const VW = 1920; // a shot fills this many pixels across in the video
 
@@ -229,6 +231,27 @@ export function audit(board, comp, tl) {
   // length: a complete explanation runs three to six minutes; past ten, at the speed it plays at, it loses its viewer
   const minutes = tl.duration / (board.speed ?? 1) / 60;
   if (minutes > 10) warn("length", `the board runs ${minutes.toFixed(1)} minutes at its speed; past ten it loses its viewer, so split it into two boards`);
+
+  // the guide, whole in the picture whenever the camera holds still: its hat and its hops included, every quarter second
+  // from when it appears to when the circle closes on it (while the camera flies, the picture moves anyway)
+  const A = tl.actors?.[0];
+  if (A) {
+    const M = A.rig.measures;
+    const half = Math.max(M.back, M.front) * A.h;
+    const up = A.h * (1 + reachAbove(board.cast));
+    const end = tl.outro ? tl.outro.iris.close : tl.duration;
+    let worst = null;
+    for (let t = 0; t < end; t += 0.25) {
+      if (tl.camera.some((k) => t >= k.t0 && t < k.t1)) continue;
+      const st = actorAt(A, t);
+      if (!st.shown) continue;
+      const s = cameraAt(tl.camera, t);
+      const sides = { left: s[0] - s[2] / 2 - (st.x - half), right: st.x + half - (s[0] + s[2] / 2), top: s[1] - (s[2] * 9) / 32 - (st.y - st.lift - up), bottom: st.y - st.lift - (s[1] + (s[2] * 9) / 32) };
+      const [side, by] = Object.entries(sides).sort((a, b) => b[1] - a[1])[0];
+      if (by > 6 && (!worst || by > worst.by)) worst = { t, side, by };
+    }
+    if (worst) problem("guide", `at ${worst.t.toFixed(2)} s the guide is cut by the ${worst.side} of the picture, by ${Math.round(worst.by)} units: give the idea it stands beside more room, or fewer things at that edge`);
+  }
 
   // the closing map: its titles at least must read in the overview
   const kOverview = VW / tl.overview[2];
