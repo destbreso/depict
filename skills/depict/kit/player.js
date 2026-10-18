@@ -161,6 +161,8 @@
     const floor = node("g", {}, shadow);
     const root = node("g", {}, actorLayer);
     const backArm = node("path", { stroke: INKC, "stroke-width": A.arm.width }, root);
+    // a limb with a color of its own: its color drawn along the middle of its ink
+    const backArmFill = A.arm.fill != null ? node("path", { stroke: S.palette[A.arm.fill], "stroke-width": A.arm.fillWidth }, root) : null;
     const backGloveG = node("g", {}, root);
     const bodyUnder = node("g", {}, root);
     const bodyInk = node("g", {}, root);
@@ -171,6 +173,7 @@
     const wearG = node("g", {}, root);
     const [wearUnder, wearInk] = [0, 1].map(() => node("g", {}, wearG));
     const frontArm = node("path", { stroke: INKC, "stroke-width": A.arm.width }, root);
+    const frontArmFill = A.arm.fill != null ? node("path", { stroke: S.palette[A.arm.fill], "stroke-width": A.arm.fillWidth }, root) : null;
     const pointerG = node("g", {}, root); // a pointer, under the fist that holds it
     const frontGloveG = node("g", {}, root);
     const [pointerUnder, pointerInk] = [0, 1].map(() => node("g", {}, pointerG));
@@ -203,14 +206,14 @@
       for (const kind in A.gloves) {
         const gl = A.gloves[kind];
         const g = node("g", {}, parent);
-        for (const f of gl.fill) node("path", { d: pathOf(f, f.length), stroke: PAPERC, "stroke-width": gl.fillWidth }, g);
+        for (const f of gl.fill) node("path", { d: pathOf(f, f.length), stroke: A.gloveFill != null ? S.palette[A.gloveFill] : PAPERC, "stroke-width": gl.fillWidth }, g);
         for (const l of gl.lines) node("path", { d: pathOf(l, l.length), stroke: INKC, "stroke-width": A.gloveWidth }, g);
         g.style.display = "none";
         set[kind] = g;
       }
       return set;
     };
-    return { A, floor, root, backArm, frontArm, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups };
+    return { A, floor, root, backArm, frontArm, backArmFill, frontArmFill, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups };
   });
   const revealed = (rv, t) => (!rv ? 1 : t < rv[0] ? 0 : t >= rv[1] ? 1 : (t - rv[0]) / (rv[1] - rv[0]));
   /** Poses an actor at time t (and, paused, breathes and blinks on the wall clock); returns the pen's tip while it is being drawn. */
@@ -221,17 +224,21 @@
     X.floor.style.display = st.shown ? "" : "none";
     if (!st.shown) return null;
     if (wall != null) {
-      const b = Math.sin((2 * Math.PI * wall) / 2.7);
-      st.sy = 1 + 0.011 * b;
-      st.sx = 1 - 0.005 * b;
+      const mo = A.motion || {};
+      const deep = mo.breath ?? 1;
+      const b = Math.sin((2 * Math.PI * wall) / (mo.breathPeriod ?? 2.7));
+      st.sy = 1 + 0.011 * deep * b;
+      st.sx = 1 - 0.005 * deep * b;
+      if (mo.jelly) st.skew = mo.jelly * 1.4 * Math.sin((2 * Math.PI * wall) / 3.4);
       const p = wall % 3.9;
       st.blink = p < 0.16 ? Math.sin((Math.PI * p) / 0.16) : 0;
       // tapped: a springy hop and a wave
       const d = X.react == null ? Infinity : wall - X.react;
       if (d < 1.8) {
         const sq = Math.exp(-5 * d) * Math.cos(13 * d);
-        st.sy *= 1 - 0.14 * sq;
-        st.sx *= 1 + 0.12 * sq;
+        st.sy *= 1 - 0.14 * (A.motion?.squash ?? 1) * sq;
+        st.sx *= 1 + 0.12 * (A.motion?.squash ?? 1) * sq;
+        if (A.motion?.jelly) st.skew += A.motion.jelly * 9 * Math.exp(-3 * d) * Math.sin(11 * d);
         st.lift = d < 0.5 ? 70 * 4 * (d / 0.5) * (1 - d / 0.5) : 0;
         st.feel = "excited";
         const w = Math.sin(2 * Math.PI * 2.4 * d);
@@ -242,7 +249,7 @@
         st.front = { hand: [hand[0] + w * 0.055 * A.h, hand[1]], bow: [bow[0] + w * 0.03 * A.h, bow[1]], glove: "open" };
       }
     }
-    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing}) scale(${st.facing * st.sx} ${st.sy})`);
+    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${st.facing * st.sx} ${st.sy})`);
     X.floor.setAttribute("transform", `translate(${st.x} ${st.y}) scale(${1 - 0.45 * st.air} 1)`);
     X.floor.setAttribute("opacity", 1 - 0.5 * st.air);
     let tip = null;
@@ -297,16 +304,25 @@
     for (const side of ["back", "front"]) {
       const arm = st[side];
       const n = side === "back" ? X.backArm : X.frontArm;
+      const nf = side === "back" ? X.backArmFill : X.frontArmFill;
       const frac = revealed(A.reveal && A.reveal[side === "back" ? "armBack" : "armFront"], t);
-      if (frac <= 0) n.style.display = "none";
-      else {
+      if (frac <= 0) {
+        n.style.display = "none";
+        if (nf) nf.style.display = "none";
+      } else {
         n.style.display = "";
         const m = measured(hosePath(A.shoulders[side], arm.bow, arm.hand, A.arm.hose));
-        if (frac >= 1) n.setAttribute("d", pathOf(m.pts, m.pts.length));
+        let d;
+        if (frac >= 1) d = pathOf(m.pts, m.pts.length);
         else {
           const p = partial(m, m.len * frac);
-          n.setAttribute("d", p.d);
+          d = p.d;
           tip = p;
+        }
+        n.setAttribute("d", d);
+        if (nf) {
+          nf.style.display = "";
+          nf.setAttribute("d", d);
         }
       }
       const gf = revealed(A.reveal && A.reveal[side === "back" ? "gloveBack" : "gloveFront"], t);

@@ -63,17 +63,44 @@ export function actorAt(actor, t) {
   // a turn to face something, when it came after the last landing
   const turn = lastAt(tr.turns, t);
   if (turn && turn[0] >= settled && !(lift > 0)) facing = turn[1];
-  // squash and stretch: stretched in the air, and a springy squash after each landing or jolt
+  // squash and stretch: stretched in the air, and a springy squash after each landing or jolt. What it is made of
+  // says how much: a stiff barrel squashes a little and is still at once; a soft body squashes deep and wobbles on
+  // like a jelly (its motion: squash and stretch as multiples, the wobble's frequency, how fast it dies, its breath)
+  const mo = actor.motion ?? {};
+  const soft = mo.squash ?? 1;
+  const freq = mo.freq ?? 13;
+  const damp = mo.damp ?? 5.5;
+  const window = mo.damp ? Math.min(3, 6.6 / mo.damp) : 1.2;
   let squash = 0;
   for (const [tb, strength] of tr.bounces) {
     if (t < tb) break;
     const d = t - tb;
-    if (d < 1.2) squash += strength * Math.exp(-5.5 * d) * Math.cos(13 * d);
+    if (d < window) squash += strength * Math.exp(-damp * d) * Math.cos(freq * d);
   }
-  const breath = Math.sin((2 * Math.PI * t) / 2.7);
-  const stretch = lift > 0 ? 0.09 * air - 0.03 : 0;
-  const sy = (1 - 0.13 * squash + stretch) * (1 + 0.011 * breath);
-  const sx = (1 + 0.11 * squash - stretch * 0.6) * (1 - 0.005 * breath);
+  const breath = Math.sin((2 * Math.PI * t) / (mo.breathPeriod ?? 2.7));
+  const stretch = lift > 0 ? (0.09 * air - 0.03) * (mo.stretch ?? 1) : 0;
+  const deep = mo.breath ?? 1;
+  const sy = (1 - 0.13 * soft * squash + stretch) * (1 + 0.011 * deep * breath);
+  const sx = (1 + 0.11 * soft * squash - stretch * 0.6) * (1 - 0.005 * deep * breath);
+  // a soft body's top sways over its feet like a jelly on a plate (its skew, in degrees, top toward +x when positive):
+  // it lags as it sets off, sloshes on past its feet when it lands, and sways a little on its own
+  let skew = 0;
+  if (mo.jelly) {
+    for (const m of tr.moves) {
+      const dir = Math.sign(m.to[0] - m.from[0]);
+      if (!dir) continue;
+      const d0 = t - m.t0;
+      const d1 = t - m.t1;
+      if (d0 > 0 && t < m.t1) skew -= dir * mo.jelly * 6 * Math.exp(-4 * d0) * Math.sin(9 * d0);
+      if (d1 > 0 && d1 < 2.5) skew += dir * mo.jelly * 9 * Math.exp(-2.6 * d1) * Math.sin(10 * d1);
+    }
+    for (const [tb, strength] of tr.bounces) {
+      if (t < tb) break;
+      const d = t - tb;
+      if (d < 2) skew += mo.jelly * 3.2 * strength * Math.exp(-3 * d) * Math.sin(11 * d + 0.6);
+    }
+    skew += mo.jelly * 1.4 * Math.sin((2 * Math.PI * t) / 3.4);
+  }
   let lean = lift > 0 ? 7 * air : 0; // leaning into the hop, in degrees
   // a bow: the whole figure leans forward about its feet, and back up
   for (const [t0, t1, deg] of tr.leans ?? []) if (t >= t0 && t < t1) lean += deg * envelope((t - t0) / (t1 - t0));
@@ -132,7 +159,7 @@ export function actorAt(actor, t) {
     if (tb > t) break;
     if (t - tb < 0.16) blink = Math.sin((Math.PI * (t - tb)) / 0.16);
   }
-  return { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, front, back, feel, look, blink, cap, shown: t >= tr.appear[0] };
+  return { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, shown: t >= tr.appear[0] };
 }
 
 /** The point a share u of the way along a polyline, and which way it is heading there (left or right). */
@@ -174,7 +201,7 @@ function armsFor(actor, key, x, y, facing, t) {
       dy = Math.sign(dy || 1) * Math.sqrt(1 - dx * dx);
     }
     // as far as an arm goes, and never past the thing pointed at (less a pointer's length, when it holds one)
-    const reach = Math.max(0.05 * actor.h, Math.min(0.36 * actor.h, most, l - (actor.hold === "pointer" ? 0.27 * actor.h : 0)));
+    const reach = Math.max(0.05 * actor.h, Math.min((actor.reach ?? 0.36) * actor.h, most, l - (actor.hold === "pointer" ? 0.27 * actor.h : 0)));
     const hx = sh[0] + dx * reach;
     const hy = sh[1] + dy * reach;
     // the hose sags a little under the line from shoulder to hand

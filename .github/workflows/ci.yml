@@ -28,6 +28,9 @@ jobs:
       - name: Tests (the script, the hand, the camera, every example's audit)
         run: npm test
 
+      - name: Check every character and picture its model sheet and test boards
+        run: for c in marker brain; do node skills/depict/scripts/character.mjs "$c" --out shots/characters; done
+
       - name: Build, audit and check every example in headless Chrome
         run: |
           for board in skills/depict/examples/*/board.mjs; do

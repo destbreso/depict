@@ -11,10 +11,10 @@ A board is a JavaScript module whose default export is the script. It says what 
 | `flow` | `"page"` | How a canvas is composed. `"page"` lays the regions out as a page is read: left to right, then the next row down, the rows balanced and as many as bring the board closest to 16:9, each row's titles on one line. `"row"`, `"column"` and `"grid"` (with a region `at: [column, row]`) are plain layouts: use them only when the shape of the idea needs it. |
 | `hand` | `"print"` | The lettering: `"print"`, a clear handwritten print (EMS Tech, after Architects Daughter), or `"marker"`, a looser hand (EMS Casual Hand). Both cover Latin-1: accents, ñ, ¿, ¡, €, ×, ÷. |
 | `accent` | `"#c43f0a"` | The one accent color: the numbers, the guide's cap and cheeks, title underlines, marks, the live part's play mark. |
-| `guide` | `true` | The guide: the animated marker who presents the board. `false` leaves it out. An object dresses and directs it: `{ wear, hold, skin, intro, outro }` (see "Dressing the guide"). |
+| `guide` | `true` | The guide: the animated character who presents the board, the marker unless it says. `false` leaves it out. An object chooses, dresses and directs it: `{ character, wear, hold, skin, intro, outro }` (see "Dressing the guide" and references/characters.md). |
 | `numbers` | `true` | Each region's title carries its number, in paper on a disc of the accent: the order the ideas are told in. `false` leaves the numbers out; then link regions yourself, or the audit warns about islands. |
 | `outro` | `true` | The standard ending: the camera comes in on the guide, who waves and winks as a circle closes on it, then the title on the dark. `false` ends on the held overview. |
-| `audience` | `"adult"` | `"child"` for a young viewer: larger captions, the page starting at half speed (captions read at about eight letters a second, the drawing at a calm pace), and the audit holding a sentence to about 64 characters. |
+| `audience` | `"adult"` | `"child"` for a young viewer: larger captions, the page starting at half speed (captions read at about eight letters a second, the drawing at a calm pace), and the audit holding a sentence to about 64 characters. Decide it from the request and the subject (SKILL.md, "Who it is for"). |
 | `speed` | `1` (`0.5` for a child) | The speed the page starts at, and a video is made at. The viewer can change it from 0.5 to 2. |
 | `seed` | `1` | The wobble of every line, the guide's blinking, and, unless the guide is told, how it arrives and leaves. The same seed draws the same board; change it to redraw by hand. |
 | `lang` | `"en"` | The page's language. |
@@ -88,15 +88,16 @@ Without a `feel` or an `act`, the guide still performs: it is drawn as the board
 
 ## Dressing the guide
 
-`guide: { wear, hold, skin, intro, outro }`, every field optional. Dress it for the board's world: its look tells the viewer what the board is about before a word is written, and a guide dressed the same on every board is a uniform, not a character. One or two things to wear and one to hold is plenty.
+`guide: { character, wear, hold, skin, intro, outro }`, every field optional. Choose the character, then dress it for the board's world: its look tells the viewer what the board is about before a word is written, and a guide dressed the same on every board is a uniform, not a character. One or two things to wear and one to hold is plenty. Each character has its own list of what it can wear, its skins and its ways to arrive and leave; a script that asks for something its character does not have is refused with what it does have.
 
 | Field | Choices | What it is for |
 |---|---|---|
-| `wear` | `glasses`, `bow-tie`, `scarf`, `star`, `hair-bow`, `pencil-ear`, and one hat: `grad-cap`, `hard-hat`, `headphones`, `party-hat`, `crown`, `beanie`, `chef-hat` | Up to three, at most one hat. Glasses and a bow tie for a lesson, a mortarboard for a summary or a classic result, a hard hat for building and infrastructure, headphones for sound and music, a crown for "the best of", a beanie for winter or the outdoors, a party hat for a celebration, a pencil behind the ear for working something out, a bow for a child's board, a star for a rule to remember. |
+| `character` | `"marker"` (default), `"brain"`, or a character module (`import mine from "./characters/mine.mjs"`, then `character: mine`) | Who presents the board: the marker for any board; the brain, created by a seven-year-old, soft and bouncy, for a learning board a child will love; one made from someone's drawing (references/characters.md). |
+| `wear` | The shared ones: `glasses`, `bow-tie`, `scarf`, `star`, `hair-bow`, `pencil-ear`, and one hat: `grad-cap`, `hard-hat`, `headphones`, `party-hat`, `crown`, `beanie`, `chef-hat`. A character's own: the brain's `elf-hat` and `mittens`. | Up to three, at most one hat. The brain has its own glasses and no neck for a scarf. Glasses and a bow tie for a lesson, a mortarboard for a summary or a classic result, a hard hat for building and infrastructure, headphones for sound and music, a crown for "the best of", a beanie or the elf hat and mittens for winter, a party hat for a celebration, a pencil behind the ear for working something out, a bow for a child's board, a star for a rule to remember. |
 | `hold` | `pointer`, `book`, `pencil`, `ruler`, `coin`, `clock`, `magnifier`, `flag`, `balloon`, `wrench`, `calculator`, `lightbulb` | One thing. A pointer rests in its front hand and lies along its arm when it points; the rest it holds up in its other hand. A ruler for measuring, a clock for time, a coin for money, a calculator for arithmetic, a magnifier for a search or a closer look, a wrench for fixing, a lightbulb for an idea, a book for a definition, a flag for a goal, a balloon for a child's board. |
-| `skin` | `plain`, `blue`, `green`, `sand`, `pink`, `stripes`, `dots` | Its body: plain paper, a tint, or bands or dots in the accent. |
-| `intro` | `wave`, `hop`, `spin`, `bow`, `tip`, `jump` | How it comes alive once it is drawn. Left out, the seed picks. |
-| `outro` | `wave`, `bow`, `cheer`, `salute`, `tip`, `spin` | How it says goodbye as the circle closes on it. Left out, the seed picks. |
+| `skin` | The marker's: `plain`, `blue`, `green`, `sand`, `pink`, `stripes`, `dots`; the brain's: `plain` | Its body: plain, a tint, or bands or dots in the accent. |
+| `intro` | The marker's: `wave`, `hop`, `spin`, `bow`, `tip`, `jump`; the brain's: `bounce`, `jiggle`, `hop`, `wave`, `spin` | How it comes alive once it is drawn. Left out, the seed picks among its character's own. |
+| `outro` | The marker's: `wave`, `bow`, `cheer`, `salute`, `tip`, `spin`; the brain's: `bounce`, `wave`, `cheer`, `spin`, `bow` | How it says goodbye as the circle closes on it. Left out, the seed picks among its character's own. |
 
 ## Words the hand can write
 

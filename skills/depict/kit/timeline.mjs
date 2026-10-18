@@ -295,4 +295,13 @@ const OUTROS = {
     k.bounces.push([t + fly + 0.05, 0.85]);
     k.arms.push([t + 0.15, "cheer"], [t + fly + 0.1, "wave"]);
   },
+  // a soft body's goodbye: two happy bounces, the second smaller, wobbling on as the circle closes
+  bounce: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "cheer"]);
+    k.moves.push(hopHere(at, t + fly - 0.75, t + fly - 0.3, 75));
+    k.bounces.push([t + fly - 0.3, 1.0]);
+    k.moves.push(hopHere(at, t + fly - 0.22, t + fly + 0.06, 32));
+    k.bounces.push([t + fly + 0.06, 0.7]);
+    k.feel.push([t + 0.15, "excited"]);
+  },
 };

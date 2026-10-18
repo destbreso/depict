@@ -19,7 +19,7 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 | load | warning over 4 things | New things in one beat | Split the beat |
 | hook | warning over 7 s (10 s with the guide, whose hello counts as the opening picture) | The first beat's drawing time | Open with a picture; move a long title or a second item to the next beat |
 | focal | warning | A region of two or more items where none is large, a character, a sketch, framed or marked | Draw the thing the region is about as a large sketch, or frame or mark it |
-| sparse | warning under 10% | How much of a region's shot its items cover | Draw the idea as a scene, make the key item large, merge a thin region into another |
+| sparse | warning under 10% | How much of a region's shot its drawing covers: its items, each line as the band of paper it marks, and a drawing of two or more linked things (a tree, a graph) as the paper it spans | Draw the idea as a scene, make the key item large, merge a thin region into another |
 | tangle | warning | Two lines crossing (arrows) | Put the item between the other two, link fewer things, or say the connection in the sentence |
 | through | warning | A link's line running through a third item | Bend it (`bend`), or place the items so the line has a clear way |
 | bridge | warning | A link between regions that are not side by side, or many links between regions | The numbers already give the order: say the connection, or put both items in one region |
@@ -40,7 +40,13 @@ Read them as the artist. For each beat's picture, ask:
 - Does the overview read as a poster: the title, the numbered ideas in the order they were told, no empty corner, the guide at the end?
 - Is the idea explained completely: the problem, every step of the worked example, why it works, what it costs, the mistakes, when to use it?
 
+- Does the guide point at the thing the sentence names? It points only along a clear line; when it only looks at something, often, the idea's things stand in its way: give the region room beside them, or a grid instead of a long row.
+
 The audit cannot answer these; the pictures can.
+
+## A character
+
+`node scripts/character.mjs <character> --out <folder>` checks a character module (every missing or wrong field at once) and writes its model sheet and three test boards it presents. Read the sheet against the drawing it came from, part by part: the proportions, the colors, the signature details, every feeling and pose. Play the tests: does it land and move the way its material says, point where it means to, look like itself in every costume? Show both to the person before any board uses it (references/characters.md).
 
 ## The video
 

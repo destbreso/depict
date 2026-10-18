@@ -1,7 +1,7 @@
 {
   "name": "depict",
-  "version": "0.2.0",
-  "description": "Explain a concept by drawing it: a hand-drawn board that builds stroke by stroke, one sentence at a time, and stays explorable when the explanation ends. A canvas tour or sketched slides, from one script.",
+  "version": "0.4.0",
+  "description": "Explain a concept by drawing it: a hand-drawn board that builds stroke by stroke, one sentence at a time, presented by an animated character, pitched to its viewer from a young child to an expert, and explorable when the explanation ends. Turns a drawing into a character of your own.",
   "author": {
     "name": "David Estévez",
     "url": "https://github.com/destbreso"
@@ -9,5 +9,15 @@
   "homepage": "https://github.com/destbreso/depict",
   "repository": "https://github.com/destbreso/depict",
   "license": "MIT",
-  "keywords": ["skill", "explainer", "whiteboard", "sketch", "sketchnote", "animation", "teaching", "slides", "visualization"]
+  "keywords": [
+    "skill",
+    "explainer",
+    "whiteboard",
+    "sketch",
+    "sketchnote",
+    "animation",
+    "teaching",
+    "slides",
+    "visualization"
+  ]
 }

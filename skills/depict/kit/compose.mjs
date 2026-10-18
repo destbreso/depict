@@ -8,7 +8,8 @@ import * as ink from "./ink.mjs";
 import { widest, write } from "./hand.mjs";
 import { icon } from "./icons.mjs";
 import { person, TINTS } from "./people.mjs";
-import { reachAbove, rig } from "./rig.mjs";
+import { reachAbove, rig, spotBox } from "./rig.mjs";
+import { characterOf } from "./characters/index.mjs";
 import { INTRO_HEIGHT } from "./perform.mjs";
 import { flattenPath } from "./svgpath.mjs";
 import { bounds, cubic, pad, union } from "./geom.mjs";
@@ -456,9 +457,10 @@ function layoutRegion(board, font, region, S, first, index) {
     // where it first appears and presents the title (its pointing finger stops short of the first letter)
     const line = title ?? boardTitle;
     const h = SIZE.guide;
-    const feet = [content.x - 34 - GUIDE.reach * h, line.box.y + line.box.h + 40];
+    const M = characterOf(board.cast).measures;
+    const feet = [content.x - 34 - M.reach * h, line.box.y + line.box.h + 40];
     const up = h * reachAbove(board.cast); // and a hat above it, if it wears one
-    guide = { feet, box: { x: feet[0] - GUIDE.back * h, y: feet[1] - h - up, w: (GUIDE.back + GUIDE.reach) * h, h: h + up } };
+    guide = { feet, box: { x: feet[0] - M.back * h, y: feet[1] - h - up, w: (M.back + M.reach) * h, h: h + up } };
   }
   let box = cards.reduce((b, c) => union(b, c.box), null);
   if (title) box = union(box, title.box);
@@ -485,29 +487,23 @@ function badge(board, font, S, id, n, cx, cy, r) {
   ];
 }
 
-/** The guide's measures, in units of its height, from the point between its feet: how far it reaches back and forward (a pointing finger), and how tall it is. */
-const GUIDE = { back: 0.32, reach: 0.56, front: 0.36 };
-
-/** The paper the guide takes on a spot, at rest (hands on its hips), facing either way. */
-const spotBox = (q, h) => ({ x: q.x - (q.facing > 0 ? GUIDE.back : GUIDE.front) * h, y: q.y - h * (1 + (q.top ?? 0)), w: (GUIDE.back + GUIDE.front) * h, h: h * (1 + (q.top ?? 0)) });
-
 /**
  * Where the guide stands in a region: beside its title, beside its items, or
  * after them, whichever leaves it on free paper and inside the region's shot,
  * facing into the region. When none is free, the least crowded.
  */
-function freeSpot(r, elements, taken, h, top = 0) {
+function freeSpot(r, elements, taken, h, top = 0, M) {
   const tb = elements.get(r.id)?.box;
   const items = r.items.map((id) => elements.get(id).box);
   const content = items.reduce((b, x) => union(b, x), null);
   const ground = Math.max(...items.map((b) => b.y + b.h));
   const cands = [];
-  if (tb) cands.push({ x: tb.x - 40 - GUIDE.reach * h, y: tb.y + tb.h + 40, facing: 1, top });
-  cands.push({ x: content.x - 40 - GUIDE.front * h, y: ground, facing: 1, top });
-  cands.push({ x: content.x + content.w + 40 + GUIDE.front * h, y: ground, facing: -1, top });
-  if (tb) cands.push({ x: tb.x + tb.w + 40 + GUIDE.front * h, y: tb.y + tb.h + 40, facing: -1, top }); // after the title, facing back into the idea
+  if (tb) cands.push({ x: tb.x - 40 - M.reach * h, y: tb.y + tb.h + 40, facing: 1, top });
+  cands.push({ x: content.x - 40 - M.front * h, y: ground, facing: 1, top });
+  cands.push({ x: content.x + content.w + 40 + M.front * h, y: ground, facing: -1, top });
+  if (tb) cands.push({ x: tb.x + tb.w + 40 + M.front * h, y: tb.y + tb.h + 40, facing: -1, top }); // after the title, facing back into the idea
   const clash = (q) => {
-    const b = spotBox(q, h);
+    const b = spotBox(q, h, M);
     let a = 0;
     for (const o of taken) {
       const w = Math.min(b.x + b.w, o.x + o.w) - Math.max(b.x, o.x);
@@ -527,7 +523,7 @@ function freeSpot(r, elements, taken, h, top = 0) {
     }, 0);
   const already = intrudes(r.frame);
   const cost = (q) => {
-    const f = fit169(union(r.frame, pad(spotBox(q, h), 30)));
+    const f = fit169(union(r.frame, pad(spotBox(q, h, M), 30)));
     return f.w * f.h - r.frame.w * r.frame.h + 3 * (intrudes(f) - already);
   };
   let best = null;
@@ -1001,11 +997,11 @@ export function compose(board, font) {
     const spots = [guideStart];
     for (const r of regions) {
       if (r.id === guideStart.region && board.mode === "slides") continue;
-      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast))) };
+      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast), characterOf(board.cast).measures)) };
       spots.push(spot);
-      taken.push(pad(spotBox(spot, h), 10));
+      taken.push(pad(spotBox(spot, h, characterOf(board.cast).measures), 10));
     }
-    guide = { h, rig: rig(ink.pen(S("guide"), { width: W.icon }), h, board.accent, board.cast), spots };
+    guide = { h, rig: rig(ink.pen(S("guide"), { width: W.icon }), h, board.accent, board.cast), spots, measures: characterOf(board.cast).measures };
   }
 
   // a region's frame holds everything drawn in it (a note or a mark may reach past the content), grown to 16:9;
@@ -1014,7 +1010,7 @@ export function compose(board, font) {
     let f = r.frame;
     for (const e of elements.values()) if (e.region === r.id && !e.joins && e.kind !== "title" && e.kind !== "guide") f = union(f, pad(e.box, 40));
     const spot = guide?.spots.filter((q) => q.region === r.id).at(-1); // where it stands for this idea (the first idea's start is the opening's)
-    if (spot) f = union(f, pad(spotBox(spot, guide.h), 30));
+    if (spot) f = union(f, pad(spotBox(spot, guide.h, guide.measures), 30));
     if (f !== r.frame && board.mode !== "slides") r.frame = fit169(f);
   }
   // a region's shot has room to spare round its own idea: it slides within that room (never off what it holds) to take in
@@ -1025,7 +1021,7 @@ export function compose(board, font) {
       if (!mine.length) continue;
       let own = mine.reduce((b, e) => union(b, e.box), null);
       const spot = guide?.spots.filter((q) => q.region === r.id).at(-1);
-      if (spot) own = union(own, spotBox(spot, guide.h));
+      if (spot) own = union(own, spotBox(spot, guide.h, guide.measures));
       const others = [...elements.values()].filter((e) => e.region && e.region !== r.id && !e.joins && e.kind !== "mark" && e.kind !== "guide").map((e) => e.box);
       // what a shot takes in of the other ideas: a thing of theirs it shows whole counts its size, and one it cuts
       // through counts twice its whole size, however thin the slice (a cut-off word at the edge reads as a mistake)
@@ -1063,7 +1059,7 @@ export function compose(board, font) {
       const spot = guide?.spots.filter((q) => q.region === r0.id).at(-1);
       const low = t.y + t.h + 48; // where a frame starts whose shot (40 round it) stays under the title
       const content = [...elements.values()].filter((e) => e.region === r0.id && !e.joins && e.kind !== "title" && e.kind !== "guide").reduce((b, e) => union(b, e.box), null);
-      const clear = content && low <= content.y - 16 && (!spot || low <= spotBox(spot, guide.h).y - 10);
+      const clear = content && low <= content.y - 16 && (!spot || low <= spotBox(spot, guide.h, guide.measures).y - 10);
       if (whole.w <= f.w * 1.12 || !clear) r0.frame = whole;
       else r0.frame = { ...f, y: Math.max(f.y, low) };
     }
@@ -1077,7 +1073,7 @@ export function compose(board, font) {
     // the guide ends beside the idea it presented last, and the closing shot holds it there
     let last = null;
     for (const bt of board.beats) for (const id of bt.draw) if (elements.get(id)?.region && !elements.get(id).joins) last = elements.get(id).region;
-    extent = union(extent, spotBox(guide.spots.filter((q) => q.region === last).at(-1) ?? guide.spots.at(-1), guide.h));
+    extent = union(extent, spotBox(guide.spots.filter((q) => q.region === last).at(-1) ?? guide.spots.at(-1), guide.h, guide.measures));
   }
   // the end card: the title in paper on the dark, in the frame's own coordinates (1920 x 1080), underlined in the accent
   const et = write(font, board.title, { x: 960, y: 0, size: 76, align: "center", maxWidth: 1500, lineHeight: 1.5, rng: S("endcard") });

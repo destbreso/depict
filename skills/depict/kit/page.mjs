@@ -82,12 +82,16 @@ function actorOf(a, color) {
     feelings: a.feelings,
     track: a.track,
     strokes: rg.strokes.map((s) => ({ part: s.part, t0: Math.round(s.t0 * 1000) / 1000, t1: Math.round(s.t1 * 1000) / 1000, w: q(s.w), c: color(s.c), l: { under: 1, shadow: 2 }[s.l] ?? 0, o: s.o, pts: pts(s.pts) })),
-    arm: { width: q(rg.arm.width), hose: rg.arm.hose.map(q) },
+    arm: { width: q(rg.arm.width), hose: rg.arm.hose.map(q), ...(rg.arm.fill ? { fill: color(rg.arm.fill), fillWidth: q(rg.arm.fillWidth) } : {}) },
     gloves: Object.fromEntries(Object.entries(rg.gloves).map(([k, g]) => [k, { lines: g.lines.map(pts), fill: g.fill.map(pts), fillWidth: q(g.fillWidth) }])),
     gloveWidth: q(rg.gloveWidth),
+    ...(rg.gloveFill ? { gloveFill: color(rg.gloveFill) } : {}),
     reveal: rg.reveal,
     capPivot: rg.capPivot.map(q),
     hold: rg.hold,
+    // what it is made of, and how far its arm reaches: the pose of every frame follows from them
+    ...(Object.keys(rg.motion ?? {}).length ? { motion: rg.motion } : {}),
+    ...(rg.reach !== 0.36 ? { reach: rg.reach } : {}),
   };
 }
 

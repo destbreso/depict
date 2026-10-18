@@ -239,13 +239,21 @@ test("the guide comes alive, hops to each new idea with the camera, lands in its
   const [guide] = tl.actors;
   assert.ok(guide, "the board has its guide");
   const tr = guide.track;
-  // every trip starts with a camera flight to another region and lands in that region's shot
-  for (const m of tr.moves.filter((m) => m.from[0] !== m.to[0] || m.from[1] !== m.to[1])) {
+  // every trip starts with a camera flight to another region and lands in that region's shot; a step within an idea
+  // lands inside the shot the camera holds
+  for (const m of tr.moves.filter((m) => !m.step && (m.from[0] !== m.to[0] || m.from[1] !== m.to[1]))) {
     const k = tl.camera.find((c) => Math.abs(c.t0 + 0.08 - m.t0) < 1e-6);
     assert.ok(k && k.region, "a trip rides a camera flight");
     const f = comp.regions.find((r) => r.id === k.region).frame;
     assert.ok(m.to[0] > f.x && m.to[0] < f.x + f.w && m.to[1] > f.y && m.to[1] <= f.y + f.h, "it lands inside the region's shot");
   }
+  for (const m of tr.moves.filter((m) => m.step)) {
+    const shot = tl.camera.filter((c) => c.t0 <= m.t1).at(-1).to;
+    assert.ok(Math.abs(m.to[0] - shot[0]) < shot[2] / 2 && Math.abs(m.to[1] - shot[1]) < (shot[2] * 9) / 32, "a step lands inside the shot");
+  }
+  // one move at a time
+  const ms = [...tr.moves].sort((a, b) => a.t0 - b.t0);
+  for (let i = 1; i < ms.length; i++) assert.ok(ms[i].t0 >= ms[i - 1].t1 - 1e-9, "moves never overlap");
   // the same time, the same pose
   assert.deepEqual(actorAt(guide, 21.3), actorAt(guide, 21.3));
   // a mark makes it surprised while the mark is drawn
@@ -472,4 +480,115 @@ test("a long sketch takes a wide box, and a shape can be colored in with no outl
   assert.ok(pic("line").w > 2.5 * pic("sq").w, "the 300-wide box draws about three times as wide as a square one");
   assert.equal(comp.elements.get("line").parts.find((q) => q.role === "sketch").strokes.length, 1, "the band has no outline of its own");
   assert.match(normalize({ ...s, regions: [{ ...s.regions[0], items: [{ id: "x", box: [300, 60], sketch: ["M10 30 H350"], label: "Too long" }] }] }).errors.join("\n"), /outside its 300 x 60 box/);
+});
+
+test("the guide's hand never crosses one thing to point at another: it steps where it sees it, or only looks", async () => {
+  const { actorAt } = await import("../skills/depict/kit/act.mjs");
+  // a row of four things told one at a time: from beside the first, the way to the last crosses the ones between
+  const row = ["a", "b", "c", "d"];
+  const s = {
+    title: "A row",
+    regions: [{ id: "r", title: "Four in a row", layout: "row", items: row.map((id, i) => ({ id, sketch: ["M10 10 H90 V90 H10 Z"], label: `Thing ${i + 1}` })) }],
+    beats: [
+      { say: "Here is the first thing.", draw: ["title", "r", "a"] },
+      { say: "Then a second one, beside it.", draw: ["b"] },
+      { say: "A third one comes after.", draw: ["c"] },
+      { say: "And the last one, at the end.", draw: ["d"] },
+    ],
+  };
+  const { comp, tl } = build(s);
+  const [guide] = tl.actors;
+  const els = comp.elements;
+  const first = (id) => tl.strokes.find((q) => q.el === id).t0;
+  for (const id of row.slice(1)) {
+    const t = first(id) + 0.3;
+    const st = actorAt(guide, t);
+    const key = guide.track.arms.filter((k) => k[0] <= first(id) + 1e-9).at(-1);
+    if (key[1] !== "point") {
+      assert.equal(key[1], "rest", `${id}: it only looks`);
+      assert.ok(guide.blocked.some((b) => b.id === id), `${id}: and the audit hears why`);
+      continue;
+    }
+    // pointing: the straight way from its shoulder to the thing crosses nothing else on the board
+    const tb = els.get(id).box;
+    const [cx, cy] = [tb.x + tb.w / 2, tb.y + tb.h / 2];
+    const [sx, sy] = [st.x + st.facing * 0.165 * guide.h, st.y - 0.39 * guide.h];
+    for (let u = 0; u < 1; u += 0.01) {
+      const [x, y] = [sx + (cx - sx) * u, sy + (cy - sy) * u];
+      if (x > tb.x - 6 && x < tb.x + tb.w + 6 && y > tb.y - 6 && y < tb.y + tb.h + 6) break;
+      for (const other of row.filter((o) => o !== id && first(o) <= first(id))) {
+        const ob = els.get(other).box;
+        assert.ok(!(x > ob.x - 6 && x < ob.x + ob.w + 6 && y > ob.y - 6 && y < ob.y + ob.h + 6), `${id}: its hand does not cross ${other}`);
+      }
+    }
+  }
+  assert.ok(guide.track.moves.some((m) => m.step) || guide.blocked.length, "it stepped or looked where its hand would have crossed");
+});
+
+test("each character is its own: the brain wears its own costumes, refuses what it does not have, and the marker stays the default", async () => {
+  const { tl } = build({ ...tiny(), guide: { character: "brain", wear: ["elf-hat", "mittens"], hold: "pencil" } });
+  const [g] = tl.actors;
+  assert.equal(g.rig.character, "brain");
+  assert.ok(g.rig.strokes.some((s) => s.part === "hat"), "its elf hat is drawn");
+  assert.equal(g.rig.gloveFill, "#4fa65d", "its hands are green mittens");
+  assert.ok(g.rig.arm.fill, "its arms are limbs with a color of their own");
+  const bad = normalize({ ...tiny(), guide: { character: "brain", wear: ["glasses", "scarf"], skin: "dots", intro: "tip" } }).errors.join("\n");
+  for (const m of [/the brain wears "glasses"/, /the brain wears "scarf"/, /skin "dots"/, /intro "tip"/]) assert.match(bad, m);
+  assert.match(normalize({ ...tiny(), guide: { character: "dragon" } }).errors.join("\n"), /use marker, brain/);
+  assert.match(normalize({ ...tiny(), guide: { character: "brain", wear: ["elf-hat", "crown"] } }).errors.join("\n"), /one hat at a time/);
+  assert.equal(build(tiny()).tl.actors[0].rig.character, "marker", "the marker, when the board does not say");
+});
+
+test("a soft body squashes deeper and sways over its feet after it lands; a stiff one stops at once", async () => {
+  const { actorAt } = await import("../skills/depict/kit/act.mjs");
+  const two = (character) => {
+    const s = { ...tiny(), guide: { character, intro: "wave" } };
+    s.regions = [...s.regions, { id: "r2", title: "A second idea", items: [{ id: "c", icon: "users", label: "Three" }] }];
+    s.beats = [...s.beats, { say: "And a second idea.", draw: ["r2", "c"] }];
+    return build(s).tl.actors[0];
+  };
+  for (const [character, soft] of [["brain", true], ["marker", false]]) {
+    const g = two(character);
+    const trip = g.track.moves.find((m) => !m.step && m.from[0] !== m.to[0]);
+    assert.ok(trip, `${character} hops to the second idea`);
+    const sway = Math.max(...[0.1, 0.2, 0.3, 0.4, 0.5].map((d) => Math.abs(actorAt(g, trip.t1 + d).skew)));
+    if (soft) assert.ok(sway > 2, `the brain sways after it lands (${sway.toFixed(1)} degrees)`);
+    else assert.equal(sway, 0, "the marker does not sway");
+  }
+});
+
+test("a character module is checked whole, every problem at once", async () => {
+  const { checkCharacter, CHARACTERS } = await import("../skills/depict/kit/characters/index.mjs");
+  for (const c of Object.values(CHARACTERS)) assert.deepEqual(checkCharacter(c), [], `${c.id} is complete`);
+  const half = { ...CHARACTERS.brain, poses: { rest: CHARACTERS.brain.poses.rest }, measures: { back: 0.5 }, draw: null };
+  const problems = checkCharacter(half);
+  for (const m of [/poses\.point/, /measures/, /"draw"/]) assert.ok(problems.some((p) => m.test(p)), `it names ${m}`);
+  // a board can bring its own character module
+  const mine = { ...CHARACTERS.brain, id: "mine", name: "mine" };
+  const { board, errors } = normalize({ ...structuredClone(tiny()), guide: { character: mine } });
+  assert.deepEqual(errors, []);
+  const tl = time(board, compose(board, hand(board.hand)));
+  assert.equal(tl.actors[0].rig.character, "mine");
+});
+
+test("a series builds every board, keeps one report and writes its gallery", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "depict-series-"));
+  const kit = new URL("../skills/depict/", import.meta.url).pathname;
+  for (const [id, order] of [["second", 2], ["first", 1]]) {
+    fs.mkdirSync(path.join(dir, "boards", id), { recursive: true });
+    fs.writeFileSync(path.join(dir, "boards", id, "board.mjs"), `export const meta = { order: ${order}, group: "Things" };\nexport default ${JSON.stringify({ ...tiny(), title: `The ${id} board` })};\n`);
+  }
+  fs.writeFileSync(path.join(dir, "series.mjs"), `export default { title: "A tiny course", look: "pick", order: (m) => m.order, group: (m) => m.group };\n`);
+  const r = spawnSync(process.execPath, [path.join(kit, "scripts/series.mjs"), dir, "--no-check"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const report = JSON.parse(fs.readFileSync(path.join(dir, "site/report.json"), "utf8"));
+  assert.deepEqual(Object.keys(report).sort(), ["first", "second"]);
+  const index = fs.readFileSync(path.join(dir, "site/index.html"), "utf8");
+  assert.ok(index.indexOf("The first board") < index.indexOf("The second board"), "in the series' own order");
+  assert.match(index, /A tiny course/);
+  assert.match(index, /class="group">Things/);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -1,6 +1,6 @@
 {
   "name": "depict",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "An Agent Skill that explains a concept by drawing it: a hand-drawn board that builds stroke by stroke and stays explorable.",
   "type": "module",

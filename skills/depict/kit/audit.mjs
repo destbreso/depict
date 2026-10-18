@@ -2,7 +2,7 @@
 // rule comes from the craft of whiteboard explanations (references/craft.md
 // has the sources) or from the geometry of the board itself. Problems stop
 // the build; warnings are worth a look.
-import { bounds, overlaps, pad } from "./geom.mjs";
+import { bounds, lengthOf, overlaps, pad, union } from "./geom.mjs";
 import { SIZE } from "./compose.mjs";
 import { safeArea } from "./camera.mjs";
 
@@ -203,12 +203,20 @@ export function audit(board, comp, tl) {
     const focal = r.items.some((it) => it.size === "large" || it.character || it.sketch || it.shape !== "none" || marked.has(it.id));
     if (r.items.length > 1 && !focal) warn("focal", `region "${r.id}" has no focal point: make the item it is about large, a character or a sketch, give it a frame, or mark it`);
     const frame = comp.regions.find((x) => x.id === r.id).frame;
-    // a tree's or a graph's edges are part of its drawing: the paper between its nodes is not empty
+    // a tree's or a graph's edges are part of its drawing: each line counts as the band of paper it marks, and a
+    // drawing of two or more linked things fills the paper it spans (the room between its nodes is not empty)
     let area = r.items.reduce((a, it) => a + els.get(it.id).box.w * els.get(it.id).box.h, 0);
+    let drawing = null;
+    let lines = 0;
+    const grow = (b) => (drawing = drawing ? union(drawing, b) : { ...b });
     for (const e of els.values()) if (e.kind === "link" && !e.bridge && e.region === r.id && e.path) {
       const b = bounds([e.path]);
-      area += b.w * b.h * 0.4;
+      area += Math.max(b.w * b.h * 0.4, lengthOf(e.path) * 60);
+      lines++;
+      grow(b);
+      for (const id of [e.from, e.to]) if (els.get(id)?.region === r.id) grow(els.get(id).box);
     }
+    if (lines >= 2) area = Math.max(area, drawing.w * drawing.h);
     const fill = area / (frame.w * frame.h);
     if (fill < 0.1) warn("sparse", `region "${r.id}" is mostly empty paper (its items cover ${Math.round(fill * 100)}% of its shot): draw its idea as a scene, a character or a sketch, or make its key item large`);
   }

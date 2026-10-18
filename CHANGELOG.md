@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Characters: the guide is a character, `guide: { character }`. The marker stays the default; the brain, a fuzzy pink brain with round glasses created by Niki, age 7, ships beside it, with its own costumes from her drawings (an elf hat and mittens); a board can also bring a character module of its own. Each character has its look, its measures and poses for its own body, places for the shared costumes, what it can wear and its skins, its material (how much it squashes and stretches, how it wobbles, whether its top sways over its feet like a jelly) and its personality (its own ways to arrive and leave, chosen by the seed, and its quirks: the brain pushes its glasses up in a quiet moment). Soft bodies arrive with a `bounce` or a `jiggle` and leave with a `bounce`.
+- A character from a drawing: references/characters.md says how, from one picture or several, keeping the drawing's proportions, colors and details and improving only what a guide needs; `scripts/character.mjs` checks a character module and writes its model sheet and three test boards it presents.
+- The guide points only along a clear line: when something drawn earlier stands between it and what a sentence names, it steps to free paper beside or under the thing, inside the shot, and otherwise only looks. A thing not drawn yet never stops its hand.
+- Who it is for: the skill decides from the request and the subject whether a board is for a young child, a beginner, an adult or an expert, and pitches the pace, the words, the example and the depth to them. Get it right: every number checked and written down at the top of the script, a source's own example used, and where a source is wrong the board says what is true and the person is told.
+- A series: `scripts/series.mjs` builds a folder of boards with their audits and checks, keeps one report (two builds at once both keep theirs) and writes a gallery to pick from or to review.
+- The page keeps the film's place every frame and as it goes, so a reload goes on from the very frame it was showing.
+- The audit's sparse rule counts a line by the paper it marks and a linked drawing (a tree, a graph) by the paper it spans.
+- The skill's description fits the Agent Skills limit of 1024 characters.
+
 ## 0.3.0
 
 - A numbered page: the regions are numbered in the order they are told (in paper on a disc of the accent, before each title) and laid out as a page is read, left to right in balanced rows, as many rows as make the board 16:9, each row's titles on one line and no corner left empty (`flow: "page"`, the default; `numbers: false` leaves the numbers out). Slides end as a numbered storyboard. The story road and the story arrows are gone: the numbers give the order, and a link between regions is only for a connection the order does not say.

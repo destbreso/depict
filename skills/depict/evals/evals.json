@@ -24,6 +24,24 @@
       "prompt": "/depict how a site survives a DDoS attack, and let people try the defenses themselves",
       "expected_output": "A board that explains the concept (the attack, the layers at the edge, autoscaling) and has a live part: an item whose figure is a Dissect page of the same system (built with the dissect skill when it is installed, or the ddos example), opened by a beat with open, so the reader can switch each layer off. The build resolves the figure's path; the check passes; the answer says the figure opens from the board and that the video shows its play mark instead.",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "/depict my daughter drew this character for her math lessons (three pictures: a fuzzy pink brain with round glasses, one in a green hat and mittens). Make it the guide of her boards, and credit her: Niki, 7.",
+      "expected_output": "The agent follows references/characters.md: it studies the pictures for what stays (the character) and what changes (the hat and mittens become costumes), measures the drawing's proportions and keeps them, colors and signature details included, decides the material (a soft brain: squash, bounce, a jelly wobble) and a personality, and writes a character module with every field (credit to Niki, 7). It runs scripts/character.mjs on it, reads the model sheet against the drawings, and shows the sheet and the three test boards to the person before putting the character on any board; it does not change the drawing's proportions or add features it does not have.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "/depict telling time to the nearest five minutes, for my 7-year-old",
+      "expected_output": "A board pitched to a young child: audience is \"child\" (half speed, short sentences under the child limit), a real clock drawn first and the minute hand counted by fives step by step on one example, a second example worked together, the common mistake (reading the hour hand wrong) shown and fixed, numbers within second grade's limits; plain everyday words, a playful guide. The answer says it took the viewer to be a young child.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "/depict how Raft elects a leader, for our backend team's design review",
+      "expected_output": "A board pitched to experts: adult pace, the field's own terms (term, vote, election timeout, log index), the real mechanism traced on one cluster of five nodes through a failed leader, a split vote and a new election, with the timeouts and terms as numbers, why it is safe (one vote per term, a majority), what it costs, the classic mistakes and alternatives; not slow or playful. The answer says it took the viewer to be engineers who know distributed systems.",
+      "files": []
     }
   ]
 }

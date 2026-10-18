@@ -45,7 +45,9 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 ## What you get
 
 - **A page that plays like a video.** One standalone HTML file, no network. A pen draws each shape and writes each word in the order a hand would, and each sentence is written under the board as it is said, never over the drawing. Pause, scrub, step sentence by sentence, change the speed.
-- **A guide with a face.** Every board is presented by the same character: a felt marker with its cap in the board's accent. It is drawn first, then comes alive its own way (a wave, a hop, a spin, a bow, a tip of its cap, a jump), points at each new thing as the pen draws it, follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops to the next idea and cheers at the end. It is dressed for the subject: a mortarboard and a book, a hard hat and a wrench, glasses and a pointer, headphones, a crown, a ruler, a coin, a clock. It blinks and breathes while you explore, and waves back when you tap it.
+- **A guide with a face, and a cast to choose from.** Every board is presented by a character: depict's own marker by default (a felt marker with its cap in the board's accent), the brain (a fuzzy pink brain with round glasses, created by Niki, age 7), or one made from any drawing you give it. Each has its own look, its own way of moving (the marker is stiff; the brain is soft and wobbles like a jelly when it lands) and its own personality (how it arrives and leaves, what it does on its own). It is drawn first, then comes alive its own way, points at each new thing as the pen draws it (only along a clear line: when something is in the way it steps aside to see it, or only looks), follows the pen with its eyes, is surprised when something is marked, worried or thinking when the sentence is, hops to the next idea and says goodbye at the end. It is dressed for the subject: a mortarboard and a book, a hard hat and a wrench, glasses and a pointer, headphones, a crown, a ruler, a coin, a clock, the brain's elf hat and mittens. It blinks and breathes while you explore, and waves back when you tap it.
+- **Pitched to its viewer.** It decides from what you ask and what the subject is whether the board is for a young child, a beginner, an adult or an expert, and sets the pace, the words, how concrete the example is and how deep it goes: real blocks and coins and half speed for a seven-year-old, the field's own terms and the internals for a design review.
+- **A character from a drawing.** Give it a drawing (a child's drawing, a sketch; one picture or several of the same character) and it makes it a guide: the drawing's proportions, colors and details kept, the lines evened, every feeling and pose added, a material and a personality chosen, and a model sheet and three test boards to look at before any board uses it.
 - **Numbered ideas, read as a page.** Each idea is numbered in the order it is told and the ideas are laid out as a page is read, left to right in balanced rows, so three or ten compose into one 16:9 poster with no empty corner.
 - **Explained completely.** The problem and why the obvious way falls short, the mechanism traced step by step on one worked example, why it works, what it costs, the classic mistakes and when to use it.
 - **Things drawn as they are.** A chip with its pins, memory sticks, a server rack, bars and curves drawn to scale, colored in with marker fills, framed with drop shadows; people only where people are part of the idea.
@@ -55,6 +57,7 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 - **A camera that is computed.** Every shot is checked to be readable; the board opens close on the guide and the title, the camera flies between shots along the optimal zoom path, and the board ends on a held overview that reads as a map of the idea.
 - **Two modes from one script.** A tour of one big canvas, or sketched slides that end laid out as a numbered storyboard.
 - **Live parts.** An item can open into a running [Dissect](https://github.com/destbreso/dissect) figure, grown from its place on the board: the board explains, the figure lets you try.
+- **A series.** A course or a set of lessons builds in one go, with one report of what every audit said and a gallery to pick the boards from.
 - **A video when you want one.** 1920 x 1080, the board alone and clean, in the form social sites take without trouble, with its sentences as an .srt beside it: subtitles for the site, or the script for a voice.
 
 ## Gallery
@@ -78,6 +81,12 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
   </tr>
 </table>
 
+### Characters
+
+<p align="center"><img src="assets/brain-sheet.png" width="800" alt="The brain's model sheet: a fuzzy pink brain with round glasses far apart on a long bridge, rosy cheeks, a little w of a mouth, short salmon arms and legs and big black shoes, drawn eight times with its feelings (happy, excited, surprised with its mouth open, worried, thinking, proud, winking, sad), nine times in its poses (resting, pointing, presenting, waving, cheering, shrugging, scratching its head, saluting, pushing its glasses up) and seven times in costumes (its own green elf hat with a white pompom and green mittens, a mortarboard, a hard hat with a book, headphones, a party hat, a bow tie with a pencil, a pointer)."></p>
+
+<p align="center"><sub><b>The brain</b>, created by Niki, age 7, beside depict's own marker: soft and bouncy, it wobbles like a jelly when it lands. Its model sheet is written by <code>scripts/character.mjs</code>, the same check any character made from a drawing goes through.</sub></p>
+
 ## Install
 
 Depict is one skill folder, `skills/depict`, with a `SKILL.md` at its root.
@@ -98,7 +107,11 @@ Ask in your own words; the skill triggers on explaining, teaching, sketching out
 /depict the CAP theorem, for my team, under a minute
 /depict why the sky is blue, as slides, with a video for LinkedIn
 /depict how a hash table works, for someone who just learned arrays
+/depict telling time to the nearest five minutes, for my 7-year-old
+/depict make a character from my daughter's drawings: brain-1.jpg brain-2.jpg
 ```
+
+Open a page in a browser, straight from the file. A preview that reloads the page whenever a file in its folder changes (VS Code's Live Server or Live Preview) stops the film at every reload.
 
 ## Examples
 
@@ -121,13 +134,15 @@ The kit does the rest, in Node, with nothing but its own modules:
 2. **Strokes.** Every shape, sketch, icon and letter becomes polylines in pen order, wobbled by a seeded hand: lines bowed and jittered as Rough.js draws them, ellipses that overshoot where they close, letters from single-stroke fonts; shapes are colored in with a marker's passes and cast grey shadows.
 3. **Time.** Each stroke gets its moment: the pen's pace, the lifts between strokes, and each beat at least as long as its sentence takes to read.
 4. **Camera.** The board opens close on the guide and the title; each beat is shot from its region's frame; between shots the camera flies along van Wijk and Nuij's path; the board ends on the overview.
-5. **The guide.** A rig of components (cap, body, eyes, pupils, brows, mouths, rubber-hose arms, gloves, legs, and what it wears and holds) and a track written from the timeline: where it stands, how it arrives and leaves, its hops, bows, spins and tipped cap, its gestures, feelings, gaze and blinks.
+5. **The guide.** A character drawn as a rig of components (body, eyes, pupils, brows, mouths, rubber-hose arms, hands, legs, and what it wears and holds), with its own measures, poses, material and personality, and a track written from the timeline: where it stands, where it steps to see what it points at, how it arrives and leaves, its hops, bows, spins and quirks, its gestures, feelings, gaze and blinks. Its pose at any moment follows from its material: a stiff body squashes a little, a soft one squashes deep and sways over its feet.
 6. **Page.** All of it goes into one HTML file whose player draws the board and poses the guide as a pure function of time, `render(t)`. Playing, scrubbing and capturing a video frame by frame are the same call.
 
 ## Checks
 
 - **The audit**, `--audit` on the build: readable text in every shot, nothing overlapping or outside its slide, captions that fit two lines and read at no more than 20 characters a second, short labels, a quick opening, a closing map, and the composition: a focal point in every region, no empty paper, no crossing lines, no long bridges.
 - **The check**, `scripts/check.mjs board.html`: pictures every beat, the overview and the page in headless Chrome and fails on any page error. The agent reads the pictures before handing anything over.
+- **A character**, `scripts/character.mjs <character> --out <folder>`: checks a character module, every field, and writes its model sheet (every feeling, pose and costume) and three test boards it presents.
+- **A series**, `scripts/series.mjs <folder>`: builds, audits and checks every board under `boards/`, keeps one report and writes the gallery.
 - **The video**, `scripts/video.mjs board.html`: 1920 x 1080 at 30 frames a second, H.264 in studio-range color with Rec. 709 tags, a silent audio track and the index first.
 
 `skills/depict/references/craft.md` gives the rules of the genre and where each comes from.
@@ -150,6 +165,7 @@ The page itself needs only a browser.
 - The icons are [Lucide](https://lucide.dev) (ISC; icons from Feather, MIT).
 - The camera's flights are van Wijk and Nuij's "Smooth and efficient zooming and panning" (InfoVis 2003).
 - Live parts open figures made with [Dissect](https://github.com/destbreso/dissect).
+- The brain was created by Niki, age 7, who drew it in three pictures.
 
 ## License
 

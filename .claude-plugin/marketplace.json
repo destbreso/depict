@@ -9,8 +9,8 @@
     {
       "name": "depict",
       "source": "./",
-      "description": "Explain a concept by drawing it: a hand-drawn board, written in pen order, with a computed camera, that stays explorable when it ends.",
-      "version": "0.2.0"
+      "description": "Explain a concept by drawing it: a hand-drawn board with an animated guide character, pitched to its viewer, that stays explorable when it ends; and a drawing made into a character.",
+      "version": "0.4.0"
     }
   ]
 }

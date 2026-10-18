@@ -7,7 +7,8 @@ import { hasIcon, nearIcons } from "./icons.mjs";
 import { hand } from "./fonts.mjs";
 import { POSE_NAMES, FACES, HAIRS, HATS, TINTS } from "./people.mjs";
 import { flattenPath } from "./svgpath.mjs";
-import { ACTS, FEELINGS, HATS as GUIDE_HATS, HOLD, INTROS, OUTROS, SKINS, WEAR } from "./rig.mjs";
+import { ACTS, FEELINGS, HATS as GUIDE_HATS, HOLD } from "./rig.mjs";
+import { CHARACTERS, characterOf, checkCharacter } from "./characters/index.mjs";
 import { hash32 } from "./rng.mjs";
 
 /** Typographic marks a hand writes the plain way; anything else outside its glyphs is a problem. */
@@ -52,19 +53,29 @@ export function normalize(input) {
   b.speed = b.speed ?? (b.audience === "child" ? 0.5 : 1);
   if (!(b.speed >= 0.25 && b.speed <= 3)) err(`speed ${b.speed}: use a number from 0.25 to 3 (1 is the drawing's own pace)`);
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
-  // the guide dressed for the subject ({ wear, hold, skin }) and directed ({ intro, outro }); how it arrives and leaves is the seed's pick when not said
-  for (const k of Object.keys(cast)) if (!["wear", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes wear, hold, skin, intro and outro`);
+  // the guide: which character presents the board, dressed for the subject ({ wear, hold, skin }) and directed
+  // ({ intro, outro }); how it arrives and leaves is the seed's pick, among its character's own, when not said
+  for (const k of Object.keys(cast)) if (!["character", "wear", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes character, wear, hold, skin, intro and outro`);
+  if (typeof cast.character === "string" && !CHARACTERS[cast.character]) err(`the guide's character "${cast.character}": use ${Object.keys(CHARACTERS).join(", ")}, or a character module of your own`);
+  if (cast.character && typeof cast.character === "object") for (const m of checkCharacter(cast.character)) err(`the guide's character: ${m}`);
+  const C = characterOf(cast);
+  const who = C.name ?? C.id;
+  const own = Object.keys(C.costumes ?? {});
+  const wearable = [...(C.wear ?? []), ...own];
   const wear = cast.wear == null ? [] : [cast.wear].flat();
-  for (const w of wear) if (!WEAR.includes(w)) err(`the guide wears "${w}": it can wear ${WEAR.join(", ")}`);
-  const hats = wear.filter((w) => GUIDE_HATS.includes(w));
+  for (const w of wear) if (!wearable.includes(w)) err(`${who} wears "${w}": it can wear ${wearable.join(", ")}`);
+  const hats = wear.filter((w) => GUIDE_HATS.includes(w) || C.costumes?.[w]?.hat);
   if (hats.length > 1) err(`the guide wears ${hats.join(" and ")}: one hat at a time`);
   if (wear.length > 3) err(`the guide wears ${wear.length} things: three at most, or it stops looking like itself`);
   if (cast.hold != null && !HOLD.includes(cast.hold)) err(`the guide holds "${cast.hold}": it can hold ${HOLD.join(", ")}`);
-  if (cast.skin != null && !SKINS.includes(cast.skin)) err(`the guide's skin "${cast.skin}": use ${SKINS.join(", ")}`);
-  if (cast.intro != null && !INTROS.includes(cast.intro)) err(`the guide's intro "${cast.intro}": use ${INTROS.join(", ")}`);
-  if (cast.outro != null && !OUTROS.includes(cast.outro)) err(`the guide's outro "${cast.outro}": use ${OUTROS.join(", ")}`);
+  const skins = C.skins ?? ["plain"];
+  if (cast.skin != null && !skins.includes(cast.skin)) err(`${who}'s skin "${cast.skin}": use ${skins.join(", ")}`);
+  const intros = C.personality?.intros ?? ["wave"];
+  const outros = C.personality?.outros ?? ["wave"];
+  if (cast.intro != null && !intros.includes(cast.intro)) err(`${who}'s intro "${cast.intro}": it comes alive with ${intros.join(", ")}`);
+  if (cast.outro != null && !outros.includes(cast.outro)) err(`${who}'s outro "${cast.outro}": it says goodbye with ${outros.join(", ")}`);
   const pick = (list, salt) => list[hash32(`${b.seed}:${b.title}:${salt}`) % list.length];
-  b.cast = { wear, hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(INTROS, "intro"), outro: cast.outro ?? pick(OUTROS, "outro") };
+  b.cast = { character: cast.character ?? "marker", wear, hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(intros, "intro"), outro: cast.outro ?? pick(outros, "outro") };
 
   const ids = new Map(); // id -> kind
   const claim = (id, kind, where) => {
