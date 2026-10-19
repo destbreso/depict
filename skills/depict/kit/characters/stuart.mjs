@@ -73,13 +73,14 @@ export default {
   // what it is made of: soft and elastic, so it squashes deep, stretches tall, bounces, and wobbles on like a jelly
   motion: { squash: 1.5, stretch: 1.4, freq: 10, damp: 3.2, jelly: 1, breath: 1.8, breathPeriod: 2.2 },
   personality: {
-    traits: "curious, cheerful and a little nerdy: it thinks with its whole body, bounces when it is happy, wobbles like a jelly when it lands, and pushes its glasses up before it explains",
+    traits: "curious, cheerful and a little nerdy: he thinks with his whole body, bounces when he is happy, wobbles like a jelly when he lands, and pushes his glasses up before he explains",
     intros: ["bounce", "jiggle", "hop", "wave", "spin"],
     outros: ["bounce", "wave", "cheer", "spin", "bow"],
     quirks: ["glasses"],
   },
-  // shared costumes it can wear (its glasses are its own, and it has no neck for a scarf), each in its place on it
-  wear: ["grad-cap", "hard-hat", "headphones", "party-hat", "crown", "beanie", "chef-hat", "bow-tie", "star", "hair-bow", "pencil-ear"],
+  // shared costumes he can wear (his glasses are his own, and he has no neck for a scarf), each in its place on him.
+  // Stuart is a boy, as Niki made him: he wears what a boy would, so no hair bow
+  wear: ["grad-cap", "hard-hat", "headphones", "party-hat", "crown", "beanie", "chef-hat", "bow-tie", "star", "pencil-ear"],
   skins: ["plain"],
   anchors: {
     hat: { s: 1.45, du: 0.02, dv: 0.0 },

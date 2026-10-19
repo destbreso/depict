@@ -7,6 +7,8 @@
 - A child's board has controls big enough for small fingers: 44 pixel buttons, with the paper under the board to fit them.
 - On a touch screen, two fingers pinch a board to zoom it about the point between them, and one finger drags it. Embedded, one finger scrolls the host's page over the board until the film has ended (so a page is never stuck under a board), and the host can start and pause the film (`{ depict: "play" }`, `{ depict: "pause" }`) and show its own start button instead of the page's (`&nostart`).
 - A series gives each board a cover, `site/<id>-cover.png`: the frame of its own film where its first picture is complete and the camera holds on it, the guide beside it (`meta.cover` names another beat). The gallery's tiles for a child show it: a whole board shrunk to a tile is too small to read.
+- A series builds while someone else writes another board in the same folder: a board that does not load (half written, or broken) no longer stops the others; its own build says why it fails.
+- Stuart is a boy, as Niki made him: he wears what a boy would, so the hair bow is no longer his to wear (a board that asks for it is refused with what he has); the marker keeps it.
 
 ## 0.4.0
 

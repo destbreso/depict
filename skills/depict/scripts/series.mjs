@@ -41,10 +41,16 @@ const root = path.resolve(folder);
 const check = !args.includes("--no-check");
 const cfgFile = path.join(root, "series.mjs");
 const cfg = fs.existsSync(cfgFile) ? (await import(pathToFileURL(cfgFile).href)).default : {};
+// a board that does not load (being written by someone else, or broken) still lets the others build; its own build
+// says why it does not
 const metaOf = async (id) => {
   const file = path.join(root, "boards", id, "board.mjs");
-  const mod = await import(`${pathToFileURL(file).href}?t=${Date.now()}`);
-  return { meta: mod.meta ?? {}, title: mod.default?.title };
+  try {
+    const mod = await import(`${pathToFileURL(file).href}?t=${Date.now()}`);
+    return { meta: mod.meta ?? {}, title: mod.default?.title };
+  } catch {
+    return { meta: {}, title: undefined };
+  }
 };
 const numberIn = (id) => Number(id.match(/(\d+)(?!.*\d)/)?.[1] ?? Infinity);
 const found = fs.readdirSync(path.join(root, "boards")).filter((d) => fs.existsSync(path.join(root, "boards", d, "board.mjs")));
