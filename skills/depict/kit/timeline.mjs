@@ -25,6 +25,7 @@ export const PACE = {
   part: 0.12, // between parts of one element
   element: 0.28, // between elements
   hold: 0.55, // after a beat's drawing
+  still: 0.3, // of the hold, the beat's picture whole and nothing moving on: its picture is taken here
   regionHold: 0.7, // more when the next beat moves to another region
   readBase: 0.5, // a caption takes readBase + chars / readRate seconds to read
   readRate: 16,
@@ -90,9 +91,24 @@ const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1 && Math.abs(a[2]
  * Times the board. Returns { strokes, beats, camera, duration, overview }:
  * strokes in drawing order with t0 and t1; beats with their span and shot;
  * camera keys (flights between shots). Every element keeps the shot it was
- * drawn in, for the audit.
+ * drawn in, for the audit. A beat whose guide steps to a new place before the
+ * pen begins gets the moment its step takes: the board is timed again with it.
  */
 export function time(board, comp) {
+  const lead = new Map();
+  let tl;
+  for (let pass = 0; pass < 3; pass++) {
+    tl = run(board, comp, lead, pass < 2);
+    const needs = tl.actors[0]?.needs;
+    if (!needs?.size || pass === 2) break;
+    for (const [bi, s] of needs) lead.set(bi, (lead.get(bi) ?? 0) + s);
+  }
+  if (board.outro) outro(board, comp, tl);
+  return tl;
+}
+
+/** One timing of the board, with `lead` seconds (by beat index) before a beat's pen begins. */
+function run(board, comp, lead, provisional) {
   // a child reads more slowly than an adult: longer holds, more time per caption, a little more between things
   const P = PACE;
   const cellsOf = new Map(board.regions.filter((r) => r.layout === "cells" || r.layout === "stack").flatMap((r) => r.items.filter((it) => it.under == null).map((it) => [it.id, r.id])));
@@ -150,6 +166,8 @@ export function time(board, comp) {
       toward = e.joins ? null : e.region;
       go(next);
       e.shot = next;
+      // the moment the guide's step takes, once the camera is there
+      if (ei === 0) t += lead.get(bi) ?? 0;
       drawStart ??= t;
       e.beat = bi;
       if (e.kind === "guide") {
@@ -207,7 +225,7 @@ export function time(board, comp) {
     const nextBeat = board.beats[bi + 1];
     const moves = nextBeat?.draw.length && !same(shot, shotFor(board, comp, comp.elements.get(nextBeat.draw[0])));
     t = Math.max(drawEnd + P.hold, drawStart + read) + (moves ? P.regionHold : 0);
-    beats.push({ say: beat.say, t0: start, draw0: drawStart, draw1: drawEnd, t1: t, shot });
+    beats.push({ say: beat.say, t0: start, draw0: drawStart, draw1: drawEnd, still: Math.min(drawEnd + P.still, t - 0.05), t1: t, shot });
   });
   // the overview: the whole board, held
   const overview = shotOf(comp.extent);
@@ -217,8 +235,7 @@ export function time(board, comp) {
   const explore = t + dur; // the board complete: where the page rests when the film is over
   t = explore + P.overviewHold;
   const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [], explore };
-  if (appear) result.actors.push(perform(board, comp, result, appear));
-  if (board.outro) outro(board, comp, result);
+  if (appear) result.actors.push(perform(board, comp, result, appear, { provisional }));
   return result;
 }
 

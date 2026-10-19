@@ -6,7 +6,7 @@ import { bounds, lengthOf, overlaps, pad, union } from "./geom.mjs";
 import { SIZE } from "./compose.mjs";
 import { cameraAt, safeArea } from "./camera.mjs";
 import { actorAt } from "./act.mjs";
-import { reachAbove } from "./rig.mjs";
+import { feetBox, reachAbove, spotBox } from "./rig.mjs";
 
 const VW = 1920; // a shot fills this many pixels across in the video
 
@@ -251,6 +251,47 @@ export function audit(board, comp, tl) {
       if (by > 6 && (!worst || by > worst.by)) worst = { t, side, by };
     }
     if (worst) problem("guide", `at ${worst.t.toFixed(2)} s the guide is cut by the ${worst.side} of the picture, by ${Math.round(worst.by)} units: give the idea it stands beside more room, or fewer things at that edge`);
+
+    // where it stands still, it stands on free paper: not on a thing, against it, or with its feet on top of it (it
+    // would seem to stand on it, as on a shelf), counting what is drawn while it stands there
+    const first = new Map();
+    for (const st of tl.strokes) if (!first.has(st.el)) first.set(st.el, st.t0);
+    const moving = A.track.moves.filter((m) => m.from[0] !== m.to[0] || m.from[1] !== m.to[1]).sort((a, b) => a.t0 - b.t0);
+    const rests = [{ at: { x: A.track.start[0], y: A.track.start[1], facing: A.track.start[2] }, t0: A.track.appear[0], t1: moving[0]?.t0 ?? end }];
+    moving.forEach((m, i) => rests.push({ at: { x: m.to[0], y: m.to[1], facing: m.land }, t0: m.t1, t1: moving[i + 1]?.t0 ?? end }));
+    const said = new Set();
+    for (const r of rests) {
+      if (r.t1 - r.t0 < 0.3) continue; // a touch between two hops
+      const q = { ...r.at, top: reachAbove(board.cast) };
+      const body = pad(spotBox(q, A.h, M), -6);
+      const feet = feetBox(q, A.h, M);
+      const under = [...els.values()].find((e) => e.kind !== "guide" && e.kind !== "mark" && e.box && (first.get(e.id) ?? Infinity) < r.t1 && (overlaps(body, e.box) || (e.box.y >= q.y - 4 && overlaps(feet, e.box))));
+      if (under && !said.has(under.id)) {
+        said.add(under.id);
+        warn("stand", `at ${r.t0.toFixed(2)} s the guide stands ${overlaps(body, under.box) ? "on" : "with its feet on top of"} "${under.id}": give the idea it stands beside free paper at that side (another layout, or that thing elsewhere)`);
+      }
+    }
+  }
+
+  // a shot shows the things of other ideas whole or not at all: a slice of the next idea at the edge reads as a mistake
+  {
+    const said = new Set();
+    tl.beats.forEach((bt, i) => {
+      const v = safeArea(bt.shot);
+      const here = new Set(board.beats[i].draw.map((id) => els.get(id)?.region).filter(Boolean));
+      for (const e of els.values()) {
+        if (!e.region || here.has(e.region) || e.joins || e.kind === "guide" || (e.beat ?? Infinity) > i) continue;
+        const b = e.box;
+        const w = Math.min(v.x + v.w, b.x + b.w) - Math.max(v.x, b.x);
+        const h = Math.min(v.y + v.h, b.y + b.h) - Math.max(v.y, b.y);
+        const whole = b.x >= v.x - 1 && b.y >= v.y - 1 && b.x + b.w <= v.x + v.w + 1 && b.y + b.h <= v.y + v.h + 1;
+        if (w > 12 && h > 12 && !whole && !said.has(e.id)) {
+          said.add(e.id);
+          const side = b.x < v.x ? "left" : b.x + b.w > v.x + v.w ? "right" : b.y < v.y ? "top" : "bottom";
+          warn("edge", `beat ${i + 1}: the shot cuts "${e.id}" (of "${e.region}") at its ${side} edge: more room between the two ideas, or that thing elsewhere`);
+        }
+      }
+    });
   }
 
   // the closing map: its titles at least must read in the overview

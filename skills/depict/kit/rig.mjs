@@ -78,6 +78,12 @@ export const GUIDE = { back: 0.32, reach: 0.56, front: 0.36 };
 /** The paper the guide takes on a spot, at rest (hands on its hips), facing either way, for a character's measures. */
 export const spotBox = (q, h, m = GUIDE) => ({ x: q.x - (q.facing > 0 ? m.back : m.front) * h, y: q.y - h * (1 + (q.top ?? 0)), w: (m.back + m.front) * h, h: h * (1 + (q.top ?? 0)) });
 
+/** The paper right under its feet at q: a thing there is what it seems to stand on, as on a shelf. */
+export const feetBox = (q, h, m = GUIDE) => {
+  const b = spotBox(q, h, m);
+  return { x: b.x + b.w * 0.2, y: q.y, w: b.w * 0.6, h: 0.25 * h };
+};
+
 /** The marker's poses: every character has its own, for its own body (references/characters.md). */
 export const POSES = characterOf({}).poses;
 export const ACTS = ["point", "wave", "cheer", "shrug", "scratch", "present", "rest"];

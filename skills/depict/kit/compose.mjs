@@ -8,7 +8,7 @@ import * as ink from "./ink.mjs";
 import { widest, write } from "./hand.mjs";
 import { icon } from "./icons.mjs";
 import { person, TINTS } from "./people.mjs";
-import { reachAbove, rig, spotBox } from "./rig.mjs";
+import { feetBox, reachAbove, rig, spotBox } from "./rig.mjs";
 import { characterOf } from "./characters/index.mjs";
 import { INTRO_HEIGHT } from "./perform.mjs";
 import { flattenPath } from "./svgpath.mjs";
@@ -490,9 +490,10 @@ function badge(board, font, S, id, n, cx, cy, r) {
 /**
  * Where the guide stands in a region: beside its title, beside its items, or
  * after them, whichever leaves it on free paper and inside the region's shot,
- * facing into the region. When none is free, the least crowded.
+ * facing into the region, and never with its feet on top of a thing (it would
+ * seem to stand on it). When none is free, the least crowded.
  */
-function freeSpot(r, elements, taken, h, top = 0, M) {
+function freeSpot(r, elements, taken, h, top = 0, M, shoulder = [0.3, 0.55]) {
   const tb = elements.get(r.id)?.box;
   const items = r.items.map((id) => elements.get(id).box);
   const content = items.reduce((b, x) => union(b, x), null);
@@ -502,14 +503,20 @@ function freeSpot(r, elements, taken, h, top = 0, M) {
   cands.push({ x: content.x - 40 - M.front * h, y: ground, facing: 1, top });
   cands.push({ x: content.x + content.w + 40 + M.front * h, y: ground, facing: -1, top });
   if (tb) cands.push({ x: tb.x + tb.w + 40 + M.front * h, y: tb.y + tb.h + 40, facing: -1, top }); // after the title, facing back into the idea
+  // at the title's height but past the items, either side, where nothing is under its feet
+  if (tb) cands.push({ x: content.x + content.w + 40 + M.front * h, y: tb.y + tb.h + 40, facing: -1, top }, { x: content.x - 40 - M.front * h, y: tb.y + tb.h + 40, facing: 1, top });
+  const drawn = [...elements.values()].filter((e) => e.kind !== "guide" && e.kind !== "mark" && e.box).map((e) => e.box);
+  const area = (b, o) => {
+    const w = Math.min(b.x + b.w, o.x + o.w) - Math.max(b.x, o.x);
+    const hh = Math.min(b.y + b.h, o.y + o.h) - Math.max(b.y, o.y);
+    return w > 0 && hh > 0 ? w * hh : 0;
+  };
   const clash = (q) => {
     const b = spotBox(q, h, M);
+    const feet = feetBox(q, h, M);
     let a = 0;
-    for (const o of taken) {
-      const w = Math.min(b.x + b.w, o.x + o.w) - Math.max(b.x, o.x);
-      const hh = Math.min(b.y + b.h, o.y + o.h) - Math.max(b.y, o.y);
-      if (w > 0 && hh > 0) a += w * hh;
-    }
+    for (const o of taken) a += area(b, o);
+    for (const o of drawn) if (o.y >= q.y - 4) a += area(feet, o);
     return a;
   };
   // on free paper, and of those the one that widens the region's shot the least (the larger the shot, the smaller its
@@ -526,9 +533,42 @@ function freeSpot(r, elements, taken, h, top = 0, M) {
     const f = fit169(union(r.frame, pad(spotBox(q, h, M), 30)));
     return f.w * f.h - r.frame.w * r.frame.h + 3 * (intrudes(f) - already);
   };
+  // and from where its hand reaches the most of what the idea holds along a clear line: a line from its shoulder (it
+  // turns to what is behind it) to a thing's middle that meets another thing of the idea first seems to point at that
+  const things = [...(tb ? [tb] : []), ...items];
+  const holdsBox = (o, t) => o.x <= t.x && o.y <= t.y && o.x + o.w >= t.x + t.w && o.y + o.h >= t.y + t.h;
+  const near = (b, x, y) => x > b.x - 6 && x < b.x + b.w + 6 && y > b.y - 6 && y < b.y + b.h + 6;
+  const hidden = (q) => {
+    let n = 0;
+    for (const t of things) {
+      const [cx, cy] = [t.x + t.w / 2, t.y + t.h / 2];
+      const f = Math.sign(cx - q.x) || q.facing;
+      const [sx, sy] = [q.x + f * shoulder[0] * h, q.y + (shoulder[1] - 0.99) * h];
+      const d = Math.hypot(cx - sx, cy - sy) || 1;
+      const others = things.filter((o) => o !== t && !holdsBox(o, t));
+      for (let k = 0; k < d; k += 8) {
+        const [x, y] = [sx + ((cx - sx) * k) / d, sy + ((cy - sy) * k) / d];
+        if (near(t, x, y)) break;
+        if (others.some((o) => near(o, x, y))) {
+          n++;
+          break;
+        }
+      }
+    }
+    return n;
+  };
+  const frameArea = r.frame.w * r.frame.h;
+  // and never where the shot it widens makes the idea's words too small to read comfortably (18 px on a 1920 frame),
+  // or leaves its things filling less than a tenth of it
+  const letters = lettersOf([...elements.values()].filter((e) => e.region === r.id && !e.joins && e.kind !== "title" && e.kind !== "guide"));
+  const filled = items.reduce((a, b) => a + b.w * b.h, 0);
+  const small = (q) => {
+    const f = fit169(union(r.frame, pad(spotBox(q, h, M), 30)));
+    return pxIn(letters, f) < Math.min(18, pxIn(letters, r.frame)) || filled / (f.w * f.h) < Math.min(0.1, filled / (r.frame.w * r.frame.h));
+  };
   let best = null;
   cands.forEach((q, i) => {
-    const score = clash(q) * 1e3 + cost(q) + i; // ties keep the order: beside the title first
+    const score = clash(q) * 1e3 + (small(q) ? 1e12 : 0) + cost(q) + hidden(q) * 0.12 * frameArea + i; // ties keep the order: beside the title first
     if (!best || score < best.score) best = { q, score };
   });
   return { region: r.id, ...best.q };
@@ -550,8 +590,20 @@ function frameFor(box) {
  * frame, the shot that shows it, is its content with air round it; the edge of
  * a neighbour may show in it.
  */
+/**
+ * The gap between one idea and the next on a canvas: twice the gap inside one, and never less than room for the guide
+ * standing beside an idea with air round it (its own frame's and its shot's), so the shot of one idea stops short of
+ * the next one instead of cutting a slice off it.
+ */
+function regionGap(board) {
+  if (!board.guide) return SIZE.regionGap;
+  const C = characterOf(board.cast);
+  const h = SIZE.guide * (C.size ?? 1);
+  return Math.max(SIZE.regionGap, Math.round((C.measures.back + C.measures.front) * h + 190));
+}
+
 function placeMural(board, laid) {
-  const gap = SIZE.regionGap;
+  const gap = regionGap(board);
   const n = laid.length;
   // how far below a region's top its title line is (the first region carries the board's title and the guide above its own)
   const off = laid.map((r) => (r.title ? r.title.box.y : r.box.y) - r.box.y);
@@ -650,7 +702,7 @@ function placeRegions(board, laid) {
   }
   // the ideas (or the sheets) in the order they are told, read as a page: left to right, then the next row down
   const boxes = laid.map((r) => (slides ? { w, h, line: 0 } : { w: r.box.w, h: r.box.h, line: (r.title ? r.title.box.y : r.box.y) - r.box.y }));
-  const at = layPage(boxes, slides ? SIZE.sheetGap : SIZE.regionGap, slides ? SIZE.sheetGap : SIZE.rowGap);
+  const at = layPage(boxes, slides ? SIZE.sheetGap : regionGap(board), slides ? SIZE.sheetGap : SIZE.rowGap);
   return laid.map((r, i) => {
     const [x, y] = at[i];
     if (slides) {
@@ -757,6 +809,15 @@ function leave(e, tx, ty, gap) {
 }
 
 /** A frame grown to 16:9 about its center. */
+/** The smallest letters an idea's things are written in, in board units (its notes, labels, title, the words inside its drawings). */
+const lettersOf = (things) =>
+  Math.min(
+    ...things.map((e) => (e.kind === "item" ? (e.parts.some((p) => p.role === "note") ? SIZE.note : SIZE.label) * (e.zoom ?? 1) : e.kind === "note" ? SIZE.note : e.kind === "region" ? SIZE.regionTitle : Infinity)),
+    ...things.flatMap((e) => (e.kind === "item" ? e.parts.filter((p) => p.role === "text" && p.size).map((p) => p.size) : [])),
+  );
+/** How tall letters of size `size` are on a 1920 x 1080 frame, in the shot of a frame f (the frame and 40 round it, 16:9). */
+const pxIn = (size, f) => (size * 1920) / Math.max(f.w + 80, ((f.h + 80) * 16) / 9);
+
 const fit169 = (f) => {
   const w = Math.max(f.w, (f.h * 16) / 9);
   const h = (w * 9) / 16;
@@ -998,7 +1059,7 @@ export function compose(board, font) {
     const spots = [guideStart];
     for (const r of regions) {
       if (r.id === guideStart.region && board.mode === "slides") continue;
-      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast), characterOf(board.cast).measures)) };
+      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast), characterOf(board.cast).measures, characterOf(board.cast).shoulders?.front)) };
       spots.push(spot);
       taken.push(pad(spotBox(spot, h, characterOf(board.cast).measures), 10));
     }
@@ -1023,7 +1084,7 @@ export function compose(board, font) {
       let own = mine.reduce((b, e) => union(b, e.box), null);
       const spot = guide?.spots.filter((q) => q.region === r.id).at(-1);
       if (spot) own = union(own, spotBox(spot, guide.h, guide.measures));
-      const others = [...elements.values()].filter((e) => e.region && e.region !== r.id && !e.joins && e.kind !== "mark" && e.kind !== "guide").map((e) => e.box);
+      const others = [...elements.values()].filter((e) => e.region && e.region !== r.id && !e.joins && e.kind !== "guide").map((e) => e.box); // a neighbour's circles and underlines too
       // what a shot takes in of the other ideas: a thing of theirs it shows whole counts its size, and one it cuts
       // through counts twice its whole size, however thin the slice (a cut-off word at the edge reads as a mistake)
       const cost = (f) => {
@@ -1036,16 +1097,44 @@ export function compose(board, font) {
           return a + (whole ? b.w * b.h : 2 * b.w * b.h);
         }, 0);
       };
-      const f = r.frame;
-      let best = { f, c: cost(f) };
-      if (best.c === 0) continue;
-      const [xlo, xhi] = [own.x + own.w + 20 - (f.x + f.w), own.x - 20 - f.x];
-      const [ylo, yhi] = [own.y + own.h + 20 - (f.y + f.h), own.y - 20 - f.y];
-      for (const ux of [0, 0.25, 0.5, 0.75, 1])
-        for (const uy of [0, 0.25, 0.5, 0.75, 1]) {
-          const g = { ...f, x: f.x + (xlo <= xhi ? xlo + (xhi - xlo) * ux : 0), y: f.y + (ylo <= yhi ? ylo + (yhi - ylo) * uy : 0) };
-          const c = cost(g);
-          if (c < best.c - 1) best = { f: g, c };
+      // what it cuts through: a thing of another idea partly in its shot
+      const cuts = (f) => {
+        const s = pad(f, 40);
+        return others.some((b) => {
+          const w = Math.min(s.x + s.w, b.x + b.w) - Math.max(s.x, b.x);
+          const h = Math.min(s.y + s.h, b.y + b.h) - Math.max(s.y, b.y);
+          return w > 0 && h > 0 && !(b.x >= s.x && b.y >= s.y && b.x + b.w <= s.x + s.w && b.y + b.h <= s.y + s.h);
+        });
+      };
+      const slide = (f) => {
+        let best = { f, c: cost(f) };
+        if (best.c === 0) return best;
+        const [xlo, xhi] = [own.x + own.w + 20 - (f.x + f.w), own.x - 20 - f.x];
+        const [ylo, yhi] = [own.y + own.h + 20 - (f.y + f.h), own.y - 20 - f.y];
+        for (const ux of [0, 0.25, 0.5, 0.75, 1])
+          for (const uy of [0, 0.25, 0.5, 0.75, 1]) {
+            const g = { ...f, x: f.x + (xlo <= xhi ? xlo + (xhi - xlo) * ux : 0), y: f.y + (ylo <= yhi ? ylo + (yhi - ylo) * uy : 0) };
+            const c = cost(g);
+            if (c < best.c - 1) best = { f: g, c };
+          }
+        return best;
+      };
+      let best = slide(r.frame);
+      // when no place in its room is clear of a cut, the shot takes a little more paper (a few steps, up to 15% wider),
+      // so the neighbour's thing at its edge is whole in it, or out of it; but only while its own words still read (18
+      // px or more on a 1920 frame) and its items still fill a tenth of it
+      const letters = lettersOf(mine);
+      const filled = r.items.reduce((a, id) => a + elements.get(id).box.w * elements.get(id).box.h, 0);
+      const reads = (f) => pxIn(letters, f) >= 18 && filled / (f.w * f.h) >= 0.1;
+      if (best.c > 0 && cuts(best.f))
+        for (const k of [1.03, 1.06, 1.09, 1.12, 1.15]) {
+          const f = r.frame;
+          const g = slide({ x: f.x + (f.w * (1 - k)) / 2, y: f.y + (f.h * (1 - k)) / 2, w: f.w * k, h: f.h * k });
+          if (!reads(g.f)) break;
+          if (!cuts(g.f)) {
+            best = g;
+            break;
+          }
         }
       r.frame = best.f;
     }

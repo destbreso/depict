@@ -19,6 +19,8 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 | load | warning over 4 things | New things in one beat | Split the beat |
 | hook | warning over 7 s (10 s with the guide, whose hello counts as the opening picture) | The first beat's drawing time | Open with a picture; move a long title or a second item to the next beat |
 | guide | problem | The guide whole inside the picture whenever the camera holds still, its hat and its hops included, from when it appears to when the circle closes on it (the kit keeps it so: it lands as the camera arrives, never hops higher than the shot has room for, and steps only to free paper inside the shot and on the board) | Give the idea it stands beside more room, or fewer things at that edge |
+| stand | warning | Wherever the guide stands still, it is on free paper: not on a thing, against one, or with its feet on top of one, counting what is drawn while it stands there (the kit chooses such places, and warns where an idea leaves it none) | Free paper at the side of the idea where it stands: another layout, or that thing elsewhere |
+| edge | warning | A held shot shows another idea's things whole or not at all, never a slice at its edge (the kit sets the ideas apart and slides each shot to keep them so) | More room between the two ideas, or that thing elsewhere |
 | focal | warning | A region of two or more items where none is large, a character, a sketch, framed or marked | Draw the thing the region is about as a large sketch, or frame or mark it |
 | sparse | warning under 10% | How much of a region's shot its drawing covers: its items, each line as the band of paper it marks, and a drawing of two or more linked things (a tree, a graph) as the paper it spans | Draw the idea as a scene, make the key item large, merge a thin region into another |
 | tangle | warning | Two lines crossing (arrows) | Put the item between the other two, link fewer things, or say the connection in the sentence |
@@ -30,7 +32,7 @@ Two checks run before anyone sees a board. The audit measures it; the check look
 
 ## The check
 
-`node scripts/check.mjs board.html` opens the page in headless Chrome, pictures the board at the end of every beat (as the video shows it, 1920 x 1080), the closing overview and the page with its controls, and fails on any error the page logs. The pictures land in `shots/` next to the page.
+`node scripts/check.mjs board.html` opens the page in headless Chrome, pictures the board at the end of every beat (as the video shows it, 1920 x 1080: the moment its picture is whole and the guide still beside it, the beat's `still`), the closing overview and the page with its controls, and fails on any error the page logs. The pictures land in `shots/` next to the page.
 
 Read them as the artist. For each beat's picture, ask:
 

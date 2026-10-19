@@ -625,3 +625,106 @@ test("the guide is whole in the picture whenever the camera holds still, and the
   assert.ok(f && f.level === "problem", "a guide out of the picture is a problem");
   assert.match(f.text, /cut by the left of the picture/);
 });
+
+test("a step never crosses what is drawn: it leaves once its beat has begun, and every beat's picture holds the guide still", async () => {
+  const { spotBox, reachAbove } = await import("../skills/depict/kit/rig.mjs");
+  const { overlaps, pad } = await import("../skills/depict/kit/geom.mjs");
+  // a row of four things told one at a time, where the way to the last crosses the ones between; and the examples
+  const row = {
+    title: "A row",
+    cast: { character: "stuart" },
+    regions: [{ id: "r", title: "Four in a row", layout: "row", items: ["a", "b", "c", "d"].map((id, i) => ({ id, sketch: ["M10 10 H90 V90 H10 Z"], label: `Thing ${i + 1}` })) }],
+    beats: [
+      { say: "Here is the first thing.", draw: ["title", "r", "a"] },
+      { say: "Then a second one, beside it.", draw: ["b"] },
+      { say: "A third one comes after.", draw: ["c"] },
+      { say: "And the last one, at the end.", draw: ["d"] },
+    ],
+  };
+  const boards = [row, ...(await Promise.all(examples.map(load)))];
+  let steps = 0;
+  for (const input of boards) {
+    const { board, comp, tl } = build(input);
+    const [guide] = tl.actors;
+    if (!guide) continue;
+    const M = guide.rig.measures;
+    const top = reachAbove(board.cast);
+    const first = new Map();
+    for (const s of tl.strokes) if (!first.has(s.el)) first.set(s.el, s.t0);
+    const moving = guide.track.moves.filter((m) => m.from[0] !== m.to[0] || m.from[1] !== m.to[1]);
+    for (const m of moving.filter((m) => m.step)) {
+      steps++;
+      const beat = tl.beats.find((b) => b.t0 <= m.t1 && m.t1 < b.t1);
+      assert.ok(m.t0 >= beat.t0 - 1e-6, `${board.title}: the step at ${m.t0.toFixed(2)} s leaves once its beat has begun`);
+      const from = { x: m.from[0], y: m.from[1], facing: m.facing, top };
+      const to = { x: m.to[0], y: m.to[1], facing: m.facing, top };
+      const ends = [spotBox(from, guide.h, M), spotBox(to, guide.h, M)];
+      const drawn = [...comp.elements.values()].filter((e) => e.kind !== "guide" && e.box && (first.get(e.id) ?? Infinity) <= m.t1 && !ends.some((b) => overlaps(b, e.box)));
+      for (let k = 1; k < 12; k++) {
+        const u = k / 12;
+        const at = { x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u - m.height * 4 * u * (1 - u), facing: m.facing, top };
+        const body = pad(spotBox(at, guide.h, M), -10);
+        for (const e of drawn) assert.ok(!overlaps(body, e.box), `${board.title}: the step at ${m.t0.toFixed(2)} s passes over "${e.id}"`);
+      }
+    }
+    for (const [i, b] of tl.beats.entries()) {
+      assert.ok(b.still >= b.draw1 && b.still < b.t1, `${board.title}: beat ${i + 1}'s picture is taken once it is drawn, before the beat ends`);
+      assert.ok(!moving.some((m) => m.t0 < b.still && b.still < m.t1), `${board.title}: beat ${i + 1}'s picture holds the guide still`);
+    }
+  }
+  assert.ok(steps > 0, "some board stepped");
+});
+
+test("the guide stands on free paper: not on a thing, against it, or with its feet on top of it", async () => {
+  const { spotBox, feetBox } = await import("../skills/depict/kit/rig.mjs");
+  const { overlaps, pad } = await import("../skills/depict/kit/geom.mjs");
+  // a short title over a row of things wider than it: just past the title, its feet would be on the row
+  const shelf = {
+    title: "A shelf",
+    cast: { character: "stuart" },
+    regions: [{ id: "r", title: "Row", layout: "row", items: ["a", "b", "c", "d"].map((id, i) => ({ id, sketch: ["M0 0 H100 V100 H0 Z"], label: `Thing ${i + 1}` })) }],
+    beats: [
+      { say: "Here is a row of things.", draw: ["title", "r", "a", "b"] },
+      { say: "And two more things.", draw: ["c", "d"] },
+    ],
+  };
+  for (const input of [shelf, ...(await Promise.all(examples.map(load)))]) {
+    const { board, comp } = build(input);
+    if (!comp.guide) continue;
+    const drawn = [...comp.elements.values()].filter((e) => e.kind !== "guide" && e.kind !== "mark" && e.box);
+    for (const q of comp.guide.spots.slice(1)) {
+      const body = pad(spotBox(q, comp.guide.h, comp.guide.measures), -4);
+      const feet = feetBox(q, comp.guide.h, comp.guide.measures);
+      for (const e of drawn) {
+        assert.ok(!overlaps(body, e.box), `${board.title}: it stands on "${e.id}" in ${q.region}`);
+        assert.ok(e.box.y < q.y - 4 || !overlaps(feet, e.box), `${board.title}: its feet are on top of "${e.id}" in ${q.region}`);
+      }
+    }
+  }
+});
+
+test("the audit warns where the guide stands on a thing, and where a shot cuts a thing of another idea at its edge", () => {
+  const two = {
+    title: "Two ideas",
+    regions: [
+      { id: "one", title: "The first idea", items: [{ id: "a", icon: "cpu", label: "One" }] },
+      { id: "two", title: "The second idea", items: [{ id: "b", icon: "database", label: "Two" }] },
+    ],
+    beats: [
+      { say: "Here is the first idea.", draw: ["title", "one", "a"] },
+      { say: "And here is the second.", draw: ["two", "b"] },
+    ],
+  };
+  const { board, comp, tl } = build(two);
+  assert.ok(!audit(board, comp, tl).some((f) => f.rule === "stand" || f.rule === "edge"), "as the kit builds it, neither");
+  // the guide put down on the first thing, and the second beat's shot moved so its edge runs through it
+  const [guide] = tl.actors;
+  const a = comp.elements.get("a").box;
+  guide.track.start = [a.x + a.w / 2, a.y + a.h / 2, 1];
+  guide.track.moves = [];
+  const [, , w] = tl.beats[1].shot;
+  tl.beats[1].shot = [a.x + a.w + w / 2 - a.w / 2, a.y + a.h / 2, w];
+  const found = audit(board, comp, tl);
+  assert.match(found.find((f) => f.rule === "stand")?.text ?? "", /the guide stands (on|with its feet on top of) "(a|one)"/);
+  assert.match(found.find((f) => f.rule === "edge")?.text ?? "", /beat 2: the shot cuts "(a|one|title)" \(of "one"\) at its (left|top) edge/);
+});

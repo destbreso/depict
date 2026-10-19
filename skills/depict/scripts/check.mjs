@@ -2,9 +2,10 @@
 // Looks at a board's page in a real browser: node scripts/check.mjs <page.html> [--out shots]
 //
 // Takes a picture of the board at the end of every beat (as the video shows
-// it, 1920 x 1080), of the closing overview, and of the page itself with its
-// controls; fails on any error the page logs. Read the pictures before
-// handing the board over: the audit measures, the pictures show.
+// it, 1920 x 1080: its picture whole, the guide still where it presented it),
+// of the closing overview, and of the page itself with its controls; fails on
+// any error the page logs. Read the pictures before handing the board over:
+// the audit measures, the pictures show.
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,7 +32,7 @@ const board = await open(`${url}?capture`, { width: 1920, height: 1080, scale: 1
 const beats = await board.evaluate("depict.beats");
 const duration = await board.evaluate("depict.duration");
 for (const [n, b] of beats.entries()) {
-  await board.evaluate(`depict.render(${Math.min(b.t1 - 0.05, b.draw1 + 0.3)}); new Promise(r => requestAnimationFrame(() => r()))`);
+  await board.evaluate(`depict.render(${b.still ?? Math.min(b.t1 - 0.05, b.draw1 + 0.3)}); new Promise(r => requestAnimationFrame(() => r()))`);
   shots.push(await board.shot(path.join(dir, `${name}-beat-${String(n + 1).padStart(2, "0")}.png`)));
 }
 const explore = (await board.evaluate("depict.explore")) ?? duration;

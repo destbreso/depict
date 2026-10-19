@@ -9,16 +9,23 @@
 // cheers). A beat can set how it feels (`feel`) and what it does (`act`).
 // Blinks come at the guide's own uneven pace, from the board's seed.
 import { splitmix32 } from "./rng.mjs";
-import { FEELINGS, reachAbove, spotBox } from "./rig.mjs";
+import { FEELINGS, feetBox, reachAbove, spotBox } from "./rig.mjs";
 import { overlaps, pad } from "./geom.mjs";
 
 /** The acts that aim at a thing: past something in the way they would seem to aim at that, so there it only looks. */
 const AIMED = new Set(["point", "present"]);
-/** How long a step to another place takes, in seconds, and how soon after one another can come. */
-const STEP = { time: 0.5, gap: 2 };
+/**
+ * A step to another place: how long one hop takes, in seconds, and each of two when it goes round what is in its way;
+ * how soon after another one can come; and how high a hop may go to pass over what lies on its way.
+ */
+const STEP = { time: 0.45, hop: 0.36, gap: 2, clear: 150 };
 
-/** The actor for the page: its rig and its track. */
-export function perform(board, comp, tl, appear) {
+/**
+ * The actor for the page: its rig and its track, and `needs`: the beats whose step had no time before the pen began
+ * (beat index to the seconds it lacked), for the timeline to give them. A step that lacks time is taken all the same
+ * when `provisional` (the timeline times the board again with that time given), and left out when not.
+ */
+export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   const g = comp.guide;
   const els = comp.elements;
   const spotOf = new Map(g.spots.map((s) => [s.region, s]));
@@ -185,7 +192,11 @@ export function perform(board, comp, tl, appear) {
 
   // its steps: when something drawn earlier stands between it and what a beat draws, it steps (one small hop) to free
   // paper beside or under that thing, inside the shot, from where it sees the most of what the beat draws, the nearest
-  // such place first. One step a beat at most, never two within two seconds, never on its way between ideas.
+  // such place first. A step is its beat's: it leaves once the beat has begun (the last beat's picture seen whole and
+  // still) and lands as the pen begins, and it never crosses what is drawn, for a body that covers a thing, even in
+  // passing, hides it while the camera holds still on it: it hops over what is low enough, or goes round in two hops
+  // by free paper, or does not go. One step a beat at most, never two within two seconds, never on its way between
+  // ideas.
   const taken = [...els.values()].filter((e) => e.kind !== "guide").map((e) => pad(e.box, 18));
   const top = reachAbove(board.cast);
   const shotAt = (t) => {
@@ -193,8 +204,16 @@ export function perform(board, comp, tl, appear) {
     for (const k of tl.camera) if (t >= k.t0) shot = k.to;
     return shot;
   };
+  const viewOf = (shot) => shot && { x: shot[0] - shot[2] / 2, y: shot[1] - (shot[2] * 9) / 32, w: shot[2], h: (shot[2] * 9) / 16 };
+  // free paper: nothing drawn on it or right under its feet (it would seem to stand on that), inside the shot
+  const drawnBoxes = [...els.values()].filter((e) => e.kind !== "guide" && e.kind !== "mark" && e.box).map((e) => e.box);
+  const free = (q, view) => {
+    const b = spotBox(q, g.h, M);
+    const feet = feetBox(q, g.h, M);
+    return taken.every((o) => !overlaps(b, o)) && drawnBoxes.every((o) => o.y < q.y - 4 || !overlaps(feet, o)) && (!view || holds(pad(view, -20), b)) && holds(pad(comp.extent, -10), b);
+  };
   const placesBy = (tbox, shot) => {
-    const view = shot && { x: shot[0] - shot[2] / 2, y: shot[1] - (shot[2] * 9) / 32, w: shot[2], h: (shot[2] * 9) / 16 };
+    const view = viewOf(shot);
     const foot = tbox.y + tbox.h;
     const qs = [];
     for (const dx of [0.45, 0.75]) qs.push({ x: tbox.x - 30 - dx * g.h, y: foot, facing: 1, top }, { x: tbox.x + tbox.w + 30 + dx * g.h, y: foot, facing: -1, top });
@@ -210,10 +229,7 @@ export function perform(board, comp, tl, appear) {
       for (const dx of [-0.5, 0.5]) qs.push({ x: tbox.x + tbox.w / 2 + dx * g.h, y: floor, facing: dx < 0 ? 1 : -1, top });
     }
     // free paper, inside the shot, and on the board: the closing picture of the whole board holds it too
-    return qs.filter((q) => {
-      const b = spotBox(q, g.h, M);
-      return taken.every((o) => !overlaps(b, o)) && (!view || holds(pad(view, -20), b)) && holds(pad(comp.extent, -10), b);
-    });
+    return qs.filter((q) => free(q, view));
   };
   // how well a place serves a gesture: best when its finger reaches the thing along a clear line, still good when the
   // thing is out of reach but nothing is in the way, no good when something is
@@ -224,33 +240,94 @@ export function perform(board, comp, tl, appear) {
     return Math.hypot(dx, dy) <= g.rig.reach * g.h + tip;
   };
   const serves = (q, x) => (inTheWay(q, x.tid, x.tbox, x.until) ? 0 : within(q, x.tbox) ? 2 : 1);
+  // a hop's arc, at u of the way; and how high a hop from a to b must go so that its body passes over everything drawn
+  // by t (null when no hop it may make does). What its body touches where it stands, at either end, is not in its way.
+  const arcAt = (a, b, height, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u - height * 4 * u * (1 - u), facing: Math.sign(b.x - a.x) || a.facing, top });
+  const clearHop = (a, b, shot, t) => {
+    // no higher than the shot has room for over either end: the arc is highest between them
+    const ceiling = shot ? Math.min(room(a, shot), room(b, shot)) : 110;
+    const base = Math.min(110, ceiling, 45 + 0.1 * Math.hypot(b.x - a.x, b.y - a.y));
+    const ends = [spotBox({ ...a, top }, g.h, M), spotBox({ ...b, top }, g.h, M)];
+    const shown = [...els.values()].filter((e) => e.kind !== "guide" && e.box && shownBy(e.id, t) && !ends.some((x) => overlaps(x, e.box)));
+    for (const height of new Set([base, Math.min(STEP.clear, ceiling, base * 1.6), Math.min(STEP.clear, ceiling)])) {
+      let clear = height >= base;
+      for (let k = 1; k < 12 && clear; k++) clear = !shown.some((e) => overlaps(pad(spotBox(arcAt(a, b, height, k / 12), g.h, M), -8), e.box));
+      if (clear) return height;
+    }
+    return null;
+  };
+  // free paper on the way round: places on a grid over the shot where nothing is drawn yet by t (it only touches down
+  // there, so what is drawn later may go there)
+  const waysIn = (shot, t) => {
+    const view = viewOf(shot);
+    const out = [];
+    if (!view) return out;
+    const drawn = [...els.values()].filter((e) => e.kind !== "guide" && e.box && shownBy(e.id, t)).map((e) => pad(e.box, 18));
+    for (let i = 1; i < 16; i++) for (let j = 1; j < 10; j++) {
+      const w = { x: view.x + (view.w * i) / 16, y: view.y + (view.h * j) / 10, facing: 1, top };
+      const b = spotBox(w, g.h, M);
+      if (drawn.every((o) => !overlaps(b, o)) && holds(pad(view, -20), b) && holds(pad(comp.extent, -10), b)) out.push(w);
+    }
+    return out;
+  };
+  /** The way from `at` to q that crosses nothing drawn by t: one hop, or two by free paper, the shortest; null when none. */
+  const routeTo = (at, q, shot, t) => {
+    const h = clearHop(at, q, shot, t);
+    if (h != null) return { hops: [{ to: q, height: h }], len: Math.hypot(q.x - at.x, q.y - at.y) };
+    let best = null;
+    for (const w of waysIn(shot, t)) {
+      const len = Math.hypot(w.x - at.x, w.y - at.y) + Math.hypot(q.x - w.x, q.y - w.y);
+      if (best && len >= best.len) continue;
+      const ha = clearHop(at, w, shot, t);
+      const hb = ha == null ? null : clearHop(w, q, shot, t);
+      if (hb != null) best = { hops: [{ to: w, height: ha }, { to: q, height: hb }], len };
+    }
+    return best;
+  };
+  const needs = new Map();
   let lastStep = -Infinity;
   board.beats.forEach((bt, bi) => {
     const gs = gesturesOf(bt, bi).filter((x) => x.hands);
     if (!gs.length) return;
+    const beat = tl.beats[bi];
     const at = settledAt(gs[0].t);
     const sees = (q) => gs.reduce((a, x) => a + serves(q, x), 0);
     const here = sees(at);
     if (here === 2 * gs.length) return;
-    const t1 = gs[0].t - 0.05;
-    const t0 = t1 - STEP.time;
-    const prev = tl.beats[bi - 1];
-    if (t0 < ready || t0 - lastStep < STEP.gap || (prev && t0 < prev.draw1)) return;
-    if (track.moves.some((m) => m.t0 < t1 + 0.1 && m.t1 > t0 - 0.1)) return;
+    // it may leave once the beat has begun and anything it was doing has ended; it lands just before the pen begins
+    const busyTill = Math.max(beat.t0, ...track.moves.filter((m) => m.t0 < gs[0].t).map((m) => m.t1 + 0.1));
+    if (busyTill < ready) return;
+    const shot = shotAt(gs[0].t);
     let best = null;
     for (const x of gs) {
-      for (const q of placesBy(x.tbox, shotAt(t1))) {
+      for (const q of placesBy(x.tbox, shot)) {
         const n = sees(q);
-        const d = Math.hypot(q.x - at.x, q.y - at.y);
-        if (n > here && (!best || n > best.n || (n === best.n && d < best.d))) best = { q, n, d };
+        if (n <= here || (best && n < best.n)) continue;
+        const route = routeTo(at, q, shot, gs[0].t);
+        if (!route) continue;
+        // fewer hops first, then the nearer
+        if (!best || n > best.n || route.hops.length < best.route.hops.length || (route.hops.length === best.route.hops.length && route.len < best.route.len)) best = { q, n, route };
       }
     }
     if (!best) return;
-    const { q, d } = best;
-    const shot = shotAt(t1);
-    const ceiling = shot ? room(q, shot) : 110;
-    track.moves.push({ t0, t1, from: [at.x, at.y], to: [q.x, q.y], hops: 1, height: Math.min(110, ceiling, 45 + 0.1 * d), facing: Math.sign(q.x - at.x) || at.facing, land: q.facing, step: true });
-    track.bounces.push([t0 - 0.06, -0.45], [t1, 0.6]);
+    const { hops } = best.route;
+    const time = hops.length === 1 ? STEP.time : STEP.hop * hops.length;
+    const t1 = gs[0].t - 0.05;
+    const t0 = t1 - time;
+    if (Math.max(t0, busyTill) - lastStep < STEP.gap) return;
+    if (t0 < busyTill) {
+      needs.set(bi, busyTill - t0 + 0.02);
+      if (!provisional) return;
+    }
+    let from = at;
+    hops.forEach((hp, i) => {
+      const a = t0 + (time * i) / hops.length;
+      const b = t0 + (time * (i + 1)) / hops.length;
+      const land = i === hops.length - 1 ? hp.to.facing : Math.sign(hops[i + 1].to.x - hp.to.x) || hp.to.facing;
+      track.moves.push({ t0: a, t1: b, from: [from.x, from.y], to: [hp.to.x, hp.to.y], hops: 1, height: hp.height, facing: Math.sign(hp.to.x - from.x) || from.facing, land, step: true });
+      track.bounces.push([a - 0.06, -0.45], [b, 0.6]);
+      from = hp.to;
+    });
     lastStep = t0;
   });
   // a trip to the next idea leaves from wherever it last stood
@@ -370,6 +447,7 @@ export function perform(board, comp, tl, appear) {
     reach: g.rig.reach,
     track,
     blocked,
+    needs,
   };
 }
 
