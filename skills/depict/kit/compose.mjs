@@ -568,7 +568,9 @@ function freeSpot(r, elements, taken, h, top = 0, M, shoulder = [0.3, 0.55]) {
   };
   let best = null;
   cands.forEach((q, i) => {
-    const score = clash(q) * 1e3 + (small(q) ? 1e12 : 0) + cost(q) + hidden(q) * 0.12 * frameArea + i; // ties keep the order: beside the title first
+    // on a thing is worst, then words made small, then the rest; ties keep the order: beside the title first
+    const c = clash(q);
+    const score = (c > 0 ? 1e15 + c * 1e3 : 0) + (small(q) ? 1e12 : 0) + cost(q) + hidden(q) * 0.12 * frameArea + i;
     if (!best || score < best.score) best = { q, score };
   });
   return { region: r.id, ...best.q };
