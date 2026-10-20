@@ -55,7 +55,7 @@ export function normalize(input) {
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
   // the guide: which character presents the board, dressed for the subject ({ wear, hold, skin }) and directed
   // ({ intro, outro }); how it arrives and leaves is the seed's pick, among its character's own, when not said
-  for (const k of Object.keys(cast)) if (!["character", "wear", "outfit", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes character, wear, outfit, hold, skin, intro and outro`);
+  for (const k of Object.keys(cast)) if (!["character", "wear", "outfit", "room", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes character, wear, outfit, room, hold, skin, intro and outro`);
   if (typeof cast.character === "string" && !CHARACTERS[cast.character]) err(`the guide's character "${cast.character}": use ${Object.keys(CHARACTERS).join(", ")}, or a character module of your own`);
   if (cast.character && typeof cast.character === "object") for (const m of checkCharacter(cast.character)) err(`the guide's character: ${m}`);
   const C = characterOf(cast);
@@ -82,8 +82,13 @@ export function normalize(input) {
   const outros = C.personality?.outros ?? ["wave"];
   if (cast.intro != null && !intros.includes(cast.intro)) err(`${who}'s intro "${cast.intro}": it comes alive with ${intros.join(", ")}`);
   if (cast.outro != null && !outros.includes(cast.outro)) err(`${who}'s outro "${cast.outro}": it says goodbye with ${outros.join(", ")}`);
+  // the room over its head the board keeps for costumes it may be dressed in as it plays (a page that dresses it,
+  // kit/act.mjs recast): "all" of them, or a list; left out, the room of what it wears
+  const roomy = cast.room === "all" ? wearable : cast.room == null ? [] : [cast.room].flat();
+  if (cast.room != null && cast.room !== "all" && !Array.isArray(cast.room) && typeof cast.room !== "string") err(`guide.room: "all", or the costumes to keep room for`);
+  for (const w of roomy) if (!wearable.includes(w)) err(`guide.room: ${who} cannot wear "${w}": it can wear ${wearable.join(", ")}`);
   const pick = (list, salt) => list[hash32(`${b.seed}:${b.title}:${salt}`) % list.length];
-  b.cast = { character: cast.character ?? "marker", wear, ...(outfit ? { outfit } : {}), hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(intros, "intro"), outro: cast.outro ?? pick(outros, "outro") };
+  b.cast = { character: cast.character ?? "marker", wear, ...(outfit ? { outfit } : {}), ...(roomy.length ? { room: roomy } : {}), hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(intros, "intro"), outro: cast.outro ?? pick(outros, "outro") };
 
   const ids = new Map(); // id -> kind
   const claim = (id, kind, where) => {

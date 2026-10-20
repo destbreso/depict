@@ -862,3 +862,23 @@ test("a guide dresses for the day: the holiday or the season, its own outfit for
   assert.equal(build({ ...tiny(), guide: { character: "stuart", wear: ["hard-hat"] } }).board.cast.outfit, "builder");
   assert.ok(L.outfits.some((o) => o.name === "builder"), "Pip can be a builder, in the shared hard hat");
 });
+
+test("a board can keep room over its guide for every costume, so a page can dress it in any of them as it plays", async () => {
+  const { recast } = await import("../skills/depict/kit/act.mjs");
+  const { lookOf } = await import("../skills/depict/kit/look.mjs");
+  const L = lookOf("stuart");
+  const dresser = (guide) => {
+    const { board, comp, tl } = build({ ...tiny(), guide });
+    const S = sceneOf(board, comp, tl);
+    return (outfit) => recast(S.actors[0], L, [...S.palette], S.elements, { outfit }).dressed.wear;
+  };
+  const bare = dresser({ character: "stuart" });
+  assert.deepEqual(bare("party"), [], "with no room kept over his head, the party hat does not go on");
+  const roomy = dresser({ character: "stuart", room: "all" });
+  for (const o of L.outfits) assert.deepEqual([...roomy(o.name)].sort(), [...o.wear].sort(), `his ${o.name} outfit goes on`);
+  // the room is kept where he stands, so a board laid out for it is laid out a little apart; the one it wears is the same
+  assert.deepEqual(build({ ...tiny(), guide: { character: "stuart", room: "all" } }).board.cast.wear, []);
+  assert.deepEqual(build({ ...tiny(), guide: { character: "stuart", room: ["crown"] } }).board.cast.room, ["crown"]);
+  const refused = normalize({ ...tiny(), guide: { character: "stuart", room: ["hair-bow"] } }).errors.join("\n");
+  assert.match(refused, /guide\.room: Stuart cannot wear "hair-bow"/, "Stuart is a boy: no room is kept for a hair bow");
+});

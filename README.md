@@ -97,6 +97,29 @@ As a Claude Code plugin instead: `/plugin marketplace add destbreso/depict`, the
 
 <p align="center"><sub>Each is the presentation <code>scripts/character.mjs</code> writes for a character: its model sheet and three short boards it presents, the same check any character made from a drawing goes through. The GIFs are moments of those boards, made with <code>scripts/gif.mjs</code>.</sub></p>
 
+### Friends who share a slot
+
+<p align="center">
+  <a href="skills/depict/examples/friends/index.html"><img src="assets/friends.png" width="800" alt="The same moment of the hash table board three times: under the title 3 Four buckets, a row of slots 0 to 3 with 3 highlighted, Ana's entry hanging under bucket 3 and Ben's under hers, and the guide in a mortarboard holding a magnifier and pointing at Ben. On the left the guide is Stuart, a fuzzy pink brain with round glasses; in the middle Pip, a pale blue rain cloud with yellow boots; on the right a narrow orange pencil with its point up, pink arms and an eraser."></a>
+</p>
+
+<p align="center"><sub>One board, built once, at the same moment: presented by Stuart, by Pip (a rain cloud) and by a pencil Niki drew. Each wears its own mortarboard and points at Ben with its own arm.</sub></p>
+
+A board keeps a slot for its guide: how tall it stands, the paper it takes beside each idea, the room over its head and how far its finger reaches. The board is laid out and its guide directed by that slot, so any character drawn to it can present the board instead, cast in while the board plays. The board is built once and each character is one file, its look: nothing is built again for another guide, and nothing is made for each pair of a board and a character.
+
+- **A body of its own.** A character drawn to Stuart's slot (`contract: "stuart"`) stands as tall as he does and has its own shape, round like Pip or as narrow as the pencil, with its own shoulders, arms and poses. `scripts/look.mjs` checks that it fits the slot and writes its look, 30 to 50 kB.
+- **Itself on every board.** It goes where the board's guide goes and points where it points, and it arrives, says goodbye, makes its signature gestures in the quiet moments and moves the way its own material does. Where its own arm could not make one of the board's gestures cleanly, it looks at the thing instead.
+- **Dressed by name.** Its own outfits from its drawings (Stuart's winter and Halloween), a part any character can dress for (`builder`, `scholar`, `chef`, `party`, `royal`, `music`, `formal`) or the day's occasion (`"today"`: Halloween, Thanksgiving, Christmas, the Fourth of July and more): a board or a page asks for the name, and each character wears its own. A hat goes on where the board kept room over its guide's head, and a board made to be dressed as it plays keeps room for every one (`guide: { room: "all" }`).
+
+A page casts a character in with one message to the board's frame, and the board answers:
+
+```js
+frame.contentWindow.postMessage({ depict: "cast", look, outfit: "today" }, "*");
+// heard back: { depict: { event: "cast", ok, character, outfit, wear } }
+```
+
+[The example](skills/depict/examples/friends/index.html) is the hash table board with a picker for who presents it and what they dress for, as a site would have one. `references/characters.md`, "Characters that share a slot", has the whole contract.
+
 ## Install
 
 Depict is one skill folder, `skills/depict`, with a `SKILL.md` at its root.
@@ -119,6 +142,7 @@ Ask in your own words; the skill triggers on explaining, teaching, sketching out
 /depict how a hash table works, for someone who just learned arrays
 /depict telling time to the nearest five minutes, for my 7-year-old
 /depict make a character from my daughter's drawings: drawing-1.jpg drawing-2.jpg
+/depict make this pencil my daughter drew a friend of Stuart's, to present his boards: pencil.jpg
 ```
 
 Open a page in a browser, straight from the file. A preview that reloads the page whenever a file in its folder changes (VS Code's Live Server or Live Preview) stops the film at every reload.
@@ -131,6 +155,7 @@ Open a page in a browser, straight from the file. A preview that reloads the pag
 | [`compound-interest`](skills/depict/examples/compound-interest/board.mjs) | **Compound interest.** Simple against compound interest on $1,000 at 10%, growing bars, the line and the curve over 30 years drawn to scale, the rule of 72. Slides. |
 | [`ddos`](skills/depict/examples/ddos/board.mjs) | **How a site survives a DDoS attack.** People and a botnet against a server rack, the layers at the edge as a stack, autoscaling, and a live part that opens Dissect's running figure. |
 | [`hash-table`](skills/depict/examples/hash-table/board.mjs) | **How a hash table works.** For someone who just learned arrays: one jump by index, a search by name, a key hashed to an index, buckets as adjacent cells, a collision and its chain, why lookups stay fast. |
+| [`friends`](skills/depict/examples/friends/index.html) | **Friends who share a slot.** The hash table board built once, presented by Stuart as a scholar; the looks of Stuart, of Pip (a rain cloud) and of Niki's pencil; and a host page that casts any of them in, dressed for an occasion or a part. |
 
 Rebuild any of them: `node skills/depict/scripts/build.mjs skills/depict/examples/<name>/board.mjs --out <your folder>/<name>.html --audit`.
 
@@ -152,6 +177,7 @@ The kit does the rest, in Node, with nothing but its own modules:
 - **The audit**, `--audit` on the build: readable text in every shot, nothing overlapping or outside its slide, captions that fit two lines and read at no more than 20 characters a second, short labels, a quick opening, a closing map, and the composition: a focal point in every region, no empty paper, no crossing lines, no long bridges.
 - **The check**, `scripts/check.mjs board.html`: pictures every beat, the overview and the page in headless Chrome and fails on any page error. The agent reads the pictures before handing anything over.
 - **A character**, `scripts/character.mjs <character> --out <folder>`: checks a character module, every field, and writes its model sheet (every feeling, pose and costume) and three test boards it presents.
+- **A look**, `scripts/look.mjs <character> --out <id>.look.json`: checks that a character drawn to another's slot fits it (at rest within its paper, a costume no higher, hands no bigger), says how far it points beside the slot's own character, and writes the one file a page casts it in from.
 - **A series**, `scripts/series.mjs <folder>`: builds, audits and checks every board under `boards/`, keeps one report and writes the gallery.
 - **A GIF**, `scripts/gif.mjs board.html@from-to ... --out file.gif`: moments of one or more boards as an animated GIF, for a README or a post that cannot play the page.
 - **The video**, `scripts/video.mjs board.html`: 1920 x 1080 at 30 frames a second, H.264 in studio-range color with Rec. 709 tags, a silent audio track and the index first.
@@ -180,7 +206,7 @@ Everything runs on your machine. The kit uses only Node's built-in modules: noth
 - The icons are [Lucide](https://lucide.dev) (ISC; icons from Feather, MIT).
 - The camera's flights are van Wijk and Nuij's "Smooth and efficient zooming and panning" (InfoVis 2003).
 - Live parts open figures made with [Dissect](https://github.com/destbreso/dissect).
-- Stuart was created by Niki, age 7, who drew him in three pictures.
+- Stuart was created by Niki, age 7, who drew him in three pictures. She drew the pencil in the friends example too.
 
 ## License
 

@@ -53,7 +53,7 @@ How far it points beside the slot's own character is reported, not required (`re
 - it arrives and says goodbye its own way: the board's own way when that is one of its own too, otherwise one of its own picked by the board's seed, and an arrival never leaves the ground higher than the board's own did (the opening shot made room for that one);
 - in the board's quiet moments, where Stuart pushes his glasses up, it does its own quirks, or rests when it has none;
 - it moves as its own material does: a cloud settles slowly, a pencil lands firm;
-- it wears its own outfit of the board's (below), or else the costumes the board wears that it can wear, and a costume goes on only where the board kept the room over its head.
+- it wears its own outfit of the board's (below), or else the costumes the board wears that it can wear, and a costume goes on only where the board kept the room over its head. A board made to be dressed as it plays (a page where a child picks the outfit) keeps room for every costume: `guide: { room: "all" }`.
 
 **Outfits: the occasion and the part.** An outfit is costumes worn together under a name. The name is what a board and a host ask for, so each character wears its own:
 

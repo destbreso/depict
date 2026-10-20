@@ -44,13 +44,14 @@ const HAT_TOP = { "grad-cap": 0.09, "hard-hat": 0.09, headphones: 0.07, "party-h
  * How far above the top of its head what the guide wears reaches, for its character: a shared costume sits in the
  * character's own place for it, and a character's own costume says its height. A board keeps that paper free over
  * its slot, so for a guide drawn to another's slot, as much as the slot's own character would need in the same
- * costume, whichever is higher: any character of the contract fits under it.
+ * costume, whichever is higher: any character of the contract fits under it. A board that keeps room for costumes
+ * its guide may be dressed in as it plays (`room`, a page that dresses it) keeps the highest of those too.
  */
 export const reachAbove = (cast = {}) => {
   const C = characterOf(cast);
   const S = slotOf(cast);
   const wears = (X, w) => (X.wear ?? []).includes(w) || Boolean(X.costumes?.[w]);
-  return Math.max(0, ...(cast.wear ?? []).map((w) => Math.max(topOf(C, w), S !== C && wears(S, w) ? topOf(S, w) : 0)));
+  return Math.max(0, ...[...(cast.wear ?? []), ...(cast.room ?? [])].map((w) => Math.max(wears(C, w) ? topOf(C, w) : 0, S !== C && wears(S, w) ? topOf(S, w) : 0)));
 };
 /** How far above the top of its head a costume reaches on a character, in units of its height. */
 export const topOf = (C, w) => {
