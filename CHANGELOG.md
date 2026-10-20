@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- The guide's place in an idea is never on a thing while another place is free, even one that makes the idea's shot a little wider.
+- The plugin has an icon: the marker, depict's own guide, waving.
+- The README says what depict runs on your machine and what it sends: nothing leaves it.
+- SKILL.md's front matter parses in every YAML reader (its description is quoted), so `npx skills add destbreso/depict` installs it.
+
 ## 0.5.0
 
 - A board on a site: `?embed` makes the page's room transparent, so it sits on the site's own page, and the page tells its host what the film does (`ready`, `play`, `pause`, `ended`), how tall it wants to be for its width and where the board sits in it (`size`), with `postMessage`; a host that starts listening late says hello and hears `ready` again. SKILL.md says how.
