@@ -6,7 +6,8 @@
 import { cumulative, union, pad } from "./geom.mjs";
 import { flight, flightTime, pan, shotOf, shotSafe } from "./camera.mjs";
 import { perform, hopHere } from "./perform.mjs";
-import { actorAt } from "./act.mjs";
+import { actorAt, OUTROS } from "./act.mjs";
+import { hash32 } from "./rng.mjs";
 
 /** The pen, in board units per second, and its pauses, in seconds. */
 export const PACE = {
@@ -263,6 +264,8 @@ function outro(board, comp, tl) {
     A.track.feel.push([start + 0.15, "happy"]);
     A.track.look.push([start + 0.15, null]);
     OUTROS[board.cast?.outro ?? "wave"](A.track, start, fly, iris, { x: st.x, y: st.y, facing: st.facing });
+    // how it said goodbye: a character cast in its place says it its own way (act.mjs, personalize)
+    A.track.outro = { kind: board.cast?.outro ?? "wave", t: start, fly, hold: iris.hold, at: { x: st.x, y: st.y, facing: st.facing }, seed: hash32(`${board.seed}:${board.title}:outro`) };
     A.track.feel.push([iris.hold + 0.1, "wink"]);
     A.track.bounces.push([iris.hold + 0.1, 0.35]);
     for (const list of [A.track.arms, A.track.feel, A.track.look, A.track.bounces, A.track.leans, A.track.spins, A.track.caps]) list.sort((a, b) => a[0] - b[0]);
@@ -283,42 +286,3 @@ function outro(board, comp, tl) {
   tl.duration = t + 1.8;
 }
 
-/** The ways the guide says goodbye as the camera comes in on it: keys from `t`, the camera arriving at `t + fly`, the circle closing after `iris.hold`. */
-const OUTROS = {
-  wave: (k, t) => k.arms.push([t + 0.15, "wave"]),
-  bow: (k, t, fly, iris) => {
-    k.arms.push([t + 0.15, "wave"], [t + fly - 0.15, "rest"]);
-    k.leans.push([t + fly - 0.1, iris.hold + 0.08, 26]);
-    k.feel.push([t + fly - 0.1, "proud"]);
-  },
-  cheer: (k, t, fly, iris, at) => {
-    k.arms.push([t + 0.15, "cheer"]);
-    k.moves.push(hopHere(at, t + fly - 0.5, t + fly + 0.08, 85));
-    k.bounces.push([t + fly + 0.08, 0.8]);
-    k.feel.push([t + 0.15, "excited"]);
-  },
-  salute: (k, t, fly) => {
-    k.arms.push([t + 0.15, "wave"], [t + fly - 0.3, "salute"]);
-    k.feel.push([t + fly - 0.3, "proud"]);
-  },
-  tip: (k, t, fly, iris) => {
-    k.arms.push([t + 0.15, "wave"], [t + fly - 0.3, "tip"]);
-    k.caps.push([t + fly - 0.15, iris.hold + 0.15, 0.075, 14]);
-    k.feel.push([t + fly - 0.15, "proud"]);
-  },
-  spin: (k, t, fly, iris, at) => {
-    k.moves.push(hopHere(at, t + fly - 0.7, t + fly + 0.05, 115));
-    k.spins.push([t + fly - 0.68, t + fly + 0.03, 1]);
-    k.bounces.push([t + fly + 0.05, 0.85]);
-    k.arms.push([t + 0.15, "cheer"], [t + fly + 0.1, "wave"]);
-  },
-  // a soft body's goodbye: two happy bounces, the second smaller, wobbling on as the circle closes
-  bounce: (k, t, fly, iris, at) => {
-    k.arms.push([t + 0.15, "cheer"]);
-    k.moves.push(hopHere(at, t + fly - 0.75, t + fly - 0.3, 75));
-    k.bounces.push([t + fly - 0.3, 1.0]);
-    k.moves.push(hopHere(at, t + fly - 0.22, t + fly + 0.06, 32));
-    k.bounces.push([t + fly + 0.06, 0.7]);
-    k.feel.push([t + 0.15, "excited"]);
-  },
-};

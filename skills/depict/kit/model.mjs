@@ -55,14 +55,22 @@ export function normalize(input) {
   b.seed = Number.isFinite(b.seed) ? b.seed : 1;
   // the guide: which character presents the board, dressed for the subject ({ wear, hold, skin }) and directed
   // ({ intro, outro }); how it arrives and leaves is the seed's pick, among its character's own, when not said
-  for (const k of Object.keys(cast)) if (!["character", "wear", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes character, wear, hold, skin, intro and outro`);
+  for (const k of Object.keys(cast)) if (!["character", "wear", "outfit", "hold", "skin", "intro", "outro"].includes(k)) err(`guide.${k}: the guide takes character, wear, outfit, hold, skin, intro and outro`);
   if (typeof cast.character === "string" && !CHARACTERS[cast.character]) err(`the guide's character "${cast.character}": use ${Object.keys(CHARACTERS).join(", ")}, or a character module of your own`);
   if (cast.character && typeof cast.character === "object") for (const m of checkCharacter(cast.character)) err(`the guide's character: ${m}`);
   const C = characterOf(cast);
   const who = C.name ?? C.id;
   const own = Object.keys(C.costumes ?? {});
   const wearable = [...(C.wear ?? []), ...own];
-  const wear = cast.wear == null ? [] : [cast.wear].flat();
+  // an outfit is the costumes of one of its drawings, worn together, by the name it has for every character that has
+  // one (its winter, its Halloween): a character cast in its place wears its own outfit of that name
+  const outfits = C.outfits ?? [];
+  const named = cast.outfit != null ? outfits.find((o) => o.name === cast.outfit) : null;
+  if (cast.outfit != null && !named) err(`${who}'s outfit "${cast.outfit}": ${outfits.length ? `it has ${outfits.map((o) => o.name).join(", ")}` : "it has none"}`);
+  if (cast.outfit != null && cast.wear != null) err(`the guide wears an outfit or a list of things, not both`);
+  const wear = named ? [...named.wear] : cast.wear == null ? [] : [cast.wear].flat();
+  // a list of things that is one of its outfits is that outfit
+  const outfit = named?.name ?? outfits.find((o) => o.wear.length === wear.length && o.wear.every((w) => wear.includes(w)))?.name ?? null;
   for (const w of wear) if (!wearable.includes(w)) err(`${who} wears "${w}": it can wear ${wearable.join(", ")}`);
   const hats = wear.filter((w) => GUIDE_HATS.includes(w) || C.costumes?.[w]?.hat);
   if (hats.length > 1) err(`the guide wears ${hats.join(" and ")}: one hat at a time`);
@@ -75,7 +83,7 @@ export function normalize(input) {
   if (cast.intro != null && !intros.includes(cast.intro)) err(`${who}'s intro "${cast.intro}": it comes alive with ${intros.join(", ")}`);
   if (cast.outro != null && !outros.includes(cast.outro)) err(`${who}'s outro "${cast.outro}": it says goodbye with ${outros.join(", ")}`);
   const pick = (list, salt) => list[hash32(`${b.seed}:${b.title}:${salt}`) % list.length];
-  b.cast = { character: cast.character ?? "marker", wear, hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(intros, "intro"), outro: cast.outro ?? pick(outros, "outro") };
+  b.cast = { character: cast.character ?? "marker", wear, ...(outfit ? { outfit } : {}), hold: cast.hold ?? null, skin: cast.skin ?? "plain", intro: cast.intro ?? pick(intros, "intro"), outro: cast.outro ?? pick(outros, "outro") };
 
   const ids = new Map(); // id -> kind
   const claim = (id, kind, where) => {

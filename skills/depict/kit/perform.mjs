@@ -8,9 +8,10 @@
 // presents the whole board at the end (or, with no outro to say goodbye,
 // cheers). A beat can set how it feels (`feel`) and what it does (`act`).
 // Blinks come at the guide's own uneven pace, from the board's seed.
-import { splitmix32 } from "./rng.mjs";
+import { hash32, splitmix32 } from "./rng.mjs";
 import { FEELINGS, feetBox, reachAbove, spotBox } from "./rig.mjs";
 import { overlaps, pad } from "./geom.mjs";
+import { INTROS, keepClear } from "./act.mjs";
 
 /** The acts that aim at a thing: past something in the way they would seem to aim at that, so there it only looks. */
 const AIMED = new Set(["point", "present"]);
@@ -47,14 +48,15 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   /** Whether a thing is on the board by time t: its first stroke has begun. */
   const shownBy = (id, t) => (span.get(id)?.[0] ?? Infinity) <= t;
   const solid = [...els.entries()].filter(([, e]) => e.kind === "item" || e.kind === "note" || e.kind === "region" || e.kind === "title");
-  const M = g.rig.measures;
-  const tip = (g.rig.tip ?? 0.13) * g.h + (g.rig.hold === "pointer" ? 0.27 * g.h : 0) + 12;
+  // the slot the board keeps for its guide directs it: where it can stand, what its finger reaches and along which line
+  const M = g.rig.slot.measures;
+  const tip = (g.rig.slot.tip ?? 0.13) * g.h + (g.rig.hold === "pointer" ? 0.27 * g.h : 0) + 12;
   /** Which way it faces to gesture at x from where it stands: it turns to what is well behind it. */
   const facingTo = (at, x) => {
     const side = Math.sign(x - at.x);
     return side && side !== at.facing && Math.abs(x - at.x) > 0.3 * g.h ? side : at.facing;
   };
-  const [shx, shy] = g.rig.shoulders.front;
+  const [shx, shy] = g.rig.slot.shoulders.front;
   const shoulder = (at, facing) => [at.x + facing * shx, at.y + shy];
   // it points at the middle of a thing, and its hand stops where the tip of its glove (or of its pointer) would reach the
   // first thing in the way, the thing itself included: a finger that lands on the words hides them. Only what is on the
@@ -64,7 +66,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
     const d = Math.hypot(px - sx, py - sy) || 1;
     const [ux, uy] = [(px - sx) / d, (py - sy) / d];
     const boxes = [...solid.filter(([id]) => shownBy(id, until)).map(([, e]) => e.box), ...(also ? [also] : [])];
-    for (let r = 0; r <= g.rig.reach * g.h + tip; r += 5) {
+    for (let r = 0; r <= g.rig.slot.reach * g.h + tip; r += 5) {
       const [qx, qy] = [sx + ux * r, sy + uy * r];
       if (boxes.some((b) => near(b, qx, qy, 6))) return Math.max(0.05 * g.h, r - tip);
     }
@@ -92,7 +94,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
     // a thing out of reach: the finger stops in the air, and the eye follows it to the first thing ahead. A finger that
     // stops beside another thing, or has another thing ahead of it, within a narrow cone, before the one it means,
     // seems to point at that one
-    const full = g.rig.reach * g.h + tip;
+    const full = g.rig.slot.reach * g.h + tip;
     if (d > full) {
       const [ux, uy] = [(cx - sx) / d, (cy - sy) / d];
       const [x, y] = [sx + ux * full, sy + uy * full];
@@ -148,12 +150,16 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
 
   // it comes alive, the way the board's cast says (or its seed chose), and then waves hello
   const ready = INTROS[board.cast?.intro ?? "wave"](track, alive, start);
+  // what it did and from where: a page that casts another character in its place has that one arrive its own way
+  // (act.mjs, personalize), chosen among its own with the board's own seed
+  track.intro = { kind: board.cast?.intro ?? "wave", at: alive, from: { x: start.x, y: start.y, facing: start.facing }, seed: hash32(`${board.seed}:${board.title}:intro`) };
   track.look.push([alive, null]);
   // the title: it presents it as it is written
   const title = span.get("title");
   if (title) {
     const tb = els.get("title").box;
     track.arms.push([Math.max(title[0] + 0.4, ready), "present", tb.x + Math.min(tb.w * 0.25, 320), tb.y + tb.h * 0.5]);
+    track.intro.title = title[0] + 0.4;
     track.look.push([title[0], tb.x + tb.w * 0.4, tb.y + tb.h / 2]);
   }
 
@@ -237,7 +243,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
     const [sx, sy] = shoulder(q, facingTo(q, tbox.x + tbox.w / 2));
     const dx = Math.max(tbox.x - sx, 0, sx - (tbox.x + tbox.w));
     const dy = Math.max(tbox.y - sy, 0, sy - (tbox.y + tbox.h));
-    return Math.hypot(dx, dy) <= g.rig.reach * g.h + tip;
+    return Math.hypot(dx, dy) <= g.rig.slot.reach * g.h + tip;
   };
   const serves = (q, x) => (inTheWay(q, x.tid, x.tbox, x.until) ? 0 : within(q, x.tbox) ? 2 : 1);
   // a hop's arc, at u of the way; and how high a hop from a to b must go so that its body passes over everything drawn
@@ -384,9 +390,12 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   });
 
   // its quirks: what its personality has it do on its own, in a quiet moment now and then (Stuart pushes his
-  // glasses up before he explains): when its hands are at rest, nothing is pointed at and it is not on its way
-  const quirks = g.rig.personality?.quirks ?? [];
-  if (quirks.includes("glasses") && g.rig.poses.glasses) {
+  // glasses up before he explains): when its hands are at rest, nothing is pointed at and it is not on its way. The
+  // quiet moments are the board's and kept in the track, whoever presents it, so a character cast in its place does
+  // its own quirks there (act.mjs, personalize)
+  const quirks = (g.rig.personality?.quirks ?? []).filter((q) => g.rig.poses[q]);
+  track.quirks = [];
+  {
     const rq = splitmix32((board.seed * 40503 + 7) >>> 0);
     let lastQuirk = -Infinity;
     tl.beats.slice(0, -1).forEach((beat) => {
@@ -396,8 +405,11 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
       const before = track.arms.filter((key) => key[0] <= q0).sort((x, y) => x[0] - y[0]).at(-1);
       const busy = track.arms.some((key) => key[0] > q0 - 0.3 && key[0] < q1 + 0.3) || track.moves.some((m) => m.t0 < q1 + 0.2 && m.t1 > q0 - 0.2);
       if (busy || (before && before[1] !== "rest") || rq() < 0.45) return;
-      track.arms.push([q0, "glasses"], [q1, "rest"]);
-      track.look.push([q0, null]);
+      track.quirks.push([q0, q1]);
+      if (quirks.length) {
+        track.arms.push([q0, quirks[(track.quirks.length - 1) % quirks.length]], [q1, "rest"]);
+        track.look.push([q0, null]);
+      }
       lastQuirk = q0;
     });
   }
@@ -433,6 +445,13 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
 
   for (const list of [track.arms, track.feel, track.look, track.turns, track.bounces, track.leans, track.spins, track.caps]) list.sort((a, b) => a[0] - b[0]);
   track.moves.sort((a, b) => a.t0 - b.t0);
+  // a guide drawn to another's slot is directed by the slot, and makes its gestures from its own shoulders: one its own
+  // arm would not make cleanly (it would cross something, or its shorter finger stop beside another thing) is a look
+  if (g.rig.contract !== g.rig.character) {
+    const elements = [...els.entries()].filter(([, e]) => e.box).map(([id, e]) => ({ kind: e.kind, t0: span.get(id)?.[0] ?? Infinity, box: [e.box.x, e.box.y, e.box.w, e.box.h] }));
+    const own = { h: g.h, hold: g.rig.hold, eyes: g.rig.eyes, shoulders: g.rig.shoulders, reach: g.rig.reach, poses: g.rig.poses, feelings: FEELINGS, motion: g.rig.motion, slot: { front: g.rig.slot.shoulders.front, reach: g.rig.slot.reach }, track };
+    track.arms = keepClear(own, elements).track.arms;
+  }
   return {
     id: "guide",
     h: g.h,
@@ -451,77 +470,6 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   };
 }
 
-/** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
-export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110 };
-
-/** A hop where it stands. */
-export const hopHere = (at, t0, t1, height) => ({ t0, t1, from: [at.x, at.y], to: [at.x, at.y], hops: 1, height, facing: at.facing, land: at.facing });
-
-/**
- * The ways it comes alive once it is drawn. Each writes its keys from `a`,
- * the moment it is complete, and returns when it is ready to present the title.
- */
-const INTROS = {
-  wave: (k, a) => {
-    k.bounces.push([a + 0.02, 1.1]);
-    k.arms.push([a, "wave"]);
-    return a + 1.2;
-  },
-  hop: (k, a, at) => {
-    k.bounces.push([a, -0.6]);
-    k.moves.push(hopHere(at, a + 0.1, a + 0.62, INTRO_HEIGHT.hop));
-    k.bounces.push([a + 0.62, 0.9]);
-    k.arms.push([a, "cheer"], [a + 0.7, "wave"]);
-    return a + 1.5;
-  },
-  spin: (k, a, at) => {
-    k.bounces.push([a, -0.6]);
-    k.moves.push(hopHere(at, a + 0.1, a + 0.82, INTRO_HEIGHT.spin));
-    k.spins.push([a + 0.12, a + 0.8, 1]);
-    k.bounces.push([a + 0.82, 1.0]);
-    k.arms.push([a, "cheer"], [a + 0.9, "wave"]);
-    k.feel.push([a, "excited"], [a + 1.4, "happy"]);
-    return a + 1.7;
-  },
-  bow: (k, a) => {
-    k.arms.push([a, "rest"]);
-    k.leans.push([a + 0.08, a + 1.0, 24]);
-    k.feel.push([a + 0.08, "proud"], [a + 1.0, "happy"]);
-    k.bounces.push([a + 1.0, 0.45]);
-    k.arms.push([a + 1.0, "wave"]);
-    return a + 1.9;
-  },
-  tip: (k, a) => {
-    k.arms.push([a, "tip"]);
-    k.caps.push([a + 0.2, a + 1.05, 0.075, 14]);
-    k.feel.push([a + 0.2, "proud"], [a + 1.05, "happy"]);
-    k.arms.push([a + 1.1, "wave"]);
-    return a + 1.9;
-  },
-  jump: (k, a, at) => {
-    k.bounces.push([a, -0.8]);
-    k.moves.push(hopHere(at, a + 0.14, a + 0.78, INTRO_HEIGHT.jump));
-    k.bounces.push([a + 0.78, 1.05]);
-    k.arms.push([a + 0.1, "cheer"], [a + 0.86, "wave"]);
-    k.feel.push([a, "excited"], [a + 1.4, "happy"]);
-    return a + 1.7;
-  },
-  // a soft body's: it squashes deep, springs up, lands and bounces once more, wobbling on, and waves
-  bounce: (k, a, at) => {
-    k.bounces.push([a, -0.9]);
-    k.moves.push(hopHere(at, a + 0.1, a + 0.66, INTRO_HEIGHT.bounce));
-    k.bounces.push([a + 0.66, 1.2]);
-    k.moves.push(hopHere(at, a + 0.74, a + 1.06, INTRO_HEIGHT.bounce * 0.35));
-    k.bounces.push([a + 1.06, 0.8]);
-    k.arms.push([a, "cheer"], [a + 1.12, "wave"]);
-    k.feel.push([a, "excited"], [a + 1.6, "happy"]);
-    return a + 2.0;
-  },
-  // it shakes itself awake like a jelly, arms out, then waves
-  jiggle: (k, a) => {
-    k.bounces.push([a, 1.1], [a + 0.32, -0.8], [a + 0.62, 0.6]);
-    k.arms.push([a, "shrug"], [a + 0.95, "wave"]);
-    k.feel.push([a, "excited"], [a + 1.5, "happy"]);
-    return a + 1.9;
-  },
-};
+// how it comes alive, and how high: the ways every character can arrive live in act.mjs, so a page can play another
+// character's own arrival when it casts one in its guide's place
+export { INTRO_HEIGHT, hopHere } from "./act.mjs";

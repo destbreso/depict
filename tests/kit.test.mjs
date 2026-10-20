@@ -728,3 +728,111 @@ test("the audit warns where the guide stands on a thing, and where a shot cuts a
   assert.match(found.find((f) => f.rule === "stand")?.text ?? "", /the guide stands (on|with its feet on top of) "(a|one)"/);
   assert.match(found.find((f) => f.rule === "edge")?.text ?? "", /beat 2: the shot cuts "(a|one|title)" \(of "one"\) at its (left|top) edge/);
 });
+
+test("a character drawn to Stuart's slot stands as tall as he does, and a board made for it is the board made for him", async () => {
+  const { checkCharacter, characterOf } = await import("../skills/depict/kit/characters/index.mjs");
+  const { fitsContract, reachShare } = await import("../skills/depict/kit/look.mjs");
+  const pip = (await import("../skills/depict/examples/friends/pip.mjs")).default;
+  const pencil = (await import("../skills/depict/examples/friends/pencil.mjs")).default;
+  for (const c of [pip, pencil]) {
+    assert.deepEqual(checkCharacter(c), [], c.id);
+    assert.deepEqual(fitsContract(c), [], `${c.id} fits Stuart's slot`);
+    assert.equal(characterOf({ character: c }).size, 0.76, `${c.id} stands as tall as Stuart`);
+  }
+  assert.equal(reachShare(pip), 1, "round like him, with his body: it points as far");
+  assert.ok(reachShare(pencil) < 1, "narrow, with short arms: it points less far");
+  assert.match(checkCharacter({ ...pip, size: 0.9 }).join("\n"), /"size" is the slot's/);
+  // a body too wide for the slot is refused, with what is too wide
+  const far = { ...pencil.poses, rest: { front: { hand: [0.75, 0.6], bow: [0.5, 0.55], glove: "fist" }, back: pencil.poses.rest.back } };
+  assert.match(fitsContract({ ...pencil, id: "wide", poses: far }).join("\n"), /in front of it, and Stuart's slot has 0.57/);
+  // the board is laid out by the slot: the same places, the same trips and steps, whoever of the contract presents
+  // it; how it arrives and leaves is its own personality's
+  // a character module has functions, so the board is cloned before its guide is put in
+  const board = (character) => {
+    const input = structuredClone({ ...tiny(), guide: { wear: ["bow-tie"], hold: "pencil" } });
+    input.guide.character = character;
+    const { board: b, errors } = normalize(input);
+    assert.deepEqual(errors, []);
+    const comp = compose(b, hand(b.hand));
+    return { board: b, comp, tl: time(b, comp) };
+  };
+  const him = board("stuart");
+  for (const c of [pip, pencil]) {
+    const them = board(c);
+    assert.deepEqual(them.comp.guide.spots, him.comp.guide.spots, `${c.id} stands where Stuart stands`);
+    // to the microsecond: the same trips and steps, at the same times
+    const trips = (x) => JSON.parse(JSON.stringify(x.tl.actors[0].track.moves.filter((m) => m.ceiling != null || m.step), (k, v) => (typeof v === "number" ? Math.round(v * 1e6) / 1e6 : v)));
+    assert.deepEqual(trips(them), trips(him), `${c.id} goes where Stuart goes`);
+    assert.ok((c.personality.intros).includes(them.tl.actors[0].track.intro.kind), `${c.id} arrives its own way`);
+    assert.equal(them.tl.duration, him.tl.duration);
+  }
+});
+
+test("a look presents a board made for its slot as it plays: the board's performance, its own body, and a look of another slot is refused", async () => {
+  const { lookOf } = await import("../skills/depict/kit/look.mjs");
+  const { castProblem, recast, keepClear } = await import("../skills/depict/kit/act.mjs");
+  const pencil = (await import("../skills/depict/examples/friends/pencil.mjs")).default;
+  const { board, comp, tl } = build({ ...tiny(), guide: { character: "stuart", wear: ["bow-tie", "elf-hat"], hold: "pencil" } });
+  const S = sceneOf(board, comp, tl);
+  const A = S.actors[0];
+  assert.equal(A.contract, "stuart");
+  assert.deepEqual(A.wear, ["bow-tie", "elf-hat"]);
+  const look = lookOf(pencil);
+  assert.equal(castProblem(A, look), null);
+  assert.match(castProblem(A, lookOf("marker")), /a character presents only the boards made for its body/);
+  assert.match(castProblem(A, { hello: 1 }), /not a character's look/);
+  assert.match(castProblem({ ...A, contract: undefined }, look), /built before/);
+  const palette = [...S.palette];
+  const B = recast(A, look, palette, S.elements);
+  assert.equal(B.character, "pencil");
+  assert.deepEqual(B.track.moves, A.track.moves, "it goes where the board's guide goes");
+  assert.deepEqual(B.track.feel, A.track.feel, "and feels what it feels");
+  assert.ok(B.strokes.some((s) => palette[s.c] === board.accent), "its bow tie takes the board's accent");
+  assert.ok(B.strokes.some((s) => s.part === "held"), "it holds what the board's guide holds");
+  assert.equal(B.strokes.filter((s) => s.part === "hat").length, 0, "it cannot wear Stuart's elf hat, so it goes without");
+  for (const s of B.strokes) assert.ok(s.t1 >= s.t0 && s.t0 >= 0, "every stroke is timed as it first appears");
+  const points = (X) => X.track.arms.filter((k) => k[1] === "point");
+  assert.ok(points(B).length <= points(A).length);
+  for (const k of B.track.arms) assert.ok(k[1] in B.poses, `${k[1]} is a pose it has`);
+  // a guide whose own arm reaches as the slot's makes every gesture the slot's guide makes
+  assert.equal(keepClear(A, S.elements), A);
+  // one whose arm is too short to reach past what is in the way looks instead
+  const short = keepClear({ ...A, slot: { ...A.slot }, shoulders: { front: [A.shoulders.front[0] * 0.2, A.shoulders.front[1]], back: A.shoulders.back }, reach: 0.02 }, S.elements);
+  assert.ok(points(short).length <= points(A).length);
+  // the board's own guide comes back as it was: recast changes nothing of A
+  assert.equal(A.character, "stuart");
+});
+
+test("a character cast in a board's place is itself: its own arrival and goodbye, its quirks in the board's quiet moments, its own outfit", async () => {
+  const { lookOf } = await import("../skills/depict/kit/look.mjs");
+  const { recast } = await import("../skills/depict/kit/act.mjs");
+  const pip = (await import("../skills/depict/examples/friends/pip.mjs")).default;
+  const pencil = (await import("../skills/depict/examples/friends/pencil.mjs")).default;
+  const input = { ...(await load("hash-table")), guide: { character: "stuart", wear: ["bow-tie"], hold: "magnifier" } };
+  const { board, comp, tl } = build(input);
+  const S = sceneOf(board, comp, tl);
+  // a quiet moment, as a long board has them every twenty seconds or so, with Stuart's quirk in it
+  const q = S.beats[6].t0 + 0.15;
+  const A = { ...S.actors[0], track: { ...S.actors[0].track, quirks: [[q, q + 1]], arms: [...S.actors[0].track.arms, [q, "glasses"], [q + 1, "rest"]].sort((a, b) => a[0] - b[0]) } };
+  for (const c of [pip, pencil]) {
+    const L = lookOf(c);
+    const B = recast(A, L, [...S.palette], S.elements);
+    assert.ok(L.intros.includes(B.track.intro.kind), `${c.id} arrives one of its own ways`);
+    assert.ok(L.outros.includes(B.track.outro.kind), `${c.id} says goodbye one of its own ways`);
+    assert.ok(!B.track.arms.some((k) => k[1] === "glasses"), `${c.id} does not push up glasses it does not have`);
+    const quirks = B.track.arms.filter((k) => !["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"].includes(k[1]));
+    if (L.quirks.length) assert.equal(quirks.length, A.track.quirks.length, `${c.id} does its own quirk in each quiet moment`);
+    else assert.equal(quirks.length, 0, `${c.id}, with no quirk, rests`);
+    assert.deepEqual(B.track.moves.filter((m) => m.ceiling != null || m.step), A.track.moves.filter((m) => m.ceiling != null || m.step), `${c.id} goes where the board's guide goes`);
+  }
+  // dressed for an occasion: Stuart's winter is his elf hat and mittens, Pip's its beanie
+  const winter = build({ ...tiny(), guide: { character: "stuart", wear: ["elf-hat", "mittens"] } });
+  assert.equal(winter.board.cast.outfit, "winter", "a list that is one of his outfits is that outfit");
+  const W = sceneOf(winter.board, winter.comp, winter.tl).actors[0];
+  assert.equal(W.outfit, "winter");
+  const L = lookOf(pip);
+  const B = recast(W, L, [...sceneOf(winter.board, winter.comp, winter.tl).palette], []);
+  assert.equal(B.strokes.filter((s) => s.part === "hat").length, L.wear.beanie.length, "Pip wears its own winter outfit, its beanie");
+  assert.match(normalize({ ...tiny(), guide: { character: "stuart", outfit: "summer" } }).errors.join("\n"), /outfit "summer": it has winter, Halloween/);
+  assert.deepEqual(normalize({ ...tiny(), guide: { character: "stuart", outfit: "Halloween" } }).board.cast.wear, ["spider"]);
+});

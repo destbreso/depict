@@ -236,7 +236,7 @@ export function audit(board, comp, tl) {
   // from when it appears to when the circle closes on it (while the camera flies, the picture moves anyway)
   const A = tl.actors?.[0];
   if (A) {
-    const M = A.rig.measures;
+    const M = A.rig.slot.measures;
     const half = Math.max(M.back, M.front) * A.h;
     const up = A.h * (1 + reachAbove(board.cast));
     const end = tl.outro ? tl.outro.iris.close : tl.duration;

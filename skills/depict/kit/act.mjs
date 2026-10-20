@@ -254,3 +254,366 @@ export function hosePath(sh, bow, hand, wobble) {
   }
   return out;
 }
+
+// ------------------------------------------------------------------ the ways it arrives and leaves
+
+/** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
+export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110 };
+
+/** A hop where it stands. */
+export const hopHere = (at, t0, t1, height) => ({ t0, t1, from: [at.x, at.y], to: [at.x, at.y], hops: 1, height, facing: at.facing, land: at.facing });
+
+/**
+ * The ways it comes alive once it is drawn. Each writes its keys from `a`,
+ * the moment it is complete, and returns when it is ready to present the title.
+ */
+export const INTROS = {
+  wave: (k, a) => {
+    k.bounces.push([a + 0.02, 1.1]);
+    k.arms.push([a, "wave"]);
+    return a + 1.2;
+  },
+  hop: (k, a, at) => {
+    k.bounces.push([a, -0.6]);
+    k.moves.push(hopHere(at, a + 0.1, a + 0.62, INTRO_HEIGHT.hop));
+    k.bounces.push([a + 0.62, 0.9]);
+    k.arms.push([a, "cheer"], [a + 0.7, "wave"]);
+    return a + 1.5;
+  },
+  spin: (k, a, at) => {
+    k.bounces.push([a, -0.6]);
+    k.moves.push(hopHere(at, a + 0.1, a + 0.82, INTRO_HEIGHT.spin));
+    k.spins.push([a + 0.12, a + 0.8, 1]);
+    k.bounces.push([a + 0.82, 1.0]);
+    k.arms.push([a, "cheer"], [a + 0.9, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.4, "happy"]);
+    return a + 1.7;
+  },
+  bow: (k, a) => {
+    k.arms.push([a, "rest"]);
+    k.leans.push([a + 0.08, a + 1.0, 24]);
+    k.feel.push([a + 0.08, "proud"], [a + 1.0, "happy"]);
+    k.bounces.push([a + 1.0, 0.45]);
+    k.arms.push([a + 1.0, "wave"]);
+    return a + 1.9;
+  },
+  tip: (k, a) => {
+    k.arms.push([a, "tip"]);
+    k.caps.push([a + 0.2, a + 1.05, 0.075, 14]);
+    k.feel.push([a + 0.2, "proud"], [a + 1.05, "happy"]);
+    k.arms.push([a + 1.1, "wave"]);
+    return a + 1.9;
+  },
+  jump: (k, a, at) => {
+    k.bounces.push([a, -0.8]);
+    k.moves.push(hopHere(at, a + 0.14, a + 0.78, INTRO_HEIGHT.jump));
+    k.bounces.push([a + 0.78, 1.05]);
+    k.arms.push([a + 0.1, "cheer"], [a + 0.86, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.4, "happy"]);
+    return a + 1.7;
+  },
+  // a soft body's: it squashes deep, springs up, lands and bounces once more, wobbling on, and waves
+  bounce: (k, a, at) => {
+    k.bounces.push([a, -0.9]);
+    k.moves.push(hopHere(at, a + 0.1, a + 0.66, INTRO_HEIGHT.bounce));
+    k.bounces.push([a + 0.66, 1.2]);
+    k.moves.push(hopHere(at, a + 0.74, a + 1.06, INTRO_HEIGHT.bounce * 0.35));
+    k.bounces.push([a + 1.06, 0.8]);
+    k.arms.push([a, "cheer"], [a + 1.12, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.6, "happy"]);
+    return a + 2.0;
+  },
+  // it shakes itself awake like a jelly, arms out, then waves
+  jiggle: (k, a) => {
+    k.bounces.push([a, 1.1], [a + 0.32, -0.8], [a + 0.62, 0.6]);
+    k.arms.push([a, "shrug"], [a + 0.95, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.5, "happy"]);
+    return a + 1.9;
+  },
+};
+
+/** The ways the guide says goodbye as the camera comes in on it: keys from `t`, the camera arriving at `t + fly`, the circle closing after `iris.hold`. */
+export const OUTROS = {
+  wave: (k, t) => k.arms.push([t + 0.15, "wave"]),
+  bow: (k, t, fly, iris) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.15, "rest"]);
+    k.leans.push([t + fly - 0.1, iris.hold + 0.08, 26]);
+    k.feel.push([t + fly - 0.1, "proud"]);
+  },
+  cheer: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "cheer"]);
+    k.moves.push(hopHere(at, t + fly - 0.5, t + fly + 0.08, 85));
+    k.bounces.push([t + fly + 0.08, 0.8]);
+    k.feel.push([t + 0.15, "excited"]);
+  },
+  salute: (k, t, fly) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.3, "salute"]);
+    k.feel.push([t + fly - 0.3, "proud"]);
+  },
+  tip: (k, t, fly, iris) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.3, "tip"]);
+    k.caps.push([t + fly - 0.15, iris.hold + 0.15, 0.075, 14]);
+    k.feel.push([t + fly - 0.15, "proud"]);
+  },
+  spin: (k, t, fly, iris, at) => {
+    k.moves.push(hopHere(at, t + fly - 0.7, t + fly + 0.05, 115));
+    k.spins.push([t + fly - 0.68, t + fly + 0.03, 1]);
+    k.bounces.push([t + fly + 0.05, 0.85]);
+    k.arms.push([t + 0.15, "cheer"], [t + fly + 0.1, "wave"]);
+  },
+  // a soft body's goodbye: two happy bounces, the second smaller, wobbling on as the circle closes
+  bounce: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "cheer"]);
+    k.moves.push(hopHere(at, t + fly - 0.75, t + fly - 0.3, 75));
+    k.bounces.push([t + fly - 0.3, 1.0]);
+    k.moves.push(hopHere(at, t + fly - 0.22, t + fly + 0.06, 32));
+    k.bounces.push([t + fly + 0.06, 0.7]);
+    k.feel.push([t + 0.15, "excited"]);
+  },
+};
+
+// ------------------------------------------------------------------ casting another guide
+
+/** The poses every character has; any other is a quirk's (Stuart's glasses), and a character without that quirk rests instead. */
+const OWN_POSES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
+/** The brows, mouths and closed eyes of the other feelings: ready when the guide is drawn, hidden until needed. */
+const WAITING = /^brows:(?!up$)|^mouth:(?!smile$)|^squint/;
+const lengthOf = (pts) => {
+  let l = 0;
+  for (let i = 2; i < pts.length; i += 2) l += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
+  return l;
+};
+
+/**
+ * When each stroke of a guide is drawn as it first appears, in its drawing order, between t0 and t1 (the span the
+ * board gave its own guide): its outline, face, arms and gloves (four strokes the page draws from the pose), legs
+ * and color, each for a time in proportion to its length, as the timeline times a guide (timeline.mjs, drawGuide).
+ * Sets t0 and t1 on each stroke and returns the arms' and gloves' spans.
+ */
+export function drawOn(strokes, armsAt, h, t0, t1) {
+  const items = [];
+  for (const s of strokes) if (!WAITING.test(s.part)) items.push({ n: s.n, s, len: lengthOf(s.pts) * (s.l === 0 ? 1 : 0.3) });
+  ["armBack", "gloveBack", "armFront", "gloveFront"].forEach((name, i) => items.push({ n: armsAt + i, name, len: name.startsWith("arm") ? 0.42 * h : 0.5 * h }));
+  items.sort((a, b) => a.n - b.n);
+  const total = items.reduce((a, x) => a + x.len, 0) || 1;
+  const lift = 0.015;
+  const room = Math.max(0.3, t1 - t0 - lift * items.length);
+  let at = t0;
+  const reveal = {};
+  for (const x of items) {
+    const d = (room * x.len) / total;
+    if (x.s) {
+      x.s.t0 = at;
+      x.s.t1 = at + d;
+    } else reveal[x.name] = [at, at + d];
+    at += d + lift;
+  }
+  for (const s of strokes) if (WAITING.test(s.part)) s.t0 = s.t1 = at;
+  return reveal;
+}
+
+/** The span a board gave its guide to be drawn in as it first appears. */
+function drawnIn(A) {
+  let a = Infinity;
+  let b = -Infinity;
+  for (const s of A.strokes) if (!WAITING.test(s.part) && s.t1 > s.t0) (a = Math.min(a, s.t0)), (b = Math.max(b, s.t1));
+  for (const k in A.reveal || {}) (a = Math.min(a, A.reveal[k][0])), (b = Math.max(b, A.reveal[k][1]));
+  return [a, b + 0.015];
+}
+
+/**
+ * A board is directed by its slot: the gestures it has its guide make were worked out with the slot's shoulders
+ * and reach. A guide with a body of its own (narrower, with shorter arms) makes them from its own shoulders: where
+ * its arm on the way to a thing would cross something the slot's would not, or its finger, out of its reach, would
+ * stop in the air beside another thing or with another ahead of it, it looks at the thing instead of pointing, its
+ * hands at rest. A is the guide as a page carries it, with `slot` ({ front, reach }); elements are the page's
+ * ({ kind, t0, box: [x, y, w, h] }).
+ */
+export function keepClear(A, elements) {
+  const S = A.slot;
+  if (!S) return A;
+  const reach = (A.reach ?? 0.36) * A.h;
+  if (S.front[0] === A.shoulders.front[0] && S.front[1] === A.shoulders.front[1] && Math.abs(S.reach * A.h - reach) < 0.5) return A;
+  const h = A.h;
+  const tip = 0.13 * h + (A.hold === "pointer" ? 0.27 * h : 0) + 12;
+  const solid = elements.filter((e) => e.box && (e.kind === "item" || e.kind === "note" || e.kind === "region" || e.kind === "title"));
+  const near = (b, x, y, m) => x > b[0] - m && x < b[0] + b[2] + m && y > b[1] - m && y < b[1] + b[3] + m;
+  const holds = (o, b) => o[0] <= b[0] && o[1] <= b[1] && o[0] + o[2] >= b[0] + b[2] && o[1] + o[3] >= b[1] + b[3];
+  // what is in the way from a shoulder to the point it aims at: on the line, and, out of reach, by the finger or ahead of it
+  const blockers = (sx, sy, arm, tx, ty, tbox, others) => {
+    const found = new Set();
+    const d = Math.hypot(tx - sx, ty - sy) || 1;
+    for (let r = 0; r < d; r += 6) {
+      const x = sx + ((tx - sx) * r) / d;
+      const y = sy + ((ty - sy) * r) / d;
+      if (tbox && near(tbox, x, y, 6)) break;
+      for (const o of others) if (near(o.box, x, y, 6)) found.add(o);
+    }
+    const full = arm + tip;
+    if (d > full) {
+      const [ux, uy] = [(tx - sx) / d, (ty - sy) / d];
+      const [x, y] = [sx + ux * full, sy + uy * full];
+      for (const o of others) {
+        const b = o.box;
+        const px = b[0] + b[2] / 2 - x;
+        const py = b[1] + b[3] / 2 - y;
+        const along = px * ux + py * uy;
+        const across = Math.abs(px * uy - py * ux);
+        if (near(b, x, y, 0.12 * h) || (along > 0 && along < d - full && across < 0.21 * along + Math.hypot(b[2], b[3]) / 2)) found.add(o);
+      }
+    }
+    return found;
+  };
+  const arms = A.track.arms.map((k) => {
+    if (k[1] !== "point" || k.length < 4) return k;
+    const [t, , tx, ty] = k;
+    const st = actorAt(A, t + 0.05);
+    const at = (sh) => [st.x + st.facing * sh[0], st.y + sh[1]];
+    const shown = solid.filter((e) => e.t0 <= t + 0.05);
+    // the thing it points at: the smallest thing drawn round the point it aims at (and whatever frames it is not in the way)
+    const target = shown.filter((e) => near(e.box, tx, ty, 2)).sort((a, b) => a.box[2] * a.box[3] - b.box[2] * b.box[3])[0];
+    const tbox = target ? target.box : null;
+    const others = shown.filter((e) => e !== target && !(tbox && holds(e.box, tbox)));
+    const mine = blockers(...at(A.shoulders.front), reach, tx, ty, tbox, others);
+    if (!mine.size) return k;
+    const theirs = blockers(...at(S.front), S.reach * h, tx, ty, tbox, others);
+    for (const o of mine) if (!theirs.has(o)) return [t, "rest"];
+    return k;
+  });
+  return { ...A, track: { ...A.track, arms } };
+}
+
+/**
+ * A guide's track for another character, who is who it is: it comes alive its own way, says goodbye its own way, and
+ * does its own quirks in the board's quiet moments. The board's own way is kept when it is one of this character's
+ * too; otherwise the board's seed picks among its own, and an arrival never leaves the ground higher than the board's
+ * own did (the opening shot made room for that one). Everything else (where it goes, what it points at and feels) is
+ * the board's.
+ */
+export function personalize(track, look) {
+  const tuples = (list) => (list || []).map((x) => [...x]);
+  const k = { ...track, moves: (track.moves || []).map((m) => ({ ...m })) };
+  for (const key of ["arms", "feel", "look", "bounces", "spins", "leans", "caps"]) k[key] = tuples(track[key]);
+  const blank = () => ({ moves: [], arms: [], feel: [], look: [], bounces: [], spins: [], leans: [], caps: [] });
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const take = (made) => {
+    for (const key in made) for (const e of made[key]) {
+      const i = k[key].findIndex((x) => same(x, e));
+      if (i >= 0) k[key].splice(i, 1);
+    }
+  };
+  const put = (made) => {
+    for (const key in made) k[key].push(...made[key]);
+  };
+  const choose = (old, own, fits) => {
+    if (own.includes(old.kind)) return old.kind;
+    const fit = own.filter(fits);
+    return fit.length ? fit[old.seed % fit.length] : old.kind;
+  };
+  const arrive = track.intro;
+  if (arrive && INTROS[arrive.kind]) {
+    const high = INTRO_HEIGHT[arrive.kind] ?? 0;
+    const kind = choose(arrive, look.intros || [], (x) => INTROS[x] && (INTRO_HEIGHT[x] ?? 0) <= high);
+    if (kind !== arrive.kind) {
+      const was = blank();
+      const ready0 = INTROS[arrive.kind](was, arrive.at, arrive.from);
+      take(was);
+      const now = blank();
+      const ready1 = INTROS[kind](now, arrive.at, arrive.from);
+      put(now);
+      // it presents the title once it is ready, its own arrival done
+      if (arrive.title != null) {
+        const [a, b] = [Math.max(arrive.title, ready0), Math.max(arrive.title, ready1)];
+        for (const key of k.arms) if (key[1] === "present" && Math.abs(key[0] - a) < 1e-9) key[0] = b;
+      }
+      k.intro = { ...arrive, kind };
+    }
+  }
+  const leave = track.outro;
+  if (leave && OUTROS[leave.kind]) {
+    const kind = choose(leave, look.outros || [], (x) => Boolean(OUTROS[x]));
+    if (kind !== leave.kind) {
+      const iris = { hold: leave.hold };
+      const was = blank();
+      OUTROS[leave.kind](was, leave.t, leave.fly, iris, leave.at);
+      take(was);
+      const now = blank();
+      OUTROS[kind](now, leave.t, leave.fly, iris, leave.at);
+      put(now);
+      k.outro = { ...leave, kind };
+    }
+  }
+  // its own quirks in the quiet moments: the board's guide's go, and this one's own come, if it has any
+  const quiet = track.quirks || [];
+  if (quiet.length) {
+    const mine = (look.quirks || []).filter((q) => look.poses[q]);
+    const at = new Set(quiet.flatMap(([a, b]) => [a, b]));
+    k.arms = k.arms.filter((x) => !at.has(x[0]));
+    quiet.forEach(([a, b], i) => {
+      if (mine.length) k.arms.push([a, mine[i % mine.length]], [b, "rest"]);
+    });
+  }
+  for (const key of ["arms", "feel", "look", "bounces", "spins", "leans", "caps"]) k[key].sort((a, b) => a[0] - b[0]);
+  k.moves.sort((a, b) => a.t0 - b.t0);
+  return k;
+}
+
+/** Why a look cannot present a board in place of its guide A, or null when it can. */
+export function castProblem(A, look) {
+  if (!look || look.depict !== "look" || look.version !== 1) return "that is not a character's look (scripts/look.mjs makes one)";
+  if (!A.contract) return "this board was built before characters had bodies to share: build it again to cast another guide in it";
+  if (look.contract !== A.contract) return `${look.name} has ${look.contract}'s body and this board's guide has ${A.contract}'s: a character presents only the boards made for its body`;
+  if (Math.abs(look.h - A.h) > 0.5) return `${look.name} is drawn ${look.h} tall and this board's guide ${Math.round(A.h * 10) / 10}: make its look again with this board's kit`;
+  return null;
+}
+
+/**
+ * The guide A of a board, played by another character of its body: the board's own performance (where it stands,
+ * how it hops, what it points at and feels), the costumes the board puts on it that this character can wear, and
+ * what it holds; this character's body, face, arms and hands, drawn as it first appears in the span A was, and
+ * moving as its own material does. A pose of a quirk it does not have (Stuart's glasses) becomes rest, and a gesture
+ * its own arm would not make cleanly becomes a look (keepClear). `palette` is the page's: the look's colors join it,
+ * and its open accent is the board's; `elements` are the page's.
+ */
+export function recast(A, look, palette, elements = []) {
+  const color = (c) => {
+    if (c === "accent") return A.accent;
+    let i = palette.indexOf(c);
+    if (i < 0) i = palette.push(c) - 1;
+    return i;
+  };
+  const copy = (s) => ({ part: s.part, n: s.n, w: s.w, c: color(s.c), l: s.l, o: s.o, pts: s.pts });
+  const strokes = look.strokes.map(copy);
+  let next = Math.max(look.armsAt + 3, ...strokes.map((s) => s.n)) + 1;
+  // what it wears: for an outfit the board's guide wears (its winter, its Halloween), its own outfit of that name;
+  // otherwise the costumes the board wears that it has; each in its turn after its body, as a board dresses a guide
+  const kit = A.outfit && (look.outfits || []).find((o) => o.name === A.outfit);
+  const wears = Object.keys(look.wear || {}).filter((w) => (kit ? kit.wear : A.wear || []).includes(w));
+  for (const w of wears) for (const s of look.wear[w]) strokes.push({ ...copy(s), n: next++ });
+  // what it holds is the board's: drawn in its hand's own frame, so the same in any hand, and drawn last
+  for (const s of A.strokes) if (s.part === "held" || s.part === "pointer") strokes.push({ ...s, n: next++ });
+  const [t0, t1] = drawnIn(A);
+  const reveal = drawOn(strokes, look.armsAt, A.h, t0, t1);
+  const hands = look.hands[wears.find((w) => look.hands[w]) ?? "plain"];
+  // its own arrival, goodbye and quirks; and any pose it does not have (another's quirk) rests
+  const played = personalize(A.track, look);
+  const has = (pose) => OWN_POSES.includes(pose) || (look.quirks || []).includes(pose);
+  const track = { ...played, arms: played.arms.map((k) => (has(k[1]) && look.poses[k[1]] ? k : [k[0], "rest"])) };
+  return keepClear({
+    ...A,
+    character: look.id,
+    eyes: look.eyes,
+    shoulders: look.shoulders,
+    poses: look.poses,
+    motion: look.motion,
+    reach: look.reach,
+    capPivot: look.capPivot,
+    arm: { width: look.arm.width, hose: look.arm.hose, ...(look.arm.fill ? { fill: color(look.arm.fill), fillWidth: look.arm.fillWidth } : {}) },
+    gloves: hands.gloves,
+    gloveWidth: hands.gloveWidth,
+    gloveFill: hands.gloveFill ? color(hands.gloveFill) : undefined,
+    strokes: strokes.map(({ n, ...s }) => s),
+    reveal,
+    track,
+  }, elements);
+}

@@ -76,6 +76,14 @@ function actorOf(a, color) {
   const rg = a.rig;
   return {
     h: a.h,
+    // who it is, the body it has, and what it wears on this board: a look of the same body can be cast in its place
+    character: rg.character,
+    contract: rg.contract,
+    // the slot it was directed by: the shoulder and reach its gestures were worked out with
+    slot: { front: rg.slot.shoulders.front.map(q), reach: rg.slot.reach },
+    wear: rg.wear,
+    outfit: rg.outfit,
+    accent: color(rg.accent),
     eyes: rg.eyes.map((e) => e.map(q)),
     shoulders: { front: rg.shoulders.front.map(q), back: rg.shoulders.back.map(q) },
     poses: a.poses,

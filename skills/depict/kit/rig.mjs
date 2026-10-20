@@ -12,7 +12,7 @@
 // fingers, y toward the thumb).
 import * as ink from "./ink.mjs";
 import { smooth } from "./geom.mjs";
-import { characterOf } from "./characters/index.mjs";
+import { characterOf, contractOf, slotOf } from "./characters/index.mjs";
 
 const PAPER = "#fbfaf7";
 const INK = "#1b1b19";
@@ -40,17 +40,22 @@ export const OUTROS = ["wave", "bow", "cheer", "salute", "tip", "spin", "bounce"
 const SKIN_TINTS = { blue: "#d3e3f0", green: "#d6ead8", sand: "#f4e6c4", pink: "#f5d9df" };
 /** How far above the top of the marker's cap a costume reaches, in units of the guide's height: its spot keeps that paper free too. */
 const HAT_TOP = { "grad-cap": 0.09, "hard-hat": 0.09, headphones: 0.07, "party-hat": 0.28, crown: 0.1, beanie: 0.11, "chef-hat": 0.26, "hair-bow": 0.04, "pencil-ear": 0.07 };
-/** How far above the top of its head what the guide wears reaches, for its character: a shared costume sits in the character's own place for it, and a character's own costume says its height. */
+/**
+ * How far above the top of its head what the guide wears reaches, for its character: a shared costume sits in the
+ * character's own place for it, and a character's own costume says its height. A board keeps that paper free over
+ * its slot, so for a guide drawn to another's slot, as much as the slot's own character would need in the same
+ * costume, whichever is higher: any character of the contract fits under it.
+ */
 export const reachAbove = (cast = {}) => {
   const C = characterOf(cast);
-  return Math.max(
-    0,
-    ...(cast.wear ?? []).map((w) => {
-      if (C.costumes?.[w]) return C.costumes[w].top ?? 0;
-      const a = C.anchors?.[SLOT[w]];
-      return HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w];
-    }),
-  );
+  const S = slotOf(cast);
+  const top = (X, w) => {
+    if (X.costumes?.[w]) return X.costumes[w].top ?? 0;
+    const a = X.anchors?.[SLOT[w]];
+    return HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w];
+  };
+  const wears = (X, w) => (X.wear ?? []).includes(w) || Boolean(X.costumes?.[w]);
+  return Math.max(0, ...(cast.wear ?? []).map((w) => Math.max(top(C, w), S !== C && wears(S, w) ? top(S, w) : 0)));
 };
 /** Where each shared costume goes on a character: its hats on its head, a bow tie or a scarf at its neck, a star on its chest, a bow in its hair, a pencil behind its ear. */
 const SLOT = { "grad-cap": "hat", "hard-hat": "hat", headphones: "hat", "party-hat": "hat", crown: "hat", beanie: "hat", "chef-hat": "hat", glasses: "eyes", "bow-tie": "neck", scarf: "neck", star: "chest", "hair-bow": "hair", "pencil-ear": "ear" };
@@ -176,9 +181,19 @@ export function rig(p, h, accent, cast = {}) {
   const hose = Array.from({ length: 19 }, () => p.off(Math.min(1.4, 0.3 * W)));
   const [su, sv] = C.shoulders.front;
   const [bu, bv] = C.shoulders.back;
+  // the slot the board keeps for it: the paper, the shoulders and the reach it is laid out and directed by (its own,
+  // or those of the character whose slot it is drawn to)
+  const S = slotOf(cast);
+  const kept = { measures: S.measures, shoulders: { front: P(...S.shoulders.front), back: P(...S.shoulders.back) }, reach: S.reach ?? 0.36 };
   return {
     h,
     character: C.id,
+    // the body it has (any character of the same contract can be cast in its place), what it wears and the accent
+    contract: contractOf(C),
+    slot: kept,
+    wear,
+    outfit: cast.outfit ?? null,
+    accent,
     strokes,
     armsAt,
     eyes,

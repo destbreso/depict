@@ -14,7 +14,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { needsWebSocketFlag, open } from "./chrome.mjs";
-import { CHARACTERS, checkCharacter } from "../kit/characters/index.mjs";
+import { CHARACTERS, checkCharacter, resolve } from "../kit/characters/index.mjs";
+import { fitsContract } from "../kit/look.mjs";
 import { sheet } from "../kit/sheet.mjs";
 import { normalize } from "../kit/model.mjs";
 import { compose } from "../kit/compose.mjs";
@@ -35,8 +36,9 @@ if (!which || !opt("out")) {
   console.error("usage: node scripts/character.mjs <marker | stuart | path/to/character.mjs> --out <folder> [--wear a,b] [--hold thing]");
   process.exit(2);
 }
-const C = CHARACTERS[which] ?? (await import(pathToFileURL(path.resolve(which)).href)).default;
-const problems = checkCharacter(C);
+const raw = CHARACTERS[which] ?? (await import(pathToFileURL(path.resolve(which)).href)).default;
+// its module, and, for a character drawn to another's body, that its drawing keeps to that body
+const problems = [...checkCharacter(raw), ...fitsContract(raw)];
 if (problems.length) {
   console.error(`${which}: ${problems.length} problem${problems.length > 1 ? "s" : ""} to fix:`);
   for (const m of problems) console.error(`  - ${m}`);
@@ -44,7 +46,9 @@ if (problems.length) {
 }
 const out = path.resolve(opt("out"));
 fs.mkdirSync(out, { recursive: true });
-const character = CHARACTERS[C.id] === C ? C.id : C;
+// the character as the kit sees it (one drawn to another's body has that body), and as a board names it
+const C = resolve(raw);
+const character = CHARACTERS[raw.id] === raw ? raw.id : raw;
 const own = Object.keys(C.costumes ?? {});
 const shared = (C.wear ?? []).filter((w) => w !== "glasses");
 const asked = opt("wear") ? opt("wear").split(",") : null;
@@ -53,7 +57,7 @@ const holding = opt("hold");
 // the sheet: every feeling, every pose, and its costumes (its own first)
 const cast = (wear = []) => ({ character, wear });
 const feels = ["happy", "excited", "surprised", "worried", "thinking", "proud", "wink", "sad"];
-const poses = ["rest", "point", "present", "wave", "cheer", "shrug", "scratch", "salute", ...(C.poses.glasses ? ["glasses"] : [])];
+const poses = ["rest", "point", "present", "wave", "cheer", "shrug", "scratch", "salute", ...(C.personality?.quirks ?? []).filter((q) => C.poses[q])];
 const hats = shared.filter((w) => ["grad-cap", "hard-hat", "headphones", "party-hat", "crown", "beanie", "chef-hat"].includes(w));
 // its outfits (the costumes of each of the drawings it came from, worn together), or its own costumes in one
 const outfits = C.outfits?.length ? C.outfits : own.length ? [{ name: own.join(" + "), wear: own.filter((w) => !C.costumes[w].hat || w === own.find((x) => C.costumes[x].hat)) }] : [];

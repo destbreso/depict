@@ -9,7 +9,7 @@ import { widest, write } from "./hand.mjs";
 import { icon } from "./icons.mjs";
 import { person, TINTS } from "./people.mjs";
 import { feetBox, reachAbove, rig, spotBox } from "./rig.mjs";
-import { characterOf } from "./characters/index.mjs";
+import { slotOf } from "./characters/index.mjs";
 import { INTRO_HEIGHT } from "./perform.mjs";
 import { flattenPath } from "./svgpath.mjs";
 import { bounds, cubic, pad, union } from "./geom.mjs";
@@ -45,7 +45,7 @@ export const SIZE = {
   frame: [1120, 630], // the smallest shot of a region
   frameAir: 90, // space round a region's content inside its shot
 };
-const W = { line: 5, icon: 4.6, label: 4, note: 3.1, title: 6.4, mark: 5, link: 4.6, highlight: 0 };
+export const W = { line: 5, icon: 4.6, label: 4, note: 3.1, title: 6.4, mark: 5, link: 4.6, highlight: 0 };
 
 /** One element: something drawn as one gesture group (an item, a link, a note, a mark), with the strokes of each of its parts. */
 const element = (id, kind, parts) => ({ id, kind, parts, box: bounds(parts.flatMap((p) => p.strokes)) });
@@ -456,8 +456,8 @@ function layoutRegion(board, font, region, S, first, index) {
     // the guide: the marker that draws every board, standing beside the titles on the line under them,
     // where it first appears and presents the title (its pointing finger stops short of the first letter)
     const line = title ?? boardTitle;
-    const h = SIZE.guide * (characterOf(board.cast).size ?? 1); // a character's own size: a wide one stands a little shorter
-    const M = characterOf(board.cast).measures;
+    const h = SIZE.guide * (slotOf(board.cast).size ?? 1); // a character's own size: a wide one stands a little shorter
+    const M = slotOf(board.cast).measures;
     const feet = [content.x - 34 - M.reach * h, line.box.y + line.box.h + 40];
     const up = h * reachAbove(board.cast); // and a hat above it, if it wears one
     guide = { feet, box: { x: feet[0] - M.back * h, y: feet[1] - h - up, w: (M.back + M.reach) * h, h: h + up } };
@@ -599,7 +599,7 @@ function frameFor(box) {
  */
 function regionGap(board) {
   if (!board.guide) return SIZE.regionGap;
-  const C = characterOf(board.cast);
+  const C = slotOf(board.cast);
   const h = SIZE.guide * (C.size ?? 1);
   return Math.max(SIZE.regionGap, Math.round((C.measures.back + C.measures.front) * h + 190));
 }
@@ -1056,16 +1056,16 @@ export function compose(board, font) {
   // the guide's spots: where it stands in each idea, in free paper beside it, so it never covers the drawing
   let guide = null;
   if (guideStart) {
-    const h = SIZE.guide * (characterOf(board.cast).size ?? 1); // a character's own size: a wide one stands a little shorter
+    const h = SIZE.guide * (slotOf(board.cast).size ?? 1); // a character's own size: a wide one stands a little shorter
     const taken = [...elements.values()].filter((e) => e.kind !== "guide").map((e) => pad(e.box, 18));
     const spots = [guideStart];
     for (const r of regions) {
       if (r.id === guideStart.region && board.mode === "slides") continue;
-      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast), characterOf(board.cast).measures, characterOf(board.cast).shoulders?.front)) };
+      const spot = { top: reachAbove(board.cast), ...(reserved.get(r.id) ?? freeSpot(r, elements, taken, h, reachAbove(board.cast), slotOf(board.cast).measures, slotOf(board.cast).shoulders?.front)) };
       spots.push(spot);
-      taken.push(pad(spotBox(spot, h, characterOf(board.cast).measures), 10));
+      taken.push(pad(spotBox(spot, h, slotOf(board.cast).measures), 10));
     }
-    guide = { h, rig: rig(ink.pen(S("guide"), { width: W.icon }), h, board.accent, board.cast), spots, measures: characterOf(board.cast).measures };
+    guide = { h, rig: rig(ink.pen(S("guide"), { width: W.icon }), h, board.accent, board.cast), spots, measures: slotOf(board.cast).measures };
   }
 
   // a region's frame holds everything drawn in it (a note or a mark may reach past the content), grown to 16:9;
