@@ -167,6 +167,10 @@ The kit does the rest, in Node, with nothing but its own modules:
 
 The page itself needs only a browser.
 
+## What it runs, and what it sends
+
+Everything runs on your machine. The kit uses only Node's built-in modules: nothing is installed, and no account or API key is needed. Building a board writes one HTML file, which makes no network requests when it plays. The check (`scripts/check.mjs`) and the video (`scripts/video.mjs`) start your own Chrome or Chromium in headless mode and drive it through its local DevTools port on 127.0.0.1, and the video runs your own ffmpeg. Depict sends nothing anywhere and collects nothing. The scripts in `tools/` are for maintainers: they rebuild the bundled font and icon files, and the skill never runs them.
+
 ## Credits
 
 - The line and ellipse models follow [Rough.js](https://github.com/rough-stuff/rough) (MIT), after Jo Wood's Handy.
