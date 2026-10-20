@@ -558,6 +558,35 @@ export function personalize(track, look) {
   return k;
 }
 
+/**
+ * The days of the year a guide can dress for, in the viewer's own calendar, from [month, day] to [month, day]: the
+ * holidays first, then the seasons. A host that asks for today's outfit (`outfit: "today"`) has a character wear its
+ * own outfit for the first of them it has one for, and its board's dress on any other day; any other name is the
+ * host's own (a school's sports day, a birthday).
+ */
+export const OCCASIONS = [
+  { name: "New Year", from: [12, 31], to: [1, 1] },
+  { name: "Valentine's Day", from: [2, 10], to: [2, 14] },
+  { name: "St. Patrick's Day", from: [3, 14], to: [3, 17] },
+  { name: "Fourth of July", from: [7, 1], to: [7, 4] },
+  { name: "Halloween", from: [10, 18], to: [10, 31] },
+  { name: "Christmas", from: [12, 1], to: [12, 26] },
+  { name: "winter", from: [12, 1], to: [2, 29] },
+  { name: "summer", from: [6, 21], to: [8, 31] },
+];
+
+/** The occasions of a day, most particular first: Thanksgiving's week (the fourth Thursday of November), a holiday, a season. */
+export function occasionsOn(date = new Date()) {
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const key = m * 100 + d;
+  const within = ([m0, d0], [m1, d1]) => (m0 * 100 + d0 <= m1 * 100 + d1 ? key >= m0 * 100 + d0 && key <= m1 * 100 + d1 : key >= m0 * 100 + d0 || key <= m1 * 100 + d1);
+  const out = OCCASIONS.filter((o) => within(o.from, o.to)).map((o) => o.name);
+  const thursday = 1 + ((4 - new Date(date.getFullYear(), 10, 1).getDay() + 7) % 7) + 21;
+  if (m === 11 && d >= thursday - 3 && d <= thursday + 1) out.unshift("Thanksgiving");
+  return out;
+}
+
 /** Why a look cannot present a board in place of its guide A, or null when it can. */
 export function castProblem(A, look) {
   if (!look || look.depict !== "look" || look.version !== 1) return "that is not a character's look (scripts/look.mjs makes one)";
@@ -573,9 +602,10 @@ export function castProblem(A, look) {
  * what it holds; this character's body, face, arms and hands, drawn as it first appears in the span A was, and
  * moving as its own material does. A pose of a quirk it does not have (Stuart's glasses) becomes rest, and a gesture
  * its own arm would not make cleanly becomes a look (keepClear). `palette` is the page's: the look's colors join it,
- * and its open accent is the board's; `elements` are the page's.
+ * and its open accent is the board's; `elements` are the page's; `dress` is what the host asks it to wear:
+ * { outfit } by name, or "today" for the day's occasion, with { date } to say another day.
  */
-export function recast(A, look, palette, elements = []) {
+export function recast(A, look, palette, elements = [], dress = {}) {
   const color = (c) => {
     if (c === "accent") return A.accent;
     let i = palette.indexOf(c);
@@ -585,10 +615,19 @@ export function recast(A, look, palette, elements = []) {
   const copy = (s) => ({ part: s.part, n: s.n, w: s.w, c: color(s.c), l: s.l, o: s.o, pts: s.pts });
   const strokes = look.strokes.map(copy);
   let next = Math.max(look.armsAt + 3, ...strokes.map((s) => s.n)) + 1;
-  // what it wears: for an outfit the board's guide wears (its winter, its Halloween), its own outfit of that name;
-  // otherwise the costumes the board wears that it has; each in its turn after its body, as a board dresses a guide
-  const kit = A.outfit && (look.outfits || []).find((o) => o.name === A.outfit);
-  const wears = Object.keys(look.wear || {}).filter((w) => (kit ? kit.wear : A.wear || []).includes(w));
+  // what it wears: an outfit the host asks for (today's: its Halloween in October), when it has one; else, for an
+  // outfit the board's guide wears (its winter, a builder's), its own outfit of that name; else the costumes the board
+  // wears that it has. A costume goes on only where the board kept the room over its head; each is drawn in its turn
+  // after its body, as a board dresses a guide
+  const find = (n) => n != null && (look.outfits || []).find((o) => o.name.toLowerCase() === String(n).toLowerCase());
+  const asked = dress.outfit === "today" ? occasionsOn(dress.date ? new Date(dress.date) : new Date()) : dress.outfit != null ? [dress.outfit] : [];
+  const room = (w) => A.top == null || (look.tops?.[w] ?? 0) <= A.top + 0.02;
+  const wearing = (kit) => Object.keys(look.wear || {}).filter((w) => (kit ? kit.wear : A.wear || []).includes(w) && room(w));
+  const day = asked.map(find).find(Boolean);
+  // the day's outfit when it fits on this board, else the board's own dress
+  const fits = day ? wearing(day) : [];
+  const wears = fits.length ? fits : wearing(find(A.outfit));
+  const worn = fits.length ? day.name : find(A.outfit) ? find(A.outfit).name : null;
   for (const w of wears) for (const s of look.wear[w]) strokes.push({ ...copy(s), n: next++ });
   // what it holds is the board's: drawn in its hand's own frame, so the same in any hand, and drawn last
   for (const s of A.strokes) if (s.part === "held" || s.part === "pointer") strokes.push({ ...s, n: next++ });
@@ -602,6 +641,8 @@ export function recast(A, look, palette, elements = []) {
   return keepClear({
     ...A,
     character: look.id,
+    // what it wears on this board, and the outfit that is, if any
+    dressed: { outfit: worn, wear: wears },
     eyes: look.eyes,
     shoulders: look.shoulders,
     poses: look.poses,

@@ -8,7 +8,7 @@ import { hand } from "./fonts.mjs";
 import { POSE_NAMES, FACES, HAIRS, HATS, TINTS } from "./people.mjs";
 import { flattenPath } from "./svgpath.mjs";
 import { ACTS, FEELINGS, HATS as GUIDE_HATS, HOLD } from "./rig.mjs";
-import { CHARACTERS, characterOf, checkCharacter } from "./characters/index.mjs";
+import { CHARACTERS, characterOf, checkCharacter, outfitsOf } from "./characters/index.mjs";
 import { hash32 } from "./rng.mjs";
 
 /** Typographic marks a hand writes the plain way; anything else outside its glyphs is a problem. */
@@ -64,8 +64,8 @@ export function normalize(input) {
   const wearable = [...(C.wear ?? []), ...own];
   // an outfit is the costumes of one of its drawings, worn together, by the name it has for every character that has
   // one (its winter, its Halloween): a character cast in its place wears its own outfit of that name
-  const outfits = C.outfits ?? [];
-  const named = cast.outfit != null ? outfits.find((o) => o.name === cast.outfit) : null;
+  const outfits = outfitsOf(C);
+  const named = cast.outfit != null ? outfits.find((o) => o.name.toLowerCase() === String(cast.outfit).toLowerCase()) : null;
   if (cast.outfit != null && !named) err(`${who}'s outfit "${cast.outfit}": ${outfits.length ? `it has ${outfits.map((o) => o.name).join(", ")}` : "it has none"}`);
   if (cast.outfit != null && cast.wear != null) err(`the guide wears an outfit or a list of things, not both`);
   const wear = named ? [...named.wear] : cast.wear == null ? [] : [cast.wear].flat();

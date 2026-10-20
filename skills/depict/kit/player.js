@@ -221,24 +221,25 @@
   const actors = (S.actors || []).map(makeActor);
   const ownGuide = S.actors && S.actors[0];
   /**
-   * Another character of the guide's body presents the board: its look (scripts/look.mjs) takes the guide's
-   * place, doing what the guide does, from this very moment; null brings the board's own guide back. Returns
-   * { ok, character } or { ok: false, reason }.
+   * Another character of the guide's slot presents the board: its look (scripts/look.mjs) takes the guide's
+   * place, doing what the guide does, its own way, from this very moment; null brings the board's own guide back.
+   * `dress` asks for an outfit, { outfit: "Halloween" } or { outfit: "today" } (act.mjs, OCCASIONS): the board's
+   * own guide dresses for an occasion by casting its own look. Returns { ok, character } or { ok: false, reason }.
    */
-  function cast(look) {
+  function cast(look, dress) {
     if (!ownGuide) return { ok: false, reason: "this board has no guide" };
     let A = ownGuide;
     if (look != null) {
       const why = castProblem(ownGuide, look);
       if (why) return { ok: false, reason: why };
-      A = recast(ownGuide, look, S.palette, S.elements);
+      A = recast(ownGuide, look, S.palette, S.elements, dress || {});
     }
     const old = actors[0];
     old.root.remove();
     old.floor.remove();
     actors[0] = makeActor(A);
     render(now);
-    return { ok: true, character: A.character };
+    return { ok: true, character: A.character, ...(A.dressed || { outfit: A.outfit ?? null, wear: A.wear || [] }) };
   }
   const revealed = (rv, t) => (!rv ? 1 : t < rv[0] ? 0 : t >= rv[1] ? 1 : (t - rv[0]) / (rv[1] - rv[0]));
   /** Poses an actor at time t (and, paused, breathes and blinks on the wall clock); returns the pen's tip while it is being drawn. */
@@ -828,7 +829,7 @@
     requestAnimationFrame(idle);
   }
 
-  window.depict = { render, seek, play, pause, cast, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
+  window.depict = { render, seek, play, pause, cast, occasions: occasionsOn, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
   // the host of an embedded page hears ready, play, pause and ended, and size whenever the height the page
   // wants (the board as wide as the frame, with its bar and caption under it) or the board's place in it changes:
   // `box`, [x, y, width, height] of the board in the frame, so a host can lay a picture exactly over it
@@ -886,7 +887,7 @@
       else if (say === "play" && !playing) play();
       else if (say === "pause" && playing) pause();
       // the host casts another character of the guide's body (its look), or the board's own back (null), and hears how it went
-      else if (say === "cast") tell("cast", cast(e.data.look ?? null));
+      else if (say === "cast") tell("cast", cast(e.data.look ?? null, { outfit: e.data.outfit, date: e.data.date }));
     });
   }
 })();

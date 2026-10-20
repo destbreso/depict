@@ -49,13 +49,14 @@ const HAT_TOP = { "grad-cap": 0.09, "hard-hat": 0.09, headphones: 0.07, "party-h
 export const reachAbove = (cast = {}) => {
   const C = characterOf(cast);
   const S = slotOf(cast);
-  const top = (X, w) => {
-    if (X.costumes?.[w]) return X.costumes[w].top ?? 0;
-    const a = X.anchors?.[SLOT[w]];
-    return HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w];
-  };
   const wears = (X, w) => (X.wear ?? []).includes(w) || Boolean(X.costumes?.[w]);
-  return Math.max(0, ...(cast.wear ?? []).map((w) => Math.max(top(C, w), S !== C && wears(S, w) ? top(S, w) : 0)));
+  return Math.max(0, ...(cast.wear ?? []).map((w) => Math.max(topOf(C, w), S !== C && wears(S, w) ? topOf(S, w) : 0)));
+};
+/** How far above the top of its head a costume reaches on a character, in units of its height. */
+export const topOf = (C, w) => {
+  if (C.costumes?.[w]) return C.costumes[w].top ?? 0;
+  const a = C.anchors?.[SLOT[w]];
+  return HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w];
 };
 /** Where each shared costume goes on a character: its hats on its head, a bow tie or a scarf at its neck, a star on its chest, a bow in its hair, a pencil behind its ear. */
 const SLOT = { "grad-cap": "hat", "hard-hat": "hat", headphones: "hat", "party-hat": "hat", crown: "hat", beanie: "hat", "chef-hat": "hat", glasses: "eyes", "bow-tie": "neck", scarf: "neck", star: "chest", "hair-bow": "hair", "pencil-ear": "ear" };
@@ -193,6 +194,8 @@ export function rig(p, h, accent, cast = {}) {
     slot: kept,
     wear,
     outfit: cast.outfit ?? null,
+    // the room the board keeps over its head for what it wears, in units of its height
+    top: reachAbove(cast),
     accent,
     strokes,
     armsAt,

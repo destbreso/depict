@@ -33,12 +33,45 @@ This is a tool of the skill. Use it when someone gives you a drawing of a charac
 6. **Use it.** A board can bring its own character: `import mine from "./characters/mine.mjs"` and `guide: { character: mine }`. To ship it with the skill instead, put its module in `kit/characters/` and add it to `kit/characters/index.mjs`; then `guide: { character: "<id>" }` works on any board.
 7. **Credit the artist** when they want it: a `credit: { by, age, note }` field, and a line at the top of its module. The sheet's title carries the note.
 
+## Characters that share a slot
+
+Every board keeps a slot for its guide: how tall it stands, the paper it takes beside each idea, the room over its head for what it wears, and how far its pointing finger reaches. The board is laid out by the slot, and the guide's performance is worked out with it (where it stands, how it hops, what it points at, when it steps aside), so a board is the same board whoever presents it. A character keeps its own slot unless it is drawn to another's: `contract: "stuart"` draws a character to Stuart's slot. Characters of one slot are interchangeable: any of them can present any board made for that slot, cast in as the board plays, with no board built again.
+
+**A character drawn to another's slot** stands exactly as tall (`size` is the slot's, and its module may not say another). Its body is its own: round like Stuart, narrow as a pencil, or any other shape, with its own shoulders, arms, reach and poses. What it does not say it takes from the slot's character (its measures, shoulders, reach, poses, the places for costumes, what a hat tips about, its arms and its hands), and poses it gives join the ones it takes, so it can add a quirk's pose without saying the rest again. `scripts/character.mjs` and `scripts/look.mjs` check that it fits the slot:
+
+- at rest, its drawing and its hands stay within the slot's paper on either side, and it is no taller than the slot;
+- a costume reaches no higher on it than on the slot's character, and its own costumes no higher than his highest;
+- its hands are no more than a quarter bigger than his.
+
+How far it points beside the slot's own character is reported, not required (`reachShare` in kit/look.mjs): a narrow character with short arms reaches less far (Niki's pencil, 68% as far as Stuart). Where a board has its guide point further than this character's finger reaches, or along a line its own arm would not keep clear, it looks at the thing instead, its hands at rest. So it never points across the drawing or at the wrong thing, whatever its shape.
+
+**One file per character, for every board of its slot.** `node scripts/look.mjs <character> --out <id>.look.json` writes the character's look: its body and face, its arms and hands, each costume it can wear as a part of its own, its outfits, its ways to arrive and leave and its quirks, and what it is made of; 30 to 50 kB. A look does not depend on any board: a board built once and a look made once meet in the page. With `--out <id>.look.js` it is a script that puts the look in `window.depictLooks[<id>]`, for a page opened from the disk, where nothing can be fetched.
+
+**Casting it in.** A page casts a look in its guide's place with `depict.cast(look, dress)`, or a host with a message to the page, `{ depict: "cast", look, outfit }`; `depict.cast(null)` (a message with `look: null`) brings the board's own guide back. The page answers a host with `{ depict: { event: "cast", ok, character, outfit, wear } }`, or with `ok: false` and the `reason` (a look of another slot, or a board built before slots). From that moment the new character does what the board's guide does, its own way:
+
+- it goes where the board's guide goes, points where it points (or looks, as above), feels what it feels, and holds what it holds;
+- it arrives and says goodbye its own way: the board's own way when that is one of its own too, otherwise one of its own picked by the board's seed, and an arrival never leaves the ground higher than the board's own did (the opening shot made room for that one);
+- in the board's quiet moments, where Stuart pushes his glasses up, it does its own quirks, or rests when it has none;
+- it moves as its own material does: a cloud settles slowly, a pencil lands firm;
+- it wears its own outfit of the board's (below), or else the costumes the board wears that it can wear, and a costume goes on only where the board kept the room over its head.
+
+**Outfits: the occasion and the part.** An outfit is costumes worn together under a name. The name is what a board and a host ask for, so each character wears its own:
+
+- **Its own outfits, from its drawings**, like Stuart's `winter` (an elf hat and mittens) and `Halloween` (his spider). A board dresses its guide in one by name (`guide: { outfit: "winter" }`), and a board whose list of things is one of its guide's outfits is dressed in that outfit.
+- **The parts every character can dress for**, from the shared costumes, unless it has its own outfit of that name: `builder` (a hard hat), `scholar` (a mortarboard), `chef`, `party`, `royal` (a crown), `music` (headphones) and `formal` (a bow tie). A board about building dresses its guide as a builder, and a friend with a builder's outfit of its own (a tool belt it was drawn with) wears that one.
+- **The occasions of the year.** A host that asks for `outfit: "today"` dresses a character in its own outfit for the day, when it has one: New Year, Valentine's Day, St. Patrick's Day, the Fourth of July, Halloween, Thanksgiving and Christmas, then the seasons, winter and summer (a holiday before its season; `OCCASIONS` in kit/act.mjs). A host can name any occasion of its own (a school's sports day), and a character with an outfit of that name wears it.
+
+Give a character the outfits its drawings show: whoever drew it can draw it for an occasion too.
+
+**The example** is `examples/friends/`: the hash table board built once and presented by Stuart as a scholar (`friends.html`); the looks of Stuart, of Pip (a rain cloud drawn to his slot with his body and its own face, colors, material, outfits and quirk) and of Niki's pencil (narrow, with its own short arms); and a host page with a picker for who presents it and what for (`index.html`), as a site would have one. `npm run looks` makes the looks again.
+
 ## The module, field by field
 
 A character is a module whose default export holds these fields. `scripts/character.mjs` checks every one.
 
 | Field | What it says |
 |---|---|
+| `contract` | Optional: the slot it is drawn to, another character's id (`"stuart"`), so it can present any board made for that slot; leave it out for a slot of its own. Its `size` is then the slot's, and what it does not say it takes from that character (see Characters that share a slot). |
 | `id`, `name` | A short lowercase id (`"stuart"`) and how a sentence names it (`"Stuart"`, or `"the marker"`). |
 | `about`, `credit` | One line on who it is; who drew it (`{ by, age, note }`), if they want the credit. |
 | `size` | Optional: its height beside the marker's (1). A wide character stands a little shorter, so the shots keep their size. |
@@ -53,9 +86,9 @@ A character is a module whose default export holds these fields. `scripts/charac
 | `anchors` | Where each shared costume goes on it, as a scale and a shift of the place it was made for on the marker: `hat`, `neck` (a bow tie, a scarf), `chest` (a star), `hair` (a bow), `ear` (a pencil): `{ s, du, dv }`. |
 | `wear`, `skins` | The shared costumes it can wear (`glasses` only if it has none of its own; a scarf only if it has a neck) and its skins (`plain` at least). |
 | `costumes` | Its own costumes, from its drawings: `{ draw(k), hat, top }`, `hat: true` for a hat or anything else that sits on its head (one at a time), `top` how far above its head it reaches. |
-| `outfits` | Optional: the costumes of each variant picture, worn together, `[{ name, wear }]` (Stuart's winter and Halloween). Its presentations wear them, one each. |
+| `outfits` | Optional: costumes worn together, by name, `[{ name, wear }]`: those of each variant picture (Stuart's `winter` and `Halloween`), and any it has for an occasion of the year (`Christmas`, `Fourth of July`) or a part it plays (`builder`, `chef`). A board or a host asks for an outfit by its name, so each character wears its own. Its presentations wear them, one each. |
 | `motion` | What it is made of: `squash` and `stretch` as multiples of the kit's own, `freq` and `damp` (how fast it wobbles after a landing and how fast that dies), `jelly` (how much its top sways over its feet, 0 for a stiff body), `breath` and `breathPeriod`. Leave it empty for the marker's stiff barrel. |
-| `personality` | `traits` (a line), `intros` and `outros` (its own ways of arriving and leaving; the seed picks among them), `quirks` (what it does on its own: `glasses`). |
+| `personality` | `traits` (a line), `intros` and `outros` (its own ways of arriving and leaving; the seed picks among them), `quirks` (its signature gestures: poses of its own it makes in a quiet moment, like Stuart's `glasses`; each needs its pose in `poses`). |
 
 The intros a character can choose from are `wave`, `hop`, `spin`, `bow`, `tip` (it needs a cap), `jump`, and for a soft body `bounce` (it squashes, springs up, lands and bounces once more) and `jiggle` (it shakes itself awake like a jelly); the outros, `wave`, `bow`, `cheer`, `salute`, `tip`, `spin` and `bounce`.
 

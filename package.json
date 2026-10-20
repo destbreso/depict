@@ -1,11 +1,11 @@
 {
   "name": "depict",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "description": "An Agent Skill that explains a concept by drawing it: a hand-drawn board that builds stroke by stroke and stays explorable.",
   "type": "module",
   "license": "MIT",
-  "author": "David Estévez",
+  "author": "David Est\u00e9vez",
   "repository": "github:destbreso/depict",
   "engines": {
     "node": ">=20.10"
@@ -15,6 +15,7 @@
     "examples": "for b in skills/depict/examples/*/board.mjs; do node skills/depict/scripts/build.mjs \"$b\" --out \"${b%board.mjs}$(basename \"$(dirname \"$b\")\").html\" --audit || exit 1; done",
     "fonts": "node tools/fonts.mjs",
     "icons": "node tools/icons.mjs",
-    "characters": "for c in marker stuart; do node skills/depict/scripts/character.mjs $c --out skills/depict/examples/characters/$c || exit 1; done"
+    "characters": "for c in marker stuart; do node skills/depict/scripts/character.mjs $c --out skills/depict/examples/characters/$c || exit 1; done",
+    "looks": "for c in stuart skills/depict/examples/friends/pip.mjs skills/depict/examples/friends/pencil.mjs; do node skills/depict/scripts/look.mjs $c --out skills/depict/examples/friends/$(basename $c .mjs).look.js || exit 1; done"
   }
 }

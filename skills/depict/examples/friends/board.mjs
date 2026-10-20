@@ -6,5 +6,6 @@
 // board's own.
 import board from "../hash-table/board.mjs";
 
-// his glasses are his own, so he finds things with a magnifier and a bow tie in the board's accent
-export default { ...board, guide: { character: "stuart", wear: ["bow-tie"], hold: "magnifier" } };
+// a scholar's cap (his glasses are his own) and a magnifier, for finding things: the cap keeps room over his head,
+// so a friend's hat for the day (a bat at Halloween) fits under it
+export default { ...board, guide: { character: "stuart", outfit: "scholar", hold: "magnifier" } };

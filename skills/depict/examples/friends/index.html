@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>One board, any guide of its slot</title>
+    <!--
+      A host page, as a site would have one: the board built once (friends.html), embedded, and a picker that
+      casts another character of its slot in its guide's place, dressed for an occasion or a part, with the page's
+      own message { depict: "cast", look, outfit }. Each character is one file, its look (scripts/look.mjs);
+      loaded here as scripts, so this page works opened from the disk, where nothing can be fetched.
+    -->
+    <script src="stuart.look.js"></script>
+    <script src="pip.look.js"></script>
+    <script src="pencil.look.js"></script>
+    <style>
+      :root { --paper: #fbfaf7; --room: #e9e6dd; --ink: #1b1b19; --muted: #6b6a64; --accent: #c43f0a; color-scheme: light; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--room); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+      main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p { margin: 0 0 14px; color: var(--muted); max-width: 72ch; }
+      .bar { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; margin: 14px 0 12px; }
+      .group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .group > span { font-weight: 600; margin-right: 2px; }
+      button, select { font: inherit; color: var(--ink); background: var(--paper); border: 2px solid #d6d2c6; border-radius: 999px; padding: 6px 14px; min-height: 40px; cursor: pointer; }
+      button[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
+      select { border-radius: 12px; }
+      .who { min-height: 1.45em; margin: 0 0 12px; color: var(--ink); }
+      .who small { color: var(--muted); }
+      iframe { display: block; width: 100%; height: 72vh; border: 0; border-radius: 14px; background: transparent; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>One board, any guide of its slot</h1>
+      <p>
+        The board was built once, presented by Stuart. Any character drawn to his slot can present it instead, from a
+        file of its own: it goes where he goes and points where he points, and is itself while it does, arriving,
+        leaving and dressing its own way.
+      </p>
+      <div class="bar">
+        <div class="group" role="group" aria-label="Who presents the board" id="who"><span>Presented by</span></div>
+        <label class="group"><span>Dressed for</span>
+          <select id="outfit">
+            <option value="">the board</option>
+            <option value="today">today</option>
+            <optgroup label="the occasion">
+              <option>Halloween</option>
+              <option>Christmas</option>
+              <option>winter</option>
+              <option>Fourth of July</option>
+            </optgroup>
+            <optgroup label="the part">
+              <option>builder</option>
+              <option>scholar</option>
+              <option>chef</option>
+              <option>party</option>
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      <p class="who" id="said" aria-live="polite"></p>
+      <iframe id="board" src="friends.html?embed" title="How a hash table works" allow="fullscreen"></iframe>
+    </main>
+    <script>
+      const looks = window.depictLooks || {};
+      const frame = document.getElementById("board");
+      const outfit = document.getElementById("outfit");
+      const said = document.getElementById("said");
+      const cast = ["stuart", "pip", "pencil"].filter((id) => looks[id]);
+      let chosen = "stuart"; // the board's own guide
+      const buttons = cast.map((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = looks[id].name.replace(/^the /, "The ");
+        b.addEventListener("click", () => {
+          chosen = id;
+          send();
+        });
+        document.getElementById("who").append(b);
+        return b;
+      });
+      const send = () => {
+        buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(cast[i] === chosen)));
+        // the board's own guide, as it was built, unless it is to be dressed for something
+        const look = chosen === "stuart" && !outfit.value ? null : looks[chosen];
+        frame.contentWindow.postMessage({ depict: "cast", look, outfit: outfit.value || undefined }, "*");
+      };
+      outfit.addEventListener("change", send);
+      addEventListener("message", (e) => {
+        const m = e.data && e.data.depict;
+        if (!m || typeof m !== "object" || e.source !== frame.contentWindow) return;
+        if (m.event === "ready") send();
+        if (m.event === "cast") {
+          const L = looks[chosen];
+          const occasion = ["Halloween", "Christmas", "winter", "Fourth of July", "summer", "New Year", "Valentine's Day", "St. Patrick's Day", "Thanksgiving"].includes(m.outfit);
+          const dress = m.outfit ? (occasion ? `, dressed for ${m.outfit}` : `, dressed as a ${m.outfit}`) : m.wear && m.wear.length ? ` in ${m.wear.join(" and ")}` : "";
+          const missed = m.ok && outfit.value && outfit.value !== "today" && m.outfit !== outfit.value ? ` (it has no ${outfit.value} outfit that fits this board)` : "";
+          said.innerHTML = m.ok ? `${L.name.replace(/^the /, "The ")} presents it${dress}${missed}.${L.credit ? ` <small>${L.credit.note}</small>` : ""}` : `It could not: ${m.reason}`;
+        }
+      });
+      send();
+    </script>
+  </body>
+</html>

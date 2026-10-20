@@ -26,6 +26,21 @@ export const BODY = ["measures", "shoulders", "reach", "tip", "poses"];
 /** What else a character drawn to another's slot takes from it when it does not say its own: where costumes sit on it, what a hat tips about, its arms and its hands. */
 const DEFAULTS = ["anchors", "capPivot", "arm", "hands"];
 
+/**
+ * The outfits every character has from the shared costumes, by the part it plays on a board: a board can dress its
+ * guide by the part (`outfit: "builder"`) and each character wears its own for it, its own outfit of that name when
+ * it has one (its drawings' tool belt), or the shared costumes it can wear.
+ */
+export const ROLES = { builder: ["hard-hat"], scholar: ["grad-cap"], chef: ["chef-hat"], party: ["party-hat"], royal: ["crown"], music: ["headphones"], formal: ["bow-tie"] };
+
+/** A character's outfits: its own (the costumes of each of its drawings, worn together), then the parts it can dress for. */
+export function outfitsOf(C) {
+  const own = C.outfits ?? [];
+  const named = new Set(own.map((o) => o.name.toLowerCase()));
+  const can = (w) => (C.wear ?? []).includes(w) || Boolean(C.costumes?.[w]);
+  return [...own, ...Object.entries(ROLES).filter(([name, wear]) => !named.has(name) && wear.every(can)).map(([name, wear]) => ({ name, wear }))];
+}
+
 /** The contract a character keeps: its own slot, or the one it is drawn to. */
 export const contractOf = (c) => c?.contract ?? c?.id;
 

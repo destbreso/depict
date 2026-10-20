@@ -83,6 +83,7 @@ function actorOf(a, color) {
     slot: { front: rg.slot.shoulders.front.map(q), reach: rg.slot.reach },
     wear: rg.wear,
     outfit: rg.outfit,
+    top: Math.round(rg.top * 1000) / 1000,
     accent: color(rg.accent),
     eyes: rg.eyes.map((e) => e.map(q)),
     shoulders: { front: rg.shoulders.front.map(q), back: rg.shoulders.back.map(q) },

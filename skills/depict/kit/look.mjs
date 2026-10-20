@@ -8,8 +8,8 @@
 // so a costume in the accent takes each board's own. One file per character,
 // for every board of its body: scripts/look.mjs writes it.
 import * as ink from "./ink.mjs";
-import { rig, reachAbove } from "./rig.mjs";
-import { CHARACTERS, characterOf, contractOf } from "./characters/index.mjs";
+import { rig, reachAbove, topOf } from "./rig.mjs";
+import { CHARACTERS, characterOf, contractOf, outfitsOf } from "./characters/index.mjs";
 import { SIZE, W } from "./compose.mjs";
 import { hash32, splitmix32 } from "./rng.mjs";
 
@@ -63,11 +63,14 @@ export function lookOf(character) {
     intros: C.personality?.intros ?? ["wave"],
     outros: C.personality?.outros ?? ["wave"],
     quirks: C.personality?.quirks ?? [],
-    outfits: (C.outfits ?? []).map((o) => ({ name: o.name, wear: o.wear })),
+    // its own outfits, then the parts it can dress for (characters/index.mjs, ROLES)
+    outfits: outfitsOf(C).map((o) => ({ name: o.name, wear: o.wear })),
     arm: { width: q(base.arm.width), hose: base.arm.hose.map(q), ...(base.arm.fill ? { fill: base.arm.fill, fillWidth: q(base.arm.fillWidth) } : {}) },
     armsAt: base.armsAt,
     strokes: base.strokes.map(strokeOf),
     wear,
+    // how far above its head each costume reaches: a page puts one on only where the board kept the room
+    tops: Object.fromEntries(wearable.map((w) => [w, Math.round(topOf(C, w) * 1000) / 1000])),
     hands,
   };
 }

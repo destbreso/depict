@@ -836,3 +836,29 @@ test("a character cast in a board's place is itself: its own arrival and goodbye
   assert.match(normalize({ ...tiny(), guide: { character: "stuart", outfit: "summer" } }).errors.join("\n"), /outfit "summer": it has winter, Halloween/);
   assert.deepEqual(normalize({ ...tiny(), guide: { character: "stuart", outfit: "Halloween" } }).board.cast.wear, ["spider"]);
 });
+
+test("a guide dresses for the day: the holiday or the season, its own outfit for it, where the board kept the room", async () => {
+  const { occasionsOn, recast } = await import("../skills/depict/kit/act.mjs");
+  const { lookOf } = await import("../skills/depict/kit/look.mjs");
+  const pip = (await import("../skills/depict/examples/friends/pip.mjs")).default;
+  assert.deepEqual(occasionsOn(new Date(2026, 9, 25)), ["Halloween"]);
+  assert.deepEqual(occasionsOn(new Date(2026, 11, 20)), ["Christmas", "winter"], "the holiday before the season");
+  assert.equal(occasionsOn(new Date(2026, 10, 26))[0], "Thanksgiving", "the fourth Thursday of November");
+  assert.deepEqual(occasionsOn(new Date(2026, 6, 4)), ["Fourth of July", "summer"]);
+  assert.deepEqual(occasionsOn(new Date(2026, 3, 8)), []);
+  const L = lookOf(pip);
+  const on = (wear) => {
+    const { board, comp, tl } = build({ ...tiny(), guide: { character: "stuart", wear } });
+    const S = sceneOf(board, comp, tl);
+    return (dress) => recast(S.actors[0], L, [...S.palette], S.elements, dress).strokes.filter((s) => s.part === "hat").length;
+  };
+  const hatted = on(["hard-hat"]);
+  assert.equal(hatted({ outfit: "today", date: "2026-10-25" }), L.wear.bat.length, "in October, under a board's hard hat, Pip wears its bat");
+  assert.equal(hatted({ outfit: "Halloween" }), L.wear.bat.length, "or when the host names the occasion");
+  assert.equal(hatted({ outfit: "today", date: "2026-04-08" }), L.wear["hard-hat"].length, "on a day with no occasion, the board's own hard hat");
+  const bare = on(["bow-tie"]);
+  assert.equal(bare({ outfit: "today", date: "2026-10-25" }), 0, "a board that kept no room over its head gets no hat, so its own dress stays");
+  // a part a board's guide plays is an outfit every character has, its own when it has one
+  assert.equal(build({ ...tiny(), guide: { character: "stuart", wear: ["hard-hat"] } }).board.cast.outfit, "builder");
+  assert.ok(L.outfits.some((o) => o.name === "builder"), "Pip can be a builder, in the shared hard hat");
+});
