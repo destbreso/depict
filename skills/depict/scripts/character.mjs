@@ -72,6 +72,8 @@ const rows = [
   { title: "feelings", cells: feels.map((f) => ({ label: f, cast: cast(), feel: f })) },
   { title: "poses", cells: poses.map((p) => ({ label: p, cast: cast(), pose: p })) },
   { title: "costumes", cells: dressed.map((d) => ({ label: d.label, cast: cast(d.wear), pose: d.pose, feel: d.feel, hold: d.hold })) },
+  // its whole-body forms (a cat sits, curls up), and how its fidgets look (its ears, where they twitch from)
+  ...(C.forms?.length ? [{ title: "forms", cells: C.forms.map((f) => ({ label: f, cast: cast(), form: f })) }] : []),
 ];
 const svgFile = path.join(out, `${C.id}-sheet.svg`);
 const named = C.name.charAt(0).toUpperCase() + C.name.slice(1);
@@ -82,7 +84,7 @@ const s = await open(svgFile, { width: Math.ceil(W), height: Math.ceil(H), scale
 const png = path.join(out, `${C.id}-sheet.png`);
 await s.shot(png, { x: 0, y: 0, w: W, h: H });
 await s.close();
-console.log(`${path.relative(process.cwd(), png)}: ${feels.length} feelings, ${poses.length} poses, ${dressed.length} costumes`);
+console.log(`${path.relative(process.cwd(), png)}: ${feels.length} feelings, ${poses.length} poses, ${dressed.length} costumes${C.forms?.length ? `, ${C.forms.length} forms` : ""}${C.swing ? `; parts that move on their own: ${Object.entries(C.swing).map(([k, s]) => `${k}${s.while ? ` (in its ${s.while})` : ""}`).join(", ")}` : ""}${C.fidgets ? `; fidgets: ${Object.keys(C.fidgets).join(", ")}` : ""}`);
 
 // the tests: a short board it presents, three times, each in other clothes and with other ways to arrive and leave
 const intros = C.personality.intros;

@@ -62,7 +62,7 @@ function shotFor(board, comp, e) {
  * Returns the span [t0, t1].
  */
 function drawGuide(r, t0, t1) {
-  const shown = (s) => !/^brows:(?!up$)|^mouth:(?!smile$)|^squint/.test(s.part);
+  const shown = (s) => !/^brows:(?!up$)|^mouth:(?!smile$)|^squint|^form:/.test(s.part);
   const len = (pts) => cumulative(pts).at(-1) * 1;
   const items = [];
   for (const s of r.strokes.filter(shown)) items.push({ n: s.n, s, len: len(s.pts) * (s.l === "ink" ? 1 : 0.3) });

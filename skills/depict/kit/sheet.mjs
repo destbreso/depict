@@ -11,7 +11,7 @@ const PAPERC = "#fbfaf7";
 const INKC = "#1b1b19";
 
 /** The guide `cast` names, in one pose and one feeling, as SVG in its own frame (its feet at the origin), `h` tall. */
-export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null } = {}) {
+export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null, form = null } = {}) {
   const pen = ink.pen(splitmix32((seed * 7919 + 13) >>> 0), { width: 4 });
   const R = rig(pen, h, accent, { ...cast, hold });
   const actor = {
@@ -83,11 +83,14 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
       : "";
   const held = R.hold && R.hold !== "pointer" ? `<g transform="translate(${st.back.hand[0]} ${st.back.hand[1]}) rotate(-6)">${group((p) => p === "held")}</g>` : "";
   const floor = R.strokes.filter((s) => s.part === "floor").map((s) => path(s.pts, s.w, s.c, s.o)).join("");
+  // a whole-body form it has taken (sitting, curled up): that drawing alone, on its shadow
+  if (form) return floor + `<g transform="scale(${st.facing * st.sx} ${st.sy})">${R.strokes.filter((s) => s.part === `form:${form}`).map((s) => path(s.pts, s.w, s.c, s.o)).join("")}</g>`;
   return (
     floor +
     `<g transform="scale(${st.facing * st.sx} ${st.sy})">` +
     armSvg("back") +
     gloveSvg("back", st.back) +
+    group((p) => Boolean(R.swing?.[p])) +
     group((p) => p === "body") +
     group((p) => p === "cap" || p === "hat") +
     face +
@@ -116,7 +119,7 @@ export function sheet(rows, { h = 260, cell = 360, title = "" } = {}) {
     r.cells.forEach((c, i) => {
       const cx = pad + i * cell + cell / 2;
       const feet = y + 40 + rowH - 40;
-      out += `<g transform="translate(${cx} ${feet})">${figure(c.cast, { pose: c.pose, feel: c.feel, hold: c.hold, h, look: c.look })}</g>`;
+      out += `<g transform="translate(${cx} ${feet})">${figure(c.cast, { pose: c.pose, feel: c.feel, hold: c.hold, h, look: c.look, form: c.form })}</g>`;
       out += `<text x="${cx}" y="${feet + 44}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="19" fill="${INKC}">${esc(c.label)}</text>`;
     });
     y += rowH + 60;

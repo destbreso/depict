@@ -100,6 +100,9 @@ function actorOf(a, color) {
     hold: rg.hold,
     // what it is made of, and how far its arm reaches: the pose of every frame follows from them
     ...(Object.keys(rg.motion ?? {}).length ? { motion: rg.motion } : {}),
+    ...(rg.swing ? { swing: Object.fromEntries(Object.entries(rg.swing).map(([k, s]) => [k, { ...s, at: s.at.map(q) }])) } : {}),
+    ...(rg.forms ? { forms: rg.forms } : {}),
+    ...(rg.fidgets ? { fidgets: rg.fidgets } : {}),
     ...(rg.reach !== 0.36 ? { reach: rg.reach } : {}),
   };
 }

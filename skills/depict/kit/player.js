@@ -167,6 +167,9 @@
     // a limb with a color of its own: its color drawn along the middle of its ink
     const backArmFill = A.arm.fill != null ? node("path", { stroke: S.palette[A.arm.fill], "stroke-width": A.arm.fillWidth }, root) : null;
     const backGloveG = node("g", {}, root);
+    // the parts that move on their own (a tail), behind its body, each turning about its own pivot
+    const swingG = node("g", {}, root);
+    const swings = new Map(Object.keys(A.swing || {}).map((part) => [part, node("g", {}, swingG)]));
     const bodyUnder = node("g", {}, root);
     const bodyInk = node("g", {}, root);
     // the cap, with whatever hat is on it: one group, so it can be lifted and tipped
@@ -183,6 +186,8 @@
     // what it holds, upright in its back hand, in front of it
     const heldG = node("g", {}, root);
     const [heldUnder, heldInk] = [0, 1].map(() => node("g", {}, heldG));
+    // its whole-body forms (sitting, curled up), each drawn in place of the standing figure while it is taken
+    const formsG = node("g", {}, root);
     const layered = { body: [bodyUnder, bodyInk], cap: [capUnder, capInk], hat: [hatUnder, hatInk], wear: [wearUnder, wearInk], pointer: [pointerUnder, pointerInk], held: [heldUnder, heldInk] };
     const groups = new Map();
     const groupFor = (part) => {
@@ -193,6 +198,8 @@
         if (!groups.has(`eyes${m[2]}`)) groups.set(`eyes${m[2]}`, node("g", {}, face));
         g = node("g", {}, groups.get(`eyes${m[2]}`));
       } else if (part === "floor") g = floor;
+      else if (swings.has(part)) g = swings.get(part);
+      else if (part.startsWith("form:")) g = node("g", {}, formsG);
       else g = node("g", {}, face);
       groups.set(part, g);
       return g;
@@ -216,7 +223,9 @@
       }
       return set;
     };
-    return { A, floor, root, backArm, frontArm, backArmFill, frontArmFill, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups };
+    // what stands: everything but its forms (hidden while it has taken one)
+    const standing = [backArm, backArmFill, backGloveG, swingG, bodyUnder, bodyInk, capG, face, wearG, frontArm, frontArmFill, pointerG, frontGloveG, heldG].filter(Boolean);
+    return { A, floor, root, backArm, frontArm, backArmFill, frontArmFill, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups, swings, standing, formsG };
   }
   const actors = (S.actors || []).map(makeActor);
   const ownGuide = S.actors && S.actors[0];
@@ -296,9 +305,49 @@
       }
       s.state = state;
     }
+    // standing, or a whole-body form it has taken (sitting, curled up): the one shown, the other hidden
+    const form = st.form && X.groups.has(`form:${st.form}`) ? st.form : null;
+    if (X.__form !== form) {
+      for (const n of X.standing) n.style.display = form ? "none" : "";
+      X.__form = form;
+    }
+    // the parts that move on their own: a tail sways all the time, and now and then swings over to its other side,
+    // passing behind the body; a part that moves only in a fidget (ears that twitch) is still until one comes; any of
+    // them swings harder while it wags (a cat's hello and goodbye)
+    const clock = wall ?? t;
+    for (const [part, g] of X.swings) {
+      const s = A.swing[part];
+      const fid = st.fidget;
+      const on = s.while ? (fid && fid.name === s.while ? fid.e : 0) : 1;
+      const wag = fid && fid.name === "wag" ? 1 + 1.4 * fid.e : 1;
+      const deg = on * s.deg * wag * Math.sin((2 * Math.PI * clock * wag) / s.period);
+      let side = 1;
+      if (s.sides) {
+        const k = Math.floor(clock / s.sides);
+        const into = clock - k * s.sides;
+        const sign = k % 2 ? -1 : 1;
+        side = sign;
+        if (k > 0 && into < 0.6) side = -sign * Math.cos(Math.PI * (0.5 - 0.5 * Math.cos((Math.PI * into) / 0.6)));
+      }
+      const [px, py] = s.at;
+      const tr = `translate(${px} ${py}) scale(${side} 1) rotate(${deg}) translate(${-px} ${-py})`;
+      if (g.__t !== tr) {
+        g.setAttribute("transform", tr);
+        g.__t = tr;
+      }
+    }
     // the feeling of the moment: its brows, its mouth, its eyes
     const F = A.feelings[st.feel] || A.feelings.happy;
     for (const [part, g] of X.groups) {
+      const fm = /^form:(.+)$/.exec(part);
+      if (fm) {
+        const on = fm[1] === form;
+        if (g.__on !== on) {
+          g.style.display = on ? "" : "none";
+          g.__on = on;
+        }
+        continue;
+      }
       const m = /^(brows|mouth):(\w+)$/.exec(part);
       let on = null;
       if (m) on = (m[1] === "brows" ? F.brows : F.mouth) === m[2];
@@ -331,7 +380,8 @@
       const arm = st[side];
       const n = side === "back" ? X.backArm : X.frontArm;
       const nf = side === "back" ? X.backArmFill : X.frontArmFill;
-      const frac = revealed(A.reveal && A.reveal[side === "back" ? "armBack" : "armFront"], t);
+      // a form it has taken (sitting, curled up) has no arms of its standing figure
+      const frac = form ? 0 : revealed(A.reveal && A.reveal[side === "back" ? "armBack" : "armFront"], t);
       if (frac <= 0) {
         n.style.display = "none";
         if (nf) nf.style.display = "none";

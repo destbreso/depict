@@ -234,7 +234,9 @@ export function normalize(input) {
     }
     // how the guide feels in this beat, and what it does
     if (bt.feel != null && !(bt.feel in FEELINGS)) err(`${where}: feel "${bt.feel}": use ${Object.keys(FEELINGS).join(", ")}`);
-    if (bt.act != null && !ACTS.includes(bt.act)) err(`${where}: act "${bt.act}": use ${ACTS.join(", ")}`);
+    // a gesture every guide has, or one of its own guide's forms (a cat sits) or fidgets (its ears twitch)
+    const acts = [...ACTS, ...(C.forms ?? []), ...Object.keys(C.fidgets ?? {})];
+    if (bt.act != null && !acts.includes(bt.act)) err(`${where}: act "${bt.act}": use ${acts.join(", ")}`);
     if (bt.open != null) {
       const it = b.regions.flatMap((r) => r.items).find((x) => x.id === bt.open);
       if (!it) err(`${where} opens "${bt.open}", which is not an item`);

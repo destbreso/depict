@@ -77,7 +77,7 @@ A link is drawn after both its items; in the same beat it may come first, pointi
 | `draw` | What the pen draws while it is said, in order: `"title"`, a region id (its title), an item id, a link id, or a note `{ note: "a few words", near: "item", side: "below" \| "above" \| "left" \| "right", arrow: true }`. |
 | `mark` | Emphasis on things already drawn: `{ circle: "id" }` (round an item's words, or round its frame), `{ underline: "id" }`, `{ highlight: "id" }`, `{ box: "id" }`, `{ cross: "id" }`. A list of ids marks them as one, side by side: `{ highlight: ["c1", "c2", "c3"] }` is a window over three cells. The guide is surprised by a mark. |
 | `feel` | How the guide feels during this beat: `happy` (its default), `excited`, `surprised`, `worried`, `thinking`, `proud`, `sad`. Its brows, eyes and mouth change, and it keeps reacting by itself. |
-| `act` | What the guide does in this beat instead of pointing at each new thing: `point`, `wave`, `cheer`, `shrug`, `scratch` (its head, puzzled), `present`, `rest`. |
+| `act` | What the guide does in this beat instead of pointing at each new thing: `point`, `wave`, `cheer`, `shrug`, `scratch` (its head, puzzled), `present`, `rest`; or one of its own guide's forms, held through the beat (a cat's `sit`, `curl`), or fidgets (a cat's `ears`: they twitch while it looks around), when its character has them (references/characters.md, "A body that moves its own way"). |
 | `open` | An item with a `figure`: the page opens it as the beat starts and waits until the reader closes it. |
 
 Everything on the board is drawn exactly once, in some beat, and marked only after it is drawn. A beat that draws, marks and opens nothing is refused: say that sentence while something is drawn, or merge it into the beat before.

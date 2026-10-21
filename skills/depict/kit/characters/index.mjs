@@ -109,5 +109,11 @@ export function checkCharacter(raw) {
   const wearable = [...(c.wear ?? []), ...Object.keys(c.costumes ?? {})];
   for (const o of c.outfits ?? []) need(`outfits.${o.name}`, o.name && Array.isArray(o.wear) && o.wear.every((w) => wearable.includes(w)), "is a name and things it can wear");
   need("draw", typeof c.draw === "function", "draws its body and face and returns its eyes");
+  for (const [part, s] of Object.entries(c.swing ?? {}))
+    need(`swing.${part}`, /^[a-z][a-z0-9-]*$/.test(part) && s && pair(s.pivot) && (s.deg == null || num(s.deg)) && (s.period == null || (num(s.period) && s.period > 0)) && (s.sides == null || (num(s.sides) && s.sides >= 2)) && (s.while == null || s.while === "wag" || Boolean(c.fidgets?.[s.while])), "gives the [u, v] it turns about (pivot), and how far (deg), how fast (period), how often it changes sides (sides, seconds) and, for a part that moves only during a fidget, which (while)");
+  for (const [name, f] of Object.entries(c.fidgets ?? {}))
+    need(`fidgets.${name}`, /^[a-z][a-z0-9-]*$/.test(name) && name !== "wag" && f && (f.time == null || (num(f.time) && f.time > 0)) && (f.look == null || f.look === "around"), "gives how long it lasts (time) and whether it looks around (look: \"around\")");
+  need("forms", c.forms == null || (Array.isArray(c.forms) && c.forms.every((f) => /^[a-z][a-z0-9-]*$/.test(f) && !["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"].includes(f))), "lists the names of its whole-body forms (drawn as form:<name>), none a pose's name");
+  for (const q of c.personality?.quirks ?? []) need(`personality.quirks.${q}`, Boolean(c.poses?.[q]) || (c.forms ?? []).includes(q) || Boolean(c.fidgets?.[q]), "is one of its poses, its forms or its fidgets");
   return out;
 }

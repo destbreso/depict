@@ -146,6 +146,7 @@ export function actorAt(actor, t) {
   let look = [0, 0];
   const override = (actor.feelings[feel] ?? {}).look;
   if (override) look = [override[0] * 0.018 * h, override[1] * 0.014 * h];
+  else if (lookKey && lookKey[1] === "dir") look = [lookKey[2] * 0.018 * h, lookKey[3] * 0.014 * h];
   else if (lookKey && lookKey[1] != null) {
     const eye = actor.eyes[0];
     const dx = (lookKey[1] - x) * facing - eye[0];
@@ -159,7 +160,13 @@ export function actorAt(actor, t) {
     if (tb > t) break;
     if (t - tb < 0.16) blink = Math.sin((Math.PI * (t - tb)) / 0.16);
   }
-  return { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, shown: t >= tr.appear[0] };
+  // a whole-body form it has taken (sitting, curled up), or standing
+  const formKey = lastAt(tr.forms ?? [], t);
+  const form = formKey ? formKey[1] : null;
+  // a fidget going on (its ears twitch, its tail wags), and how far into it: the parts that swing with it say how
+  let fidget = null;
+  for (const [f0, f1, name] of tr.fidgets ?? []) if (t >= f0 && t < f1) fidget = { name, e: envelope((t - f0) / (f1 - f0), 0.2) };
+  return { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, form, fidget, shown: t >= tr.appear[0] };
 }
 
 /** The point a share u of the way along a polyline, and which way it is heading there (left or right). */
@@ -260,6 +267,44 @@ export function hosePath(sh, bow, hand, wobble) {
 /** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
 export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110 };
 
+/** How long a form taken in a quiet moment is held at most, in seconds (a cat sits a while, then gets up). */
+export const FORM_TIME = 2.8;
+
+/** When the quiet that begins at t ends: its hands next move, it next steps or hops, or `cap` seconds on. */
+export function quietTill(track, t, cap) {
+  let end = t + cap;
+  for (const key of track.arms) if (key[0] > t + 0.01 && key[0] < end) end = key[0];
+  for (const m of track.moves) if (m.t0 > t && m.t0 < end) end = m.t0;
+  return end;
+}
+
+/**
+ * A quirk of a character's own in a quiet moment [q0, q1] of a board: a pose of its hands (Stuart pushes his glasses
+ * up), a form it takes for as long as the moment stays quiet (a cat sits, or curls up into a ball), or a fidget (its
+ * ears twitch while it looks around). C is its rig or its look. Returns whether it did one.
+ */
+export function quirk(track, name, q0, q1, C) {
+  if (C.forms?.includes(name)) {
+    const end = quietTill(track, q0, FORM_TIME) - 0.15;
+    if (end - q0 < 1.6) return false;
+    (track.forms ??= []).push([q0, name], [end, null]);
+    return true;
+  }
+  const f = C.fidgets?.[name];
+  if (f) {
+    const end = Math.min(q0 + (f.time ?? 1.6), quietTill(track, q0, 3) - 0.1);
+    (track.fidgets ??= []).push([q0, end, name]);
+    if (f.look === "around") track.look.push([q0, "dir", -1, -0.3], [q0 + (end - q0) * 0.4, "dir", 1, -0.4], [q0 + (end - q0) * 0.75, "dir", 0, 0.6], [end, null]);
+    return true;
+  }
+  if (C.poses?.[name]) {
+    track.arms.push([q0, name], [q1, "rest"]);
+    track.look.push([q0, null]);
+    return true;
+  }
+  return false;
+}
+
 /** A hop where it stands. */
 export const hopHere = (at, t0, t1, height) => ({ t0, t1, from: [at.x, at.y], to: [at.x, at.y], hops: 1, height, facing: at.facing, land: at.facing });
 
@@ -323,6 +368,16 @@ export const INTROS = {
     k.feel.push([a, "excited"], [a + 1.6, "happy"]);
     return a + 2.0;
   },
+  // a cat's hello: it rubs against you, swaying side to side with its eyes shut in pleasure, then waves
+  rub: (k, a) => {
+    k.arms.push([a, "rest"]);
+    k.leans.push([a + 0.05, a + 0.5, -12], [a + 0.5, a + 0.95, 12], [a + 0.95, a + 1.35, -9]);
+    k.feel.push([a + 0.05, "proud"], [a + 1.4, "happy"]);
+    (k.fidgets ??= []).push([a, a + 1.4, "wag"]);
+    k.bounces.push([a + 1.35, 0.4]);
+    k.arms.push([a + 1.4, "wave"]);
+    return a + 2.1;
+  },
   // it shakes itself awake like a jelly, arms out, then waves
   jiggle: (k, a) => {
     k.bounces.push([a, 1.1], [a + 0.32, -0.8], [a + 0.62, 0.6]);
@@ -361,6 +416,14 @@ export const OUTROS = {
     k.bounces.push([t + fly + 0.05, 0.85]);
     k.arms.push([t + 0.15, "cheer"], [t + fly + 0.1, "wave"]);
   },
+  // a cat's goodbye: it waves its tail, turns away and walks off a few soft steps as the circle closes, ending well
+  // inside the circle (the circle is round where it stood: a few steps, its tail and all still in it)
+  stroll: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.7, "rest"]);
+    (k.fidgets ??= []).push([t + 0.15, iris.hold + 0.4, "wag"]);
+    k.turns.push([t + fly - 0.65, -at.facing]);
+    k.moves.push({ t0: t + fly - 0.55, t1: iris.hold + 0.3, from: [at.x, at.y], to: [at.x - at.facing * 0.12 * (iris.r ?? 160), at.y], hops: 3, height: 4, facing: -at.facing, land: -at.facing });
+  },
   // a soft body's goodbye: two happy bounces, the second smaller, wobbling on as the circle closes
   bounce: (k, t, fly, iris, at) => {
     k.arms.push([t + 0.15, "cheer"]);
@@ -377,7 +440,7 @@ export const OUTROS = {
 /** The poses every character has; any other is a quirk's (Stuart's glasses), and a character without that quirk rests instead. */
 const OWN_POSES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
 /** The brows, mouths and closed eyes of the other feelings: ready when the guide is drawn, hidden until needed. */
-const WAITING = /^brows:(?!up$)|^mouth:(?!smile$)|^squint/;
+const WAITING = /^brows:(?!up$)|^mouth:(?!smile$)|^squint|^form:/;
 const lengthOf = (pts) => {
   let l = 0;
   for (let i = 2; i < pts.length; i += 2) l += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
@@ -533,7 +596,7 @@ export function personalize(track, look) {
   if (leave && OUTROS[leave.kind]) {
     const kind = choose(leave, look.outros || [], (x) => Boolean(OUTROS[x]));
     if (kind !== leave.kind) {
-      const iris = { hold: leave.hold };
+      const iris = { hold: leave.hold, r: (look.h ?? 240) * 0.66 };
       const was = blank();
       OUTROS[leave.kind](was, leave.t, leave.fly, iris, leave.at);
       take(was);
@@ -545,15 +608,19 @@ export function personalize(track, look) {
   }
   // its own quirks in the quiet moments: the board's guide's go, and this one's own come, if it has any
   const quiet = track.quirks || [];
+  // the board's guide's forms and fidgets are its own; this one takes its own in the same quiet moments
+  k.forms = [];
+  k.fidgets = (k.fidgets || []).filter((f) => f[2] === "wag" && (look.swing || look.forms));
   if (quiet.length) {
-    const mine = (look.quirks || []).filter((q) => look.poses[q]);
+    const mine = (look.quirks || []).filter((q) => look.poses[q] || look.forms?.includes(q) || look.fidgets?.[q]);
     const at = new Set(quiet.flatMap(([a, b]) => [a, b]));
     k.arms = k.arms.filter((x) => !at.has(x[0]));
+    k.look = k.look.filter((x) => x[1] !== "dir");
     quiet.forEach(([a, b], i) => {
-      if (mine.length) k.arms.push([a, mine[i % mine.length]], [b, "rest"]);
+      if (mine.length) quirk(k, mine[i % mine.length], a, b, look);
     });
   }
-  for (const key of ["arms", "feel", "look", "bounces", "spins", "leans", "caps"]) k[key].sort((a, b) => a[0] - b[0]);
+  for (const key of ["arms", "feel", "look", "bounces", "spins", "leans", "caps", "forms"]) k[key].sort((a, b) => a[0] - b[0]);
   k.moves.sort((a, b) => a.t0 - b.t0);
   return k;
 }
@@ -647,6 +714,9 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     shoulders: look.shoulders,
     poses: look.poses,
     motion: look.motion,
+    swing: look.swing,
+    forms: look.forms,
+    fidgets: look.fidgets,
     reach: look.reach,
     capPivot: look.capPivot,
     arm: { width: look.arm.width, hose: look.arm.hose, ...(look.arm.fill ? { fill: color(look.arm.fill), fillWidth: look.arm.fillWidth } : {}) },

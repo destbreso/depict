@@ -100,13 +100,14 @@ export function box(p, x, y, w, h, { corner = 0 } = {}) {
  * pen goes round, so where it closes the line passes a little outside its
  * start instead of folding over it.
  */
-export function ellipse(p, cx, cy, rx, ry, { overshoot = 0.1, outward = false } = {}) {
+export function ellipse(p, cx, cy, rx, ry, { overshoot = 0.1, outward = false, closed = false } = {}) {
   const steps = Math.max(12, Math.round(Math.sqrt((rx + ry) / 2) * 2.6));
   const start = p.r(0, TAU);
-  const span = TAU * (1 + overshoot * p.r(0.6, 1.2));
+  const span = closed ? TAU * 1.04 : TAU * (1 + overshoot * p.r(0.6, 1.2));
   // the pen ends a little outside or inside its start, clearly apart from it (at least a line and a half)
-  // (outward only, when it circles something it must not cut)
-  const drift = Math.max(p.r(0.06, 0.1), (1.6 * p.width) / Math.min(rx, ry)) * (outward || p.rng() < 0.5 ? 1 : -1);
+  // (outward only, when it circles something it must not cut); a closed ring (an eye, small enough that the pen's
+  // drift would make a spiral of it, a big one or a small one at random) ends where it began
+  const drift = closed ? 0 : Math.max(p.r(0.06, 0.1), (1.6 * p.width) / Math.min(rx, ry)) * (outward || p.rng() < 0.5 ? 1 : -1);
   const wob = [p.off(0.02), p.off(0.02), p.r(0, TAU)];
   const pts = [];
   const n = Math.ceil(steps * (span / TAU));

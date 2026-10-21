@@ -11,7 +11,7 @@
 import { hash32, splitmix32 } from "./rng.mjs";
 import { FEELINGS, feetBox, reachAbove, spotBox } from "./rig.mjs";
 import { overlaps, pad } from "./geom.mjs";
-import { INTROS, keepClear } from "./act.mjs";
+import { INTROS, keepClear, quirk } from "./act.mjs";
 
 /** The acts that aim at a thing: past something in the way they would seem to aim at that, so there it only looks. */
 const AIMED = new Set(["point", "present"]);
@@ -31,7 +31,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   const els = comp.elements;
   const spotOf = new Map(g.spots.map((s) => [s.region, s]));
   const start = g.spots[0];
-  const track = { start: [start.x, start.y, start.facing], appear, moves: [], turns: [], arms: [], feel: [[0, "happy"]], look: [], bounces: [], blinks: [], leans: [], spins: [], caps: [] };
+  const track = { start: [start.x, start.y, start.facing], appear, moves: [], turns: [], arms: [], feel: [[0, "happy"]], look: [], bounces: [], blinks: [], leans: [], spins: [], caps: [], forms: [], fidgets: [] };
   const [, alive] = appear;
 
   // when each element is drawn: its first stroke's start and its last stroke's end
@@ -181,7 +181,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
       const tbox = e.kind === "mark" ? e.targetBox ?? els.get(e.target).box : e.box;
       const tid = e.kind === "mark" ? e.target : id;
       // the beat's act goes to the first thing it draws; with no act, its hands go to each thing, a mark, or an idea's title
-      const act = bt.act && !acted ? bt.act : null;
+      const act = bt.act && !acted && !g.rig.forms?.includes(bt.act) && !g.rig.fidgets?.[bt.act] ? bt.act : null;
       if (act) acted = true;
       const hands = act ? AIMED.has(act) : !bt.act && (e.kind === "mark" || e.kind === "item" || e.kind === "region" || e.kind === "note");
       out.push({ id, e, tid, tbox, t: sp[0], act, hands });
@@ -362,6 +362,15 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   board.beats.forEach((bt, bi) => {
     const beat = tl.beats[bi];
     track.feel.push([beat.t0, bt.feel ?? "happy"]);
+    // a form the beat asks for (a cat curls up): taken as the pen begins, held to the end of the beat
+    if (bt.act && g.rig.forms?.includes(bt.act)) track.forms.push([beat.draw0 + 0.1, bt.act], [beat.t1 - 0.1, null]);
+    // a fidget the beat asks for (its ears twitch while it looks around), through the beat
+    if (bt.act && g.rig.fidgets?.[bt.act]) {
+      const f = g.rig.fidgets[bt.act];
+      const [a, b] = [beat.t0 + 0.2, Math.min(beat.t1 - 0.1, beat.t0 + 0.2 + (f.time ?? 1.6) * 1.3)];
+      track.fidgets.push([a, b, bt.act]);
+      if (f.look === "around") track.look.push([a, "dir", -1, -0.3], [a + (b - a) * 0.4, "dir", 1, -0.4], [a + (b - a) * 0.75, "dir", 0, 0.6], [b, null]);
+    }
     for (const x of gesturesOf(bt, bi)) {
       const { e, tid, tbox, t, act, hands, until } = x;
       const [cx, cy] = center(tbox);
@@ -393,7 +402,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   // glasses up before he explains): when its hands are at rest, nothing is pointed at and it is not on its way. The
   // quiet moments are the board's and kept in the track, whoever presents it, so a character cast in its place does
   // its own quirks there (act.mjs, personalize)
-  const quirks = (g.rig.personality?.quirks ?? []).filter((q) => g.rig.poses[q]);
+  const quirks = (g.rig.personality?.quirks ?? []).filter((q) => g.rig.poses[q] || g.rig.forms?.includes(q) || g.rig.fidgets?.[q]);
   track.quirks = [];
   {
     const rq = splitmix32((board.seed * 40503 + 7) >>> 0);
@@ -406,10 +415,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
       const busy = track.arms.some((key) => key[0] > q0 - 0.3 && key[0] < q1 + 0.3) || track.moves.some((m) => m.t0 < q1 + 0.2 && m.t1 > q0 - 0.2);
       if (busy || (before && before[1] !== "rest") || rq() < 0.45) return;
       track.quirks.push([q0, q1]);
-      if (quirks.length) {
-        track.arms.push([q0, quirks[(track.quirks.length - 1) % quirks.length]], [q1, "rest"]);
-        track.look.push([q0, null]);
-      }
+      if (quirks.length) quirk(track, quirks[(track.quirks.length - 1) % quirks.length], q0, q1, g.rig);
       lastQuirk = q0;
     });
   }
@@ -443,7 +449,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   const rng = splitmix32((board.seed * 2654435761) >>> 0);
   for (let t = alive + 1.6; t < tl.duration; t += 2.2 + rng() * 2.4) track.blinks.push(t);
 
-  for (const list of [track.arms, track.feel, track.look, track.turns, track.bounces, track.leans, track.spins, track.caps]) list.sort((a, b) => a[0] - b[0]);
+  for (const list of [track.arms, track.feel, track.look, track.turns, track.bounces, track.leans, track.spins, track.caps, track.forms, track.fidgets]) list.sort((a, b) => a[0] - b[0]);
   track.moves.sort((a, b) => a.t0 - b.t0);
   // a guide drawn to another's slot is directed by the slot, and makes its gestures from its own shoulders: one its own
   // arm would not make cleanly (it would cross something, or its shorter finger stop beside another thing) is a look

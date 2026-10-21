@@ -35,8 +35,8 @@ export const WEAR = [...HATS, "glasses", "bow-tie", "scarf", "star", "hair-bow",
 export const HOLD = ["pointer", "book", "pencil", "ruler", "coin", "clock", "magnifier", "flag", "balloon", "wrench", "calculator", "lightbulb"];
 export const SKINS = ["plain", "blue", "green", "sand", "pink", "stripes", "dots"];
 /** Every way a guide can arrive and leave; each character has its own few (its personality), and a soft one bounces and jiggles. */
-export const INTROS = ["wave", "hop", "spin", "bow", "tip", "jump", "bounce", "jiggle"];
-export const OUTROS = ["wave", "bow", "cheer", "salute", "tip", "spin", "bounce"];
+export const INTROS = ["wave", "hop", "spin", "bow", "tip", "jump", "bounce", "jiggle", "rub"];
+export const OUTROS = ["wave", "bow", "cheer", "salute", "tip", "spin", "bounce", "stroll"];
 const SKIN_TINTS = { blue: "#d3e3f0", green: "#d6ead8", sand: "#f4e6c4", pink: "#f5d9df" };
 /** How far above the top of the marker's cap a costume reaches, in units of the guide's height: its spot keeps that paper free too. */
 const HAT_TOP = { "grad-cap": 0.09, "hard-hat": 0.09, headphones: 0.07, "party-hat": 0.28, crown: 0.1, beanie: 0.11, "chef-hat": 0.26, "hair-bow": 0.04, "pencil-ear": 0.07 };
@@ -96,6 +96,17 @@ export const POSES = characterOf({}).poses;
 export const ACTS = ["point", "wave", "cheer", "shrug", "scratch", "present", "rest"];
 
 /** The guide's components, `h` tall, drawn with the pen `p` in the board's accent: the character `cast` names, dressed as it says ({ character, wear, hold, skin }). */
+/** Whether a point [u, v] is inside a closed outline of [u, v] points (even-odd). */
+function insideUV([u, v], poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ui, vi] = poly[i];
+    const [uj, vj] = poly[j];
+    if (vi > v !== vj > v && u < ((uj - ui) * (v - vi)) / (vj - vi) + ui) inside = !inside;
+  }
+  return inside;
+}
+
 export function rig(p, h, accent, cast = {}) {
   const { wear = [], hold = null, skin = "plain" } = cast;
   const C = characterOf(cast);
@@ -137,15 +148,41 @@ export function rig(p, h, accent, cast = {}) {
     const flat = uv.flatMap(([u, v]) => P(u, v));
     return ink.wobble(p, [...flat, flat[0] + p.off(1), flat[1] + p.off(1), flat[2], flat[3]], { amp: Math.min(1.2, 0.25 * W) });
   };
-  /** A closed shape in the figure's frame (or another), colored in under its outline. */
-  const shape = (part, uv, color, { T = P, nib = h * 0.03, angle = -35, line = fine, opacity = 0.95, round = false } = {}) => {
+  /**
+   * A closed shape in the figure's frame (or another), colored in under its outline. `behind` lists the shapes that
+   * stand in front of this one (as [u, v] outlines): its outline is left out where it runs inside them, so a leg
+   * under a body or a body under a head joins it with no seam, only the silhouette drawn (every outline of a part
+   * lies over every fill of it, so an overlap would otherwise show its line through the shape in front).
+   */
+  const shape = (part, uv, color, { T = P, nib = h * 0.03, angle = -35, line = fine, opacity = 0.95, round = false, behind = null } = {}) => {
     let flat = uv.flatMap(([u, v]) => T(u, v));
     if (round) flat = smooth([...flat, flat[0], flat[1]], 3);
     if (color) {
       const f = ink.fill(p, flat, { nib, angle, edge: 0.12 });
       add(part, "color", f.strokes, f.width, color, "under", opacity);
     }
-    if (line) add(part, "outline", [ink.wobble(p, [...flat, flat[0], flat[1]], { amp: Math.min(0.8, 0.2 * line) })], line);
+    if (!line) return;
+    if (!behind?.length) {
+      add(part, "outline", [ink.wobble(p, [...flat, flat[0], flat[1]], { amp: Math.min(0.8, 0.2 * line) })], line);
+      return;
+    }
+    // the outline, finely, kept only where it is outside every shape in front
+    const loop = [...uv, uv[0]];
+    const dense = [];
+    for (let i = 0; i < loop.length - 1; i++) for (let k = 0; k < 6; k++) dense.push([loop[i][0] + ((loop[i + 1][0] - loop[i][0]) * k) / 6, loop[i][1] + ((loop[i + 1][1] - loop[i][1]) * k) / 6]);
+    dense.push(loop[0]);
+    const runs = [];
+    let run = [];
+    for (const q of dense) {
+      if (behind.some((poly) => insideUV(q, poly))) {
+        if (run.length > 1) runs.push(run);
+        run = [];
+      } else run.push(q);
+    }
+    if (run.length > 1) runs.push(run);
+    // a run that closes the loop joins the first one
+    if (runs.length > 1 && !behind.some((poly) => insideUV(dense[0], poly))) runs[0] = [...runs.pop(), ...runs[0]];
+    for (const r of runs) add(part, "outline", [ink.wobble(p, r.flatMap(([u, v]) => T(u, v)), { amp: Math.min(0.8, 0.2 * line) })], line);
   };
   /** An open line in the figure's frame (or another). */
   const line = (part, uv, width, color = INK, T = P) => add(part, "outline", [ink.wobble(p, uv.flatMap(([u, v]) => T(u, v)), { amp: 0.35 })], width, color);
@@ -216,6 +253,12 @@ export function rig(p, h, accent, cast = {}) {
     motion: C.motion ?? {},
     reach: C.reach ?? 0.36,
     personality: C.personality,
+    // the parts that move on their own (a tail): what each turns about, in the figure's frame, and how it moves
+    ...(C.swing ? { swing: Object.fromEntries(Object.entries(C.swing).map(([part, s]) => [part, { at: P(...s.pivot), deg: s.deg ?? 10, period: s.period ?? 1.6, ...(s.sides ? { sides: s.sides } : {}), ...(s.while ? { while: s.while } : {}) }])) } : {}),
+    // the whole-body forms it can take in place of standing (a cat sits, curls up into a ball), drawn as form:<name>
+    ...(C.forms?.length ? { forms: [...C.forms] } : {}),
+    // the fidgets of its own it does in a quiet moment (its ears twitch while it looks around)
+    ...(C.fidgets ? { fidgets: C.fidgets } : {}),
   };
 }
 
