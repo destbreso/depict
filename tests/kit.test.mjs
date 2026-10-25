@@ -924,3 +924,25 @@ test("a page carries what a script needs: each beat's pause before the camera mo
     assert.ok(had >= S.read.base + b.say.length / S.read.rate - 0.02, `beat ${i + 1} had its sentence's time`);
   }
 });
+
+test("a board in another language: every text with words is listed once and looked up, a sum needs no translation, a missing one is named", async () => {
+  const { stringsOf, translate } = await import("../skills/depict/kit/strings.mjs");
+  const board = {
+    title: "Adding",
+    regions: [{ id: "a", title: "Birds", items: [{ id: "x", label: "3 birds", note: "they fly in", sketch: [{ text: "7" }, { text: "piggy bank" }] }, { id: "y", label: "3 + 2 = 5" }] }],
+    beats: [{ say: "We write it: 3 + 2 = 5.", draw: ["a", "x"] }, { say: "Birds", draw: ["y"] }],
+  };
+  const texts = stringsOf(board);
+  assert.deepEqual(texts, ["Adding", "Birds", "3 birds", "they fly in", "piggy bank", "We write it: 3 + 2 = 5."], "once each, in script order, no-break spaces as plain ones, a sum and a number left out");
+  const table = { Adding: "Sumar", Birds: "Pájaros", "3 birds": "3 pájaros", "they fly in": "llegan volando", "piggy bank": "alcancía", "We write it: 3 + 2 = 5.": "Lo escribimos: 3 + 2 = 5." };
+  const { board: es, missing } = translate(board, table);
+  assert.deepEqual(missing, []);
+  assert.equal(es.regions[0].items[0].sketch[1].text, "alcancía");
+  assert.equal(es.regions[0].items[0].sketch[0].text, "7");
+  assert.equal(es.regions[0].items[1].label, "3 + 2 = 5");
+  assert.equal(es.beats[0].say, "Lo escribimos: 3 + 2 = 5.");
+  assert.equal(es.beats[0].draw[1], "x", "ids are never words to translate");
+  assert.equal(board.title, "Adding", "the board itself is left as it was");
+  delete table["piggy bank"];
+  assert.deepEqual(translate(board, table).missing, ["piggy bank"]);
+});

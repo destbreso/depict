@@ -39,6 +39,10 @@ if (!folder || !fs.existsSync(path.join(folder, "boards"))) {
 }
 const root = path.resolve(folder);
 const check = !args.includes("--no-check");
+// --lang es: every board that has its table of translations (boards/<id>/strings.es.json), built in that language into
+// site/es/ under the same names (its pages, pictures, report and gallery); a board with none yet is left out, and said
+const langAt = args.indexOf("--lang");
+const lang = langAt >= 0 ? args[langAt + 1] : null;
 const cfgFile = path.join(root, "series.mjs");
 const cfg = fs.existsSync(cfgFile) ? (await import(pathToFileURL(cfgFile).href)).default : {};
 // a board that does not load (being written by someone else, or broken) still lets the others build; its own build
@@ -60,13 +64,16 @@ const rank = (id) => {
   return Number.isFinite(n) ? n : 1e6 + (Number.isFinite(numberIn(id)) ? numberIn(id) : 1e5);
 };
 const all = [...found].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
-const chosen = args.filter((a, i) => a !== folder && !a.startsWith("--") && i > args.indexOf(folder));
+const chosen = args.filter((a, i) => a !== folder && !a.startsWith("--") && i > args.indexOf(folder) && !(langAt >= 0 && i === langAt + 1));
 for (const id of chosen) if (!all.includes(id)) {
   console.error(`no board "${id}" in ${path.relative(process.cwd(), path.join(root, "boards"))}`);
   process.exit(2);
 }
-const ids = chosen.length ? chosen : all;
-const site = path.join(root, "site");
+const wanted = chosen.length ? chosen : all;
+const untranslated = lang ? wanted.filter((id) => !fs.existsSync(path.join(root, "boards", id, `strings.${lang}.json`))) : [];
+if (untranslated.length) console.log(`not in "${lang}" yet (no strings.${lang}.json): ${untranslated.join(", ")}`);
+const ids = wanted.filter((id) => !untranslated.includes(id));
+const site = path.join(root, "site", ...(lang ? [lang] : []));
 fs.mkdirSync(site, { recursive: true });
 
 const report = {};
@@ -74,7 +81,7 @@ let failed = 0;
 for (const id of ids) {
   const board = path.join(root, "boards", id, "board.mjs");
   const out = path.join(site, `${id}.html`);
-  const b = spawnSync(process.execPath, [path.join(here, "build.mjs"), board, "--out", out, "--audit"], { encoding: "utf8" });
+  const b = spawnSync(process.execPath, [path.join(here, "build.mjs"), board, "--out", out, "--audit", ...(lang ? ["--lang", lang] : [])], { encoding: "utf8" });
   const text = (b.stdout + b.stderr).trim();
   const ok = b.status === 0;
   if (!ok) failed++;
@@ -85,7 +92,7 @@ for (const id of ids) {
   console.log(`${ok ? "ok  " : "FAIL"} ${id}${m ? `  ${m[1]} beats, ${m[2]}` : ""}  ${findings.length ? `${findings.length} findings` : "clean"}`);
   if (!ok) console.log(text.split("\n").map((l) => `     ${l}`).join("\n"));
   if (ok && check) {
-    const shots = path.join(root, "shots", id);
+    const shots = path.join(root, "shots", ...(lang ? [lang] : []), id);
     const c = spawnSync(process.execPath, [path.join(here, "check.mjs"), out, "--out", shots], { encoding: "utf8" });
     if (c.status !== 0) {
       failed++;
