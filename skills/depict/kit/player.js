@@ -782,7 +782,8 @@
     // the clock runs at the board's own speed: it ends at the length the start button promised; before the film
     // has played, while the whole board waits behind the start button, it reads from the beginning
     clock.textContent = `${fmt(root.classList.contains("fresh") ? 0 : film / own)} / ${fmt(D / own)}`;
-    playBtn.setAttribute("aria-label", playing ? "Pause" : film >= D || root.classList.contains("ended") ? "Replay" : "Play");
+    // its words in the board's language, as the page wrote them on it (kit/ui.mjs)
+    playBtn.setAttribute("aria-label", playing ? playBtn.dataset.pause || "Pause" : film >= D || root.classList.contains("ended") ? playBtn.dataset.replay || "Replay" : playBtn.dataset.play || "Play");
   }
   playBtn.addEventListener("click", () => (playing ? pause() : play()));
   scrub.addEventListener("input", () => {

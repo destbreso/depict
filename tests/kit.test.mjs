@@ -946,3 +946,15 @@ test("a board in another language: every text with words is listed once and look
   delete table["piggy bank"];
   assert.deepEqual(translate(board, table).missing, ["piggy bank"]);
 });
+
+test("a board's page speaks its language: the player's own words too, and English where depict does not know the language yet", async () => {
+  const { uiOf } = await import("../skills/depict/kit/ui.mjs");
+  const kid = build({ ...tiny(), audience: "child" });
+  const scene = sceneOf(kid.board, kid.comp, kid.tl);
+  const es = page({ ...kid.board, lang: "es" }, scene);
+  assert.match(es, /<html lang="es">/);
+  assert.ok(es.includes(`aria-label="${uiOf("es").speed}"`) && es.includes(`data-pause="${uiOf("es").pause}"`), "its buttons are said in Spanish, play and pause alike");
+  assert.ok(es.includes(uiOf("es").hint) && !es.includes(uiOf("en").hint), "and its hint");
+  assert.equal(uiOf("pt-BR").play, uiOf("pt").play, "a language depict does not know is English, word for word");
+  assert.equal(uiOf("es-MX").play, uiOf("es").play, "a region speaks its language's words");
+});

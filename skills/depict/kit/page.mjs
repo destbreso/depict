@@ -2,6 +2,7 @@
 // player inlined. No network, no dependencies: open it in any browser, or
 // capture it frame by frame for a video.
 import fs from "node:fs";
+import { uiOf } from "./ui.mjs";
 
 const read = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8");
 
@@ -172,6 +173,7 @@ export function page(board, scene) {
   // how long it takes to watch, at the board's own speed (a child's board plays at half speed: twice as long)
   const whole = Math.round(scene.duration / (scene.speed || 1));
   const mins = `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+  const ui = uiOf(board.lang);
   return `<!doctype html>
 <html lang="${esc(board.lang ?? "en")}">
 <head>
@@ -187,22 +189,22 @@ export function page(board, scene) {
 <div class="dp${board.audience === "child" ? " child" : ""}" tabindex="0">
   <div class="dp-frame">
     <div class="dp-board"></div>
-    <div class="dp-live" hidden><div class="dp-live-bar"><span class="dp-live-name"></span><button type="button" class="dp-live-close">Back to the board</button></div></div>
+    <div class="dp-live" hidden><div class="dp-live-bar"><span class="dp-live-name"></span><button type="button" class="dp-live-close">${esc(ui.back)}</button></div></div>
   </div>
   <div class="dp-bar">
-    <button type="button" class="dp-prev" aria-label="Previous sentence">&#8249;</button>
-    <button type="button" class="dp-play" aria-label="Play"></button>
-    <button type="button" class="dp-next" aria-label="Next sentence">&#8250;</button>
-    <div class="dp-track"><div class="dp-ticks"></div><input class="dp-scrub" type="range" min="0" step="0.01" value="0" aria-label="Time"></div>
+    <button type="button" class="dp-prev" aria-label="${esc(ui.previous)}">&#8249;</button>
+    <button type="button" class="dp-play" aria-label="${esc(ui.play)}" data-play="${esc(ui.play)}" data-pause="${esc(ui.pause)}" data-replay="${esc(ui.replay)}"></button>
+    <button type="button" class="dp-next" aria-label="${esc(ui.next)}">&#8250;</button>
+    <div class="dp-track"><div class="dp-ticks"></div><input class="dp-scrub" type="range" min="0" step="0.01" value="0" aria-label="${esc(ui.time)}"></div>
     <span class="dp-time"></span>
-    <select class="dp-speed" aria-label="Speed">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((v) => `<option value="${v}"${v === 1 ? " selected" : ""}>${v}&times;</option>`).join("")}</select>
+    <select class="dp-speed" aria-label="${esc(ui.speed)}">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((v) => `<option value="${v}"${v === 1 ? " selected" : ""}>${v}&times;</option>`).join("")}</select>
   </div>
   <div class="dp-under">
     <div class="dp-caption" aria-live="polite"></div>
-    <div class="dp-hint">Drag and zoom the board. Tap any part to hear it again.</div>
-    <div class="dp-start"><button type="button" class="dp-go">Watch it drawn · ${mins}</button></div>
+    <div class="dp-hint">${esc(ui.hint)}</div>
+    <div class="dp-start"><button type="button" class="dp-go">${esc(ui.go.replace("{time}", mins))}</button></div>
   </div>
-  <noscript><p>This board plays with JavaScript. Its explanation: ${esc(board.beats.map((b) => b.say).join(" "))}</p></noscript>
+  <noscript><p>${esc(ui.noscript)} ${esc(board.beats.map((b) => b.say).join(" "))}</p></noscript>
 </div>
 <script>
 const SCENE = ${JSON.stringify(scene)};
