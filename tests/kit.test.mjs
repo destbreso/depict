@@ -882,3 +882,20 @@ test("a board can keep room over its guide for every costume, so a page can dres
   const refused = normalize({ ...tiny(), guide: { character: "stuart", room: ["hair-bow"] } }).errors.join("\n");
   assert.match(refused, /guide\.room: Stuart cannot wear "hair-bow"/, "Stuart is a boy: no room is kept for a hair bow");
 });
+
+test("a look that leaves its own way (a cat's stroll turns away) is cast into a board whose guide never turned or fidgeted", async () => {
+  const { lookOf } = await import("../skills/depict/kit/look.mjs");
+  const { recast } = await import("../skills/depict/kit/act.mjs");
+  const pencil = (await import("../skills/depict/examples/friends/pencil.mjs")).default;
+  const { board, comp, tl } = build({ ...tiny(), guide: { character: "stuart" } });
+  const S = sceneOf(board, comp, tl);
+  const A = S.actors[0];
+  // a board built before every list was kept: its guide has no turns, fidgets or forms at all
+  const bare = { ...A, track: Object.fromEntries(Object.entries(A.track).filter(([k]) => !["turns", "fidgets", "forms"].includes(k))) };
+  const look = { ...lookOf(pencil), outros: ["stroll"] };
+  const B = recast(bare, look, [...S.palette], S.elements);
+  assert.equal(B.track.outro.kind, "stroll");
+  assert.ok(B.track.turns.length > 0, "it turns away as it leaves");
+  // a pencil has no tail to wave: its wag is left out, and nothing is missing to leave it out from
+  assert.ok(Array.isArray(B.track.fidgets));
+});

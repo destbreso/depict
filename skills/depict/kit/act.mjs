@@ -556,8 +556,11 @@ export function keepClear(A, elements) {
 export function personalize(track, look) {
   const tuples = (list) => (list || []).map((x) => [...x]);
   const k = { ...track, moves: (track.moves || []).map((m) => ({ ...m })) };
-  for (const key of ["arms", "feel", "look", "bounces", "spins", "leans", "caps"]) k[key] = tuples(track[key]);
-  const blank = () => ({ moves: [], arms: [], feel: [], look: [], bounces: [], spins: [], leans: [], caps: [] });
+  // every list an arrival or a goodbye may write to, whether or not the board's own guide used it (a guide that never
+  // turned has no turns; a cat's goodbye turns it away)
+  const LISTS = ["arms", "feel", "look", "bounces", "spins", "leans", "caps", "turns", "fidgets", "forms"];
+  for (const key of LISTS) k[key] = tuples(track[key]);
+  const blank = () => ({ moves: [], ...Object.fromEntries(LISTS.map((key) => [key, []])) });
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const take = (made) => {
     for (const key in made) for (const e of made[key]) {
