@@ -226,7 +226,9 @@ function run(board, comp, lead, provisional) {
     const nextBeat = board.beats[bi + 1];
     const moves = nextBeat?.draw.length && !same(shot, shotFor(board, comp, comp.elements.get(nextBeat.draw[0])));
     t = Math.max(drawEnd + P.hold, drawStart + read) + (moves ? P.regionHold : 0);
-    beats.push({ say: beat.say, t0: start, draw0: drawStart, draw1: drawEnd, still: Math.min(drawEnd + P.still, t - 0.05), t1: t, shot });
+    // `rest`: the pause at its end before the camera moves on, kept apart so a page given other words (another
+    // language, other wording) knows how long the sentence had to be read, and holds the board longer when it needs it
+    beats.push({ say: beat.say, t0: start, draw0: drawStart, draw1: drawEnd, still: Math.min(drawEnd + P.still, t - 0.05), t1: t, rest: moves ? P.regionHold : 0, shot });
   });
   // the overview: the whole board, held
   const overview = shotOf(comp.extent);
@@ -235,7 +237,7 @@ function run(board, comp, lead, provisional) {
   camera.push({ t0: t, t1: t + dur, from: shot, to: overview });
   const explore = t + dur; // the board complete: where the page rests when the film is over
   t = explore + P.overviewHold;
-  const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [], explore };
+  const result = { strokes, beats, camera, duration: t, overview, first: beats[0].shot, actors: [], explore, read: { base: P.readBase, rate: P.readRate } };
   if (appear) result.actors.push(perform(board, comp, result, appear, { provisional }));
   return result;
 }

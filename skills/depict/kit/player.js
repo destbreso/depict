@@ -35,6 +35,33 @@
   });
   const T = S.duration;
   const beats = S.beats;
+  // The words of each beat: as the page was built, or as a host gives them (script(): other wording, another
+  // language). A sentence longer than the one the board was timed for holds the board still at the end of its beat,
+  // its picture whole and the guide breathing, until it is read. The film's clock (the bar, the clock, what a host
+  // hears) runs through those holds; the board's clock (`now`) stands still in them.
+  const lines = beats.map((b) => b.say);
+  const READ = S.read || { base: 0.5, rate: 16 };
+  let holds = []; // { at: board time, len }, in order
+  let D = T; // the film's length, holds and all
+  let film = 0; // the film's clock
+  const filmOf = (t) => holds.reduce((f, h) => (h.at < t ? f + h.len : f), t);
+  const boardOf = (f) => {
+    let acc = 0;
+    for (const h of holds) {
+      if (f < h.at + acc) return f - acc;
+      if (f < h.at + acc + h.len) return h.at;
+      acc += h.len;
+    }
+    return Math.min(T, f - acc);
+  };
+  const holding = (f) => {
+    let acc = 0;
+    for (const h of holds) {
+      if (f >= h.at + acc && f < h.at + acc + h.len) return true;
+      acc += h.len;
+    }
+    return false;
+  };
   const flights = S.camera.map((k) => ({ ...k, f: (k.pan ? pan : flight)(k.from, k.to) }));
 
   // the stage
@@ -342,6 +369,31 @@
       st.feel = "proud";
     }
   }
+  /**
+   * Other words for the board's beats, one sentence a beat (a string; an empty one keeps the board's own): other
+   * wording, or another language. Each beat whose sentence takes longer to read than the board was timed for is
+   * held at its end for as long as it needs; nothing drawn changes. Returns { ok, duration, held } (the film's new
+   * length and how much of it is holds), or { ok: false, reason }.
+   */
+  function script(next) {
+    if (!Array.isArray(next) || next.length !== beats.length) return { ok: false, reason: `a script is one sentence a beat, and this board has ${beats.length} beats` };
+    beats.forEach((b, i) => (lines[i] = typeof next[i] === "string" && next[i].trim() ? next[i].trim() : b.say));
+    const t = now;
+    holds = [];
+    beats.forEach((b, i) => {
+      // how long its sentence had to be read in the board as timed, from the start of its pen to its end (less the
+      // pause before the camera moves on), and how long this one takes
+      const had = b.t1 - (b.rest || 0) - b.draw0;
+      const more = READ.base + lines[i].length / READ.rate - had;
+      if (more > 0.05) holds.push({ at: Math.max(b.draw0, b.t1 - (b.rest || 0) - 0.02), len: Math.round(more * 100) / 100 });
+    });
+    D = T + holds.reduce((a, h) => a + h.len, 0);
+    film = filmOf(t);
+    captionFor = -1;
+    placeTicks();
+    render(t);
+    return { ok: true, duration: D, held: Math.round((D - T) * 100) / 100 };
+  }
   const revealed = (rv, t) => (!rv ? 1 : t < rv[0] ? 0 : t >= rv[1] ? 1 : (t - rv[0]) / (rv[1] - rv[0]));
   /** Poses an actor at time t (and, paused, breathes and blinks on the wall clock); returns the pen's tip while it is being drawn. */
   function renderActor(X, t, wall) {
@@ -597,7 +649,7 @@
     if (i === captionFor) return;
     captionFor = i;
     // the last sentence stays in the caption while it fades out
-    if (b) caption.textContent = b.say;
+    if (b) caption.textContent = lines[b.i];
     caption.classList.toggle("on", !!b);
   }
 
@@ -612,16 +664,19 @@
     // a frame is never more than a tenth of a second: back from a hidden tab, the film goes on from where it was
     const dt = last ? Math.min(0.1, (ms - last) / 1000) : 0;
     last = ms;
+    film = Math.min(D, film + dt * speed);
     try {
-      render(now + dt * speed);
+      render(boardOf(film));
+      // held for a longer sentence: the board stands still, and the guide breathes and blinks as it waits
+      if (holding(film) && !reduced) for (const X of actors) renderActor(X, now, ms / 1000);
       watchOpen();
     } catch (err) {
       // one bad frame never stops the film
       if (!failed) console.error("depict: a frame failed to draw", err);
       failed = true;
-      now = Math.min(T, now + dt * speed);
+      now = boardOf(film);
     }
-    if (now >= T) {
+    if (film >= D) {
       playing = false;
       ended();
       return;
@@ -633,7 +688,7 @@
     if (!playing) tell("play");
     unfade();
     // from the end, or from the board at rest after it, the film starts again from the beginning
-    if (now >= T || root.classList.contains("ended")) seek(0);
+    if (film >= D || root.classList.contains("ended")) seek(0);
     root.classList.remove("fresh");
     view = null;
     playing = true;
@@ -648,9 +703,17 @@
     root.classList.remove("playing");
     forget();
   }
+  /** To the board's time t (a beat's start, say); the film's clock goes there too. */
   function seek(t) {
     view = null;
+    film = filmOf(Math.max(0, Math.min(T, t)));
     render(t);
+  }
+  /** To a moment of the film (the bar's place), holds and all. */
+  function seekFilm(f) {
+    view = null;
+    film = Math.max(0, Math.min(D, f));
+    render(boardOf(film));
   }
   function ended() {
     root.classList.remove("playing");
@@ -698,27 +761,33 @@
   const scrub = bar.querySelector(".dp-scrub");
   const clock = bar.querySelector(".dp-time");
   const ticks = bar.querySelector(".dp-ticks");
-  scrub.max = String(T);
-  for (const b of beats) {
-    const m = document.createElement("i");
-    m.style.left = `${(100 * b.t0) / T}%`;
-    ticks.append(m);
-  }
+  // a tick for each beat, where it starts in the film
+  const placeTicks = () => {
+    scrub.max = String(D);
+    ticks.replaceChildren(
+      ...beats.map((b) => {
+        const m = document.createElement("i");
+        m.style.left = `${(100 * filmOf(b.t0)) / D}%`;
+        return m;
+      }),
+    );
+  };
+  placeTicks();
   const fmt = (s) => {
     const r = Math.round(s);
     return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`;
   };
   function updateBar() {
-    scrub.value = String(now);
+    scrub.value = String(film);
     // the clock runs at the board's own speed: it ends at the length the start button promised; before the film
     // has played, while the whole board waits behind the start button, it reads from the beginning
-    clock.textContent = `${fmt(root.classList.contains("fresh") ? 0 : now / own)} / ${fmt(T / own)}`;
-    playBtn.setAttribute("aria-label", playing ? "Pause" : now >= T || root.classList.contains("ended") ? "Replay" : "Play");
+    clock.textContent = `${fmt(root.classList.contains("fresh") ? 0 : film / own)} / ${fmt(D / own)}`;
+    playBtn.setAttribute("aria-label", playing ? "Pause" : film >= D || root.classList.contains("ended") ? "Replay" : "Play");
   }
   playBtn.addEventListener("click", () => (playing ? pause() : play()));
   scrub.addEventListener("input", () => {
     pause();
-    seek(Number(scrub.value));
+    seekFilm(Number(scrub.value));
   });
   const step = (dir) => {
     pause();
@@ -1005,14 +1074,38 @@
     requestAnimationFrame(idle);
   }
 
-  window.depict = { render, seek, play, pause, cast, occasions: occasionsOn, duration: T, explore: S.explore, speed: S.speed || 1, beats, get time() { return now; } };
+  window.depict = {
+    render,
+    seek,
+    seekFilm,
+    play,
+    pause,
+    cast,
+    script,
+    occasions: occasionsOn,
+    duration: T,
+    explore: S.explore,
+    speed: S.speed || 1,
+    beats,
+    lines,
+    get time() {
+      return now;
+    },
+    // the film's clock and length: the board's, and the holds a script needs
+    get film() {
+      return film;
+    },
+    get length() {
+      return D;
+    },
+  };
   // the host of an embedded page hears ready, play, pause and ended, and size whenever the height the page
   // wants (the board as wide as the frame, with its bar and caption under it) or the board's place in it changes:
   // `box`, [x, y, width, height] of the board in the frame, so a host can lay a picture exactly over it
   function tell(event, more) {
     if (!embedded) return;
     try {
-      window.parent.postMessage({ depict: { event, t: now, duration: T, speed: own, title: S.title, ...more } }, "*");
+      window.parent.postMessage({ depict: { event, t: film, duration: D, speed: own, title: S.title, ...more } }, "*");
     } catch {}
   }
   let told = "";
@@ -1038,6 +1131,15 @@
     const r = JSON.parse(sessionStorage.getItem(KEY) || "null");
     if (r && Date.now() - r.at < 20000 && r.t < T) resume = r.t;
   } catch {}
+  // ?script=<address>: other words for its beats, read from a file of them ({ lines: [...] } or the list itself)
+  if (q.get("script"))
+    fetch(q.get("script"))
+      .then((r) => r.json())
+      .then((j) => {
+        const r = script(Array.isArray(j) ? j : j.lines);
+        if (!r.ok) console.warn(`depict: ${r.reason}`);
+      })
+      .catch((err) => console.warn("depict: the script did not load", err));
   if (!capture && at == null && resume != null) {
     // it was playing a moment ago: go on from there
     seek(resume);
@@ -1064,6 +1166,7 @@
       else if (say === "pause" && playing) pause();
       // the host casts another character of the guide's body (its look), or the board's own back (null), and hears how it went
       else if (say === "cast") tell("cast", cast(e.data.look ?? null, { outfit: e.data.outfit, date: e.data.date }));
+      else if (say === "script") tell("script", script(e.data.lines));
     });
   }
 })();

@@ -52,7 +52,10 @@ export function sceneOf(board, comp, tl) {
       const item = e.kind === "item" ? board.regions.flatMap((g) => g.items).find((x) => x.id === id) : null;
       return { id, kind: e.kind, beat: e.beat ?? 0, t0: r(firstAt.get(id) ?? 0), box: [r(e.box.x), r(e.box.y), r(e.box.w), r(e.box.h)], ...(item?.figureUrl ? { figure: item.figureUrl, label: item.label || item.id } : {}) };
     }),
-    beats: tl.beats.map((b, i) => ({ say: keepSums(b.say), t0: r(b.t0 * 100) / 100, t1: r(b.t1 * 100) / 100, draw0: r(b.draw0 * 100) / 100, draw1: r(b.draw1 * 100) / 100, still: r(b.still * 100) / 100, ...(board.beats[i].open ? { open: elIds.indexOf(board.beats[i].open) } : {}) })),
+    beats: tl.beats.map((b, i) => ({ say: keepSums(b.say), t0: r(b.t0 * 100) / 100, t1: r(b.t1 * 100) / 100, draw0: r(b.draw0 * 100) / 100, draw1: r(b.draw1 * 100) / 100, still: r(b.still * 100) / 100, ...(b.rest ? { rest: b.rest } : {}), ...(board.beats[i].open ? { open: elIds.indexOf(board.beats[i].open) } : {}) })),
+    // how long a sentence takes to read (a caption: base + characters / rate seconds): a page given other words holds
+    // a beat longer when its sentence needs it
+    read: tl.read,
     camera: tl.camera.map((k) => ({ t0: r(k.t0 * 100) / 100, t1: r(k.t1 * 100) / 100, from: k.from.map(r), to: k.to.map(r), ...(k.pan ? { pan: 1 } : {}) })),
     overview: tl.overview.map(r),
     sheets: board.mode === "slides" ? [...comp.sheets.values()].map((f) => [r(f.x), r(f.y), r(f.w), r(f.h)]) : [],

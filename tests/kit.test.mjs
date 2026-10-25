@@ -913,3 +913,14 @@ test("a look cast in with outfit: false wears its own clothes, nothing of the bo
   assert.deepEqual(own.dressed, { outfit: null, wear: [] });
   assert.equal(own.strokes.filter((s) => s.part === "hat").length, 0);
 });
+
+test("a page carries what a script needs: each beat's pause before the camera moves on, and how long a sentence takes to read", () => {
+  const { board, comp, tl } = build(tiny());
+  const S = sceneOf(board, comp, tl);
+  assert.deepEqual(S.read, { base: 0.5, rate: 16 });
+  for (const [i, b] of S.beats.entries()) {
+    // its sentence had at least its reading time between the start of its pen and its end (less its pause)
+    const had = b.t1 - (b.rest || 0) - b.draw0;
+    assert.ok(had >= S.read.base + b.say.length / S.read.rate - 0.02, `beat ${i + 1} had its sentence's time`);
+  }
+});
