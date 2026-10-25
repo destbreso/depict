@@ -103,6 +103,9 @@ function actorOf(a, color) {
     ...(rg.swing ? { swing: Object.fromEntries(Object.entries(rg.swing).map(([k, s]) => [k, { ...s, at: s.at.map(q) }])) } : {}),
     ...(rg.forms ? { forms: rg.forms } : {}),
     ...(rg.fidgets ? { fidgets: rg.fidgets } : {}),
+    // who it is, for what it does when it is tapped: its quirks and its ways to arrive
+    ...(rg.personality?.quirks?.length ? { quirks: rg.personality.quirks } : {}),
+    ...(rg.personality?.intros?.length ? { intros: rg.personality.intros } : {}),
     ...(rg.reach !== 0.36 ? { reach: rg.reach } : {}),
   };
 }
@@ -113,7 +116,7 @@ const CSS = `
 html,body{margin:0;height:100%;background:var(--dp-room);color:var(--dp-ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .dp{--dp-reserve:200px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:100%;padding:16px;outline:none}
 .dp-frame{position:relative;width:min(100%,calc((100vh - var(--dp-reserve))*16/9));aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:var(--dp-paper);box-shadow:0 18px 50px rgba(40,36,24,.18),0 0 0 1px rgba(40,36,24,.08)}
-.dp-board,.dp-stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none}
+.dp-board,.dp-stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dp-paper{fill:var(--dp-paper)}
 .slides .dp-paper{fill:var(--dp-room)}
 .dp-sheet{fill:var(--dp-paper);stroke:rgba(40,36,24,.12);stroke-width:2}

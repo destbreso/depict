@@ -162,7 +162,7 @@
   /** An actor's rig, drawn once into the page: its strokes, arms and gloves, ready to be moved every frame. */
   function makeActor(A) {
     const floor = node("g", {}, shadow);
-    const root = node("g", {}, actorLayer);
+    const root = node("g", { class: "dp-guide" }, actorLayer);
     const backArm = node("path", { stroke: INKC, "stroke-width": A.arm.width }, root);
     // a limb with a color of its own: its color drawn along the middle of its ink
     const backArmFill = A.arm.fill != null ? node("path", { stroke: S.palette[A.arm.fill], "stroke-width": A.arm.fillWidth }, root) : null;
@@ -250,6 +250,98 @@
     render(now);
     return { ok: true, character: A.character, ...(A.dressed || { outfit: A.outfit ?? null, wear: A.wear || [] }) };
   }
+  // A tap on the guide: something of its own, a different thing each time (its quirks: a cat sits, curls up into a
+  // ball, twitches its ears and looks around; Stuart pushes his glasses up), taking turns with what any guide does
+  // its own way (a hop and a wave, a jump, a spin, a cheer, a jiggle when it is soft). It plays on the real clock, over
+  // whatever the board has it doing, playing or paused, and the board goes on under it.
+  const REACT = { hop: 1.8, jump: 1.6, spin: 1.1, jiggle: 1.7, cheer: 1.6, pose: 1.7, form: 2.4 };
+  function reactionsOf(A) {
+    const own = [...new Set(A.quirks || [])].filter((q) => A.forms?.includes(q) || A.fidgets?.[q] || A.poses?.[q]);
+    const ways = { wave: "hop", hop: "hop", bounce: "hop", jump: "jump", spin: "spin", jiggle: "jiggle" };
+    const any = [...new Set(["hop", ...(A.intros || []).map((i) => ways[i]).filter(Boolean), "cheer", "spin", ...((A.motion?.jelly ?? 0) >= 0.5 ? ["jiggle"] : [])])];
+    const list = [];
+    for (let i = 0; i < Math.max(own.length, any.length); i++) {
+      if (any[i]) list.push(any[i]);
+      if (own[i]) list.push(own[i]);
+    }
+    return list;
+  }
+  function reactNow(X, st) {
+    const r = X.react;
+    if (!r) return;
+    const A = X.A;
+    const k = r.kind;
+    const fid = A.fidgets?.[k];
+    const form = A.forms?.includes(k);
+    const time = form ? REACT.form : fid ? (fid.time ?? 1.6) + 0.2 : REACT[k] ?? REACT.pose;
+    const d = performance.now() / 1000 - r.at;
+    if (d > time) {
+      X.react = null;
+      return;
+    }
+    if (d < 0) return;
+    const at = ([u, v]) => [u * A.h, (v - 0.99) * A.h];
+    const arms = (name, wiggle = 0) => {
+      const P = A.poses?.[name];
+      if (!P) return;
+      for (const side of ["front", "back"]) {
+        if (!P[side]) continue;
+        const hand = at(P[side].hand);
+        const bow = at(P[side].bow);
+        st[side] = { hand: [hand[0] + wiggle * 0.055 * A.h, hand[1]], bow: [bow[0] + wiggle * 0.03 * A.h, bow[1]], glove: P[side].glove ?? "open" };
+      }
+    };
+    const squash = A.motion?.squash ?? 1;
+    const springy = (k0) => {
+      const sq = Math.exp(-5 * k0) * Math.cos(13 * k0);
+      st.sy *= 1 - 0.14 * squash * sq;
+      st.sx *= 1 + 0.12 * squash * sq;
+    };
+    const arc = (t, len, high) => (t < len ? high * 4 * (t / len) * (1 - t / len) : 0);
+    if (k === "hop" || k === "jump") {
+      springy(d);
+      if (A.motion?.jelly) st.skew = (st.skew || 0) + A.motion.jelly * 9 * Math.exp(-3 * d) * Math.sin(11 * d);
+      st.lift = (st.lift || 0) + arc(d, k === "jump" ? 0.7 : 0.5, k === "jump" ? 120 : 70);
+      st.feel = "excited";
+      if (k === "jump") arms("cheer");
+      else {
+        const w = Math.sin(2 * Math.PI * 2.4 * d);
+        const P = A.poses.wave.front;
+        const hand = at(P.hand);
+        const bow = at(P.bow);
+        st.front = { hand: [hand[0] + w * 0.055 * A.h, hand[1]], bow: [bow[0] + w * 0.03 * A.h, bow[1]], glove: "open" };
+      }
+    } else if (k === "spin") {
+      // turned round once, a little off the ground
+      st.sx *= Math.cos((2 * Math.PI * d) / time);
+      st.lift = (st.lift || 0) + arc(d, time, 26);
+      st.feel = "happy";
+    } else if (k === "jiggle") {
+      const j = A.motion?.jelly ?? 1;
+      st.skew = (st.skew || 0) + j * 14 * Math.exp(-2.4 * d) * Math.sin(15 * d);
+      st.sy *= 1 + 0.08 * squash * Math.exp(-2.6 * d) * Math.sin(17 * d);
+      st.feel = d < 0.6 ? "surprised" : "happy";
+    } else if (k === "cheer") {
+      arms("cheer", Math.sin(2 * Math.PI * 2 * d) * 0.4);
+      st.lift = (st.lift || 0) + (d < 1.2 ? 22 * Math.abs(Math.sin((2 * Math.PI * d) / 0.9)) : 0);
+      st.feel = "excited";
+    } else if (form) {
+      // it takes the form for a moment (a cat sits, curls up into a ball), then stands again
+      if (d > 0.12 && d < time - 0.2) st.form = k;
+      st.feel = "happy";
+    } else if (fid) {
+      const e = Math.sin(Math.PI * Math.min(1, d / time));
+      st.fidget = { name: k, e };
+      if (fid.look === "around") {
+        const f = d / time;
+        const [lx, ly] = f < 0.4 ? [-1, -0.3] : f < 0.75 ? [1, -0.4] : f < 0.95 ? [0, 0.6] : [0, 0];
+        st.look = [lx * 0.018 * A.h, ly * 0.014 * A.h];
+      }
+    } else if (A.poses?.[k]) {
+      arms(k);
+      st.feel = "proud";
+    }
+  }
   const revealed = (rv, t) => (!rv ? 1 : t < rv[0] ? 0 : t >= rv[1] ? 1 : (t - rv[0]) / (rv[1] - rv[0]));
   /** Poses an actor at time t (and, paused, breathes and blinks on the wall clock); returns the pen's tip while it is being drawn. */
   function renderActor(X, t, wall) {
@@ -267,23 +359,8 @@
       if (mo.jelly) st.skew = mo.jelly * 1.4 * Math.sin((2 * Math.PI * wall) / 3.4);
       const p = wall % 3.9;
       st.blink = p < 0.16 ? Math.sin((Math.PI * p) / 0.16) : 0;
-      // tapped: a springy hop and a wave
-      const d = X.react == null ? Infinity : wall - X.react;
-      if (d < 1.8) {
-        const sq = Math.exp(-5 * d) * Math.cos(13 * d);
-        st.sy *= 1 - 0.14 * (A.motion?.squash ?? 1) * sq;
-        st.sx *= 1 + 0.12 * (A.motion?.squash ?? 1) * sq;
-        if (A.motion?.jelly) st.skew += A.motion.jelly * 9 * Math.exp(-3 * d) * Math.sin(11 * d);
-        st.lift = d < 0.5 ? 70 * 4 * (d / 0.5) * (1 - d / 0.5) : 0;
-        st.feel = "excited";
-        const w = Math.sin(2 * Math.PI * 2.4 * d);
-        const P = A.poses.wave.front;
-        const at = ([u, v]) => [u * A.h, (v - 0.99) * A.h];
-        const hand = at(P.hand);
-        const bow = at(P.bow);
-        st.front = { hand: [hand[0] + w * 0.055 * A.h, hand[1]], bow: [bow[0] + w * 0.03 * A.h, bow[1]], glove: "open" };
-      }
     }
+    reactNow(X, st);
     X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${st.facing * st.sx} ${st.sy})`);
     X.floor.setAttribute("transform", `translate(${st.x} ${st.y}) scale(${1 - 0.45 * st.air} 1)`);
     X.floor.setAttribute("opacity", 1 - 0.5 * st.air);
@@ -711,7 +788,45 @@
     const [a, b] = [...fingers.values()];
     return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
   };
+  // the guide under a pointer, if it is there
+  const guideAt = (ev) => {
+    const [bx, by] = toBoard(ev);
+    for (const X of actors) {
+      const st = actorAt(X.A, now);
+      if (st.shown && Math.abs(bx - st.x) < 0.36 * X.A.h && by < st.y + 10 && by > st.y - X.A.h) return X;
+    }
+    return null;
+  };
+  // a tap on it: the next thing of its own (reactNow); the page hosting the board hears of it
+  const poke = (X) => {
+    const list = (X.reactions ??= reactionsOf(X.A));
+    X.pokes = ((X.pokes ?? -1) + 1) % list.length;
+    X.react = { at: performance.now() / 1000, kind: list[X.pokes] };
+    tell("guide-poke", { character: X.A.character, reaction: list[X.pokes] });
+  };
+  // a long press on it (a finger held), or the menu's click (a right click): the page hosting the board may offer
+  // something for its guide (another guide to cast in); a board on its own leaves the browser's menu alone
+  const hosted = window.parent !== window;
+  let press = null;
+  let menuAt = 0;
+  const guideMenu = (X) => {
+    if (performance.now() - menuAt < 800) return;
+    menuAt = performance.now();
+    tell("guide-menu", { character: X.A.character });
+  };
+  svg.addEventListener("contextmenu", (ev) => {
+    if (!hosted) return;
+    const X = guideAt(ev);
+    if (!X) return;
+    ev.preventDefault();
+    guideMenu(X);
+  });
   svg.addEventListener("pointerdown", (ev) => {
+    if (ev.button > 0) return;
+    if (hosted && !fingers.size) {
+      const X = guideAt(ev);
+      if (X) press = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, fired: false, timer: setTimeout(() => press && ((press.fired = true), guideMenu(X)), 550) };
+    }
     fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     svg.setPointerCapture(ev.pointerId);
     if (fingers.size === 2) {
@@ -734,12 +849,20 @@
     fingers.delete(ev.pointerId);
     if (fingers.size < 2) pinch = null;
   };
+  const unpress = () => {
+    if (press) clearTimeout(press.timer);
+    const fired = press?.fired;
+    press = null;
+    return fired;
+  };
   svg.addEventListener("pointercancel", (ev) => {
+    unpress();
     lift(ev);
     drag = null;
   });
   svg.addEventListener("pointermove", (ev) => {
     if (fingers.has(ev.pointerId)) fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (press && Math.abs(ev.clientX - press.x) + Math.abs(ev.clientY - press.y) > 8) unpress();
     if (pinch && fingers.size >= 2) {
       const p = pair();
       const w = Math.min(S.overview[2] * 1.6, Math.max(300, (pinch.w * pinch.d) / p.d));
@@ -763,6 +886,11 @@
       }
       return;
     }
+    if (guideAt(ev)) {
+      svg.style.cursor = "pointer";
+      hoverBox.style.display = "none";
+      return;
+    }
     const e = playing ? null : hit(ev);
     svg.style.cursor = e ? "pointer" : "grab";
     if (e) {
@@ -775,24 +903,22 @@
     } else hoverBox.style.display = "none";
   });
   svg.addEventListener("pointerup", (ev) => {
+    if (ev.button > 0) return;
+    const pressed = unpress();
     lift(ev);
     drag = null;
+    // a long press opened its menu: no tap
+    if (pressed) return;
     // the last finger of a drag or a pinch lifts: no tap
     if (gesture) {
       if (!fingers.size) gesture = false;
       return;
     }
     if (fingers.size) return;
+    // the guide answers a tap with something of its own, playing or paused
+    const G = guideAt(ev);
+    if (G) return poke(G);
     if (playing) return pause();
-    // the guide answers a tap with a hop and a wave
-    const [bx, by] = toBoard(ev);
-    for (const X of actors) {
-      const st = actorAt(X.A, now);
-      if (st.shown && Math.abs(bx - st.x) < 0.36 * X.A.h && by < st.y + 10 && by > st.y - X.A.h) {
-        X.react = performance.now() / 1000;
-        return;
-      }
-    }
     const e = hit(ev);
     if (e && e.figure) openLive(e, false);
     else if (e) {

@@ -717,6 +717,9 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     swing: look.swing,
     forms: look.forms,
     fidgets: look.fidgets,
+    // what it does when it is tapped comes from its own quirks and ways to arrive
+    quirks: look.quirks,
+    intros: look.intros,
     reach: look.reach,
     capPivot: look.capPivot,
     arm: { width: look.arm.width, hose: look.arm.hose, ...(look.arm.fill ? { fill: color(look.arm.fill), fillWidth: look.arm.fillWidth } : {}) },
