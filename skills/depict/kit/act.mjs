@@ -690,14 +690,17 @@ export function recast(A, look, palette, elements = [], dress = {}) {
   // wears that it has. A costume goes on only where the board kept the room over its head; each is drawn in its turn
   // after its body, as a board dresses a guide
   const find = (n) => n != null && (look.outfits || []).find((o) => o.name.toLowerCase() === String(n).toLowerCase());
-  const asked = dress.outfit === "today" ? occasionsOn(dress.date ? new Date(dress.date) : new Date()) : dress.outfit != null ? [dress.outfit] : [];
+  // `outfit: false` asks for its own clothes: nothing of the board's dress either (a host whose child has not given it
+  // an outfit, say)
+  const plain = dress.outfit === false;
+  const asked = dress.outfit === "today" ? occasionsOn(dress.date ? new Date(dress.date) : new Date()) : dress.outfit != null && !plain ? [dress.outfit] : [];
   const room = (w) => A.top == null || (look.tops?.[w] ?? 0) <= A.top + 0.02;
   const wearing = (kit) => Object.keys(look.wear || {}).filter((w) => (kit ? kit.wear : A.wear || []).includes(w) && room(w));
   const day = asked.map(find).find(Boolean);
   // the day's outfit when it fits on this board, else the board's own dress
   const fits = day ? wearing(day) : [];
-  const wears = fits.length ? fits : wearing(find(A.outfit));
-  const worn = fits.length ? day.name : find(A.outfit) ? find(A.outfit).name : null;
+  const wears = plain ? [] : fits.length ? fits : wearing(find(A.outfit));
+  const worn = plain ? null : fits.length ? day.name : find(A.outfit) ? find(A.outfit).name : null;
   for (const w of wears) for (const s of look.wear[w]) strokes.push({ ...copy(s), n: next++ });
   // what it holds is the board's: drawn in its hand's own frame, so the same in any hand, and drawn last
   for (const s of A.strokes) if (s.part === "held" || s.part === "pointer") strokes.push({ ...s, n: next++ });

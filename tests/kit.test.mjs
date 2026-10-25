@@ -899,3 +899,17 @@ test("a look that leaves its own way (a cat's stroll turns away) is cast into a 
   // a pencil has no tail to wave: its wag is left out, and nothing is missing to leave it out from
   assert.ok(Array.isArray(B.track.fidgets));
 });
+
+test("a look cast in with outfit: false wears its own clothes, nothing of the board's dress", async () => {
+  const { lookOf } = await import("../skills/depict/kit/look.mjs");
+  const { recast } = await import("../skills/depict/kit/act.mjs");
+  const pencil = (await import("../skills/depict/examples/friends/pencil.mjs")).default;
+  const { board, comp, tl } = build({ ...tiny(), guide: { character: "stuart", outfit: "party", room: "all" } });
+  const S = sceneOf(board, comp, tl);
+  const look = lookOf(pencil);
+  const dressed = recast(S.actors[0], look, [...S.palette], S.elements);
+  const own = recast(S.actors[0], look, [...S.palette], S.elements, { outfit: false });
+  assert.ok(dressed.dressed.wear.length > 0, "left alone, it wears its own outfit of the board's (its party hat)");
+  assert.deepEqual(own.dressed, { outfit: null, wear: [] });
+  assert.equal(own.strokes.filter((s) => s.part === "hat").length, 0);
+});
