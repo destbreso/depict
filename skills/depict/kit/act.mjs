@@ -329,12 +329,22 @@ const yawOf = (actor, view, facing) => {
   return facing > 0 ? y : 180 - y;
 };
 /**
- * The angle a solid character is seen from at t: the angle of its view and the way it faces, and, within VIEW_TURN of
- * a change of either, on its way there from the angle it was seen from then (itself perhaps on its way), eased.
+ * How long a solid waits for a rise to come down before it turns (s), and how long it takes to come down when the rise
+ * goes on (it comes down to turn) and to rise again once it has turned.
+ */
+export const SOLID_DOWN = 0.6;
+export const RISE_AFTER = 0.3;
+/**
+ * The angle a solid character is seen from at t, and its latest turn: the angle of its view and the way it faces, and,
+ * over VIEW_TURN from a change of either, on its way there from the angle it was seen from then (itself perhaps on its
+ * way), eased; with [when the change came, when it starts to turn, when it has turned, whether it came down to turn].
+ * It turns on its sole: a turn that comes while it is risen waits until it has come down (SOLID_DOWN), or, when the
+ * rise goes on, until it has come down to turn (RISE_AFTER).
  */
 function seenFrom(actor, t, depth = 0) {
+  const flatAt = (u) => actorAt(actor, u, true);
   const target = (u) => {
-    const s = actorAt(actor, u, true);
+    const s = flatAt(u);
     return yawOf(actor, s.view ?? null, s.facing);
   };
   const now = target(t);
@@ -344,14 +354,24 @@ function seenFrom(actor, t, depth = 0) {
   for (const m of tr.moves) at.push(m.t0, m.t1);
   for (const k of tr.turns ?? []) at.push(k[0]);
   for (const k of tr.arms) at.push(k[0]);
-  const near = at.filter((c) => c <= t && c > t - VIEW_TURN).sort((a, b) => b - a);
+  const near = at.filter((c) => c <= t && c > t - VIEW_TURN - SOLID_DOWN - RISE_AFTER).sort((a, b) => b - a);
   // the latest of them that changed the angle it turns to, and the angle it was seen from just before
   for (const c of near) {
     if (Math.abs(target(c - 1e-4) - now) < 1e-6) continue;
-    const was = depth < 3 ? seenFrom(actor, c - 1e-4, depth + 1) : target(c - 1e-4);
-    return was + (now - was) * easeInOut(clamp01((t - c) / VIEW_TURN));
+    let start = null;
+    for (let d = 0; d <= SOLID_DOWN + 1e-9; d += 0.05) {
+      const r = flatAt(c + d).rise;
+      if (!r || Math.abs(r.turn ?? 0) < 1) {
+        start = c + d;
+        break;
+      }
+    }
+    const down = start == null;
+    if (down) start = c + RISE_AFTER;
+    const was = depth < 3 ? seenFrom(actor, c - 1e-4, depth + 1)[0] : target(c - 1e-4);
+    return [was + (now - was) * easeInOut(clamp01((t - start) / VIEW_TURN)), [c, start, start + VIEW_TURN, down]];
   }
-  return now;
+  return [now, null];
 }
 /**
  * A character drawn from a modelled shape (`yaw`: the angle its standing view is seen from, its side 0 and facing the
@@ -362,7 +382,7 @@ function seenFrom(actor, t, depth = 0) {
  * with it: its eyes look the same way, and it flips over the same way.
  */
 export function solidTurn(actor, t, st) {
-  const yaw = seenFrom(actor, t);
+  const [yaw, turn] = seenFrom(actor, t);
   let best = null;
   const drawings = [[actor.yaw, null], ...Object.entries(actor.views ?? {}).filter(([, v]) => v.yaw != null && v.pitch == null).map(([k, v]) => [v.yaw, k])];
   for (const [y, v] of drawings)
@@ -378,18 +398,34 @@ export function solidTurn(actor, t, st) {
     if (st.look) st.look = [-st.look[0], st.look[1]];
     if (st.roll) st.roll = -st.roll;
   }
-  return solidRise(actor, st);
+  // how much of its rise it shows: all of it, but none while it turns (and it comes down first when the rise goes on),
+  // rising again once it has turned
+  let f = 1;
+  if (turn) {
+    const [c, start, end, down] = turn;
+    if (t < start) f = down ? 1 - easeInOut(clamp01((t - c) / (start - c))) : 1;
+    else if (t < end) f = 0;
+    else f = easeInOut(clamp01((t - end) / RISE_AFTER));
+  }
+  return solidRise(actor, st, f);
 }
 
 /**
  * A solid character rising onto a point of itself (a rise: `turn` degrees about its `pivot`) is drawn risen: it is
  * seen in the drawing of the nearest angle it has risen to (`views.<name>: { yaw, pitch, pivot }`, its drawing at that
  * yaw at 0, each placed by the character standing on its own point), turned only by what is left, about that
- * drawing's point (the pose's own for the drawing at 0); the pose's shift is the drawings' to make.
+ * drawing's point (the pose's own for the drawing at 0); the pose's shift is the drawings' to make. `share` is how much
+ * of the rise it shows (solidTurn: none while it turns).
  */
-export function solidRise(actor, st) {
+export function solidRise(actor, st, share = 1) {
+  if (!st.rise || actor.yaw == null) return st;
+  const f = share;
+  if (f < 1) {
+    st.rise = { ...st.rise, turn: (st.rise.turn ?? 0) * f, shift: st.rise.shift.map((x) => x * f) };
+    if (!st.rise.turn && !st.rise.shift[0] && !st.rise.shift[1]) delete st.rise;
+  }
   const r = st.rise;
-  if (!r || !r.turn || actor.yaw == null) return st;
+  if (!r || !r.turn) return st;
   const at = st.view ? actor.views?.[st.view]?.yaw ?? actor.yaw : actor.yaw;
   let pick = { pitch: 0, view: st.view ?? null, pivot: r.pivot };
   for (const [k, v] of Object.entries(actor.views ?? {}))
