@@ -66,6 +66,13 @@ export default {
   // the shared costumes it can wear, in the places Stuart has for them (its head is where his is); it has no neck for a scarf
   wear: ["grad-cap", "hard-hat", "headphones", "party-hat", "crown", "beanie", "chef-hat", "glasses", "bow-tie", "star", "pencil-ear"],
   skins: ["plain"],
+  // where each sits on it: where it sits on Stuart, for its head, its chin and its sides are where his are
+  anchors: {
+    hat: { s: 1.45, du: 0.02, dv: 0.0 },
+    neck: { s: 1.15, du: -0.012, dv: -0.03 },
+    chest: { s: 1.1, du: 0.24, dv: -0.15 },
+    ear: { s: 1.1, du: 0.21, dv: 0.08 },
+  },
   // its own costume: a little bat that sits on its head, for Halloween
   costumes: {
     bat: {

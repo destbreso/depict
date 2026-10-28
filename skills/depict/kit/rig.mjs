@@ -12,7 +12,7 @@
 // fingers, y toward the thumb).
 import * as ink from "./ink.mjs";
 import { smooth } from "./geom.mjs";
-import { characterOf, contractOf, slotOf } from "./characters/index.mjs";
+import { PLACES, characterOf, contractOf, slotOf } from "./characters/index.mjs";
 
 const PAPER = "#fbfaf7";
 const INK = "#1b1b19";
@@ -56,14 +56,12 @@ export const reachAbove = (cast = {}) => {
 /** How far above the top of its head a costume reaches on a character, in units of its height. */
 export const topOf = (C, w) => {
   // in a view that moves its costumes (facing the viewer, its head higher), as high as it reaches in any of them
-  const hat = C.costumes?.[w] ? Boolean(C.costumes[w].hat) : SLOT[w] === "hat";
+  const hat = C.costumes?.[w] ? Boolean(C.costumes[w].hat) : PLACES[w] === "hat";
   const moved = Object.values(C.views ?? {}).map((o) => (hat ? o.hat : o.wear)?.[1] ?? 0);
   if (C.costumes?.[w]) return (C.costumes[w].top ?? 0) - Math.min(0, ...moved);
-  const a = C.anchors?.[SLOT[w]];
+  const a = C.anchors?.[PLACES[w]];
   return (HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w]) - (HAT_TOP[w] == null ? 0 : Math.min(0, ...moved));
 };
-/** Where each shared costume goes on a character: its hats on its head, a bow tie or a scarf at its neck, a star on its chest, a bow in its hair, a pencil behind its ear. */
-const SLOT = { "grad-cap": "hat", "hard-hat": "hat", headphones: "hat", "party-hat": "hat", crown: "hat", beanie: "hat", "chef-hat": "hat", glasses: "eyes", "bow-tie": "neck", scarf: "neck", star: "chest", "hair-bow": "hair", "pencil-ear": "ear" };
 
 /** The feelings the guide shows, and the brows, mouth and eyes each one is made of. */
 export const FEELINGS = {

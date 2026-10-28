@@ -56,7 +56,7 @@ const asked = opt("wear") ? opt("wear").split(",") : null;
 const armless = C.arm === false;
 const holding = armless ? null : opt("hold");
 
-// the sheet: every feeling, every pose, and its costumes (its own first)
+// the sheet: every feeling, every pose, and the costumes it has (its own first; only the shared ones that fit its body)
 const cast = (wear = []) => ({ character, wear });
 const feels = ["happy", "excited", "surprised", "worried", "thinking", "proud", "wink", "sad"];
 const poses = ["rest", "point", "present", "wave", "cheer", "shrug", "scratch", "salute", ...(C.personality?.quirks ?? []).filter((q) => C.poses[q])];
@@ -76,7 +76,8 @@ const dressed = [
 const rows = [
   { title: "feelings", cells: feels.map((f) => ({ label: f, cast: cast(), feel: f })) },
   { title: "poses", cells: poses.map((p) => ({ label: p, cast: cast(), pose: p })) },
-  { title: "costumes", cells: dressed.map((d) => ({ label: d.label, cast: cast(d.wear), pose: d.pose, feel: d.feel, hold: d.hold })) },
+  // only the costumes it really has: a character with none (a shoe has no head for a hat) shows no row of them
+  ...(dressed.length ? [{ title: "costumes", cells: dressed.map((d) => ({ label: d.label, cast: cast(d.wear), pose: d.pose, feel: d.feel, hold: d.hold })) }] : []),
   // its whole-body forms (a cat sits, curls up), and how its fidgets look (its ears, where they twitch from)
   ...(C.forms?.length ? [{ title: "forms", cells: C.forms.map((f) => ({ label: f, cast: cast(), form: f })) }] : []),
   // its views: standing, and each other one (facing the viewer, at rest as it stands), happy and surprised

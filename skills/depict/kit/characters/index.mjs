@@ -29,8 +29,17 @@ const BODY_KEYS = ["lean", "bend", "stretch", "look", "aim", "sway", "pulse", "p
 export const SHARED = ["size"];
 /** Its body, its own when it says it and its contract's when it does not: the paper it takes, its shoulders, its reach, its finger and its poses. */
 export const BODY = ["measures", "shoulders", "reach", "tip", "poses"];
-/** What else a character drawn to another's slot takes from it when it does not say its own: where costumes sit on it, what a hat tips about, its arms and its hands. */
-const DEFAULTS = ["anchors", "capPivot", "arm", "hands"];
+/**
+ * What else a character drawn to another's slot takes from it when it does not say its own: what a hat tips about,
+ * its arms and its hands. Never where costumes sit on it: a costume fits a body, so every character says where each
+ * one it wears sits on its own (anchors) and wears none its body has no place for.
+ */
+const DEFAULTS = ["capPivot", "arm", "hands"];
+
+/** Where each shared costume sits on a body: its hats on its head, a bow tie or a scarf at its neck, a star on its chest, a bow in its hair, a pencil behind its ear, glasses over its eyes. */
+export const PLACES = { "grad-cap": "hat", "hard-hat": "hat", headphones: "hat", "party-hat": "hat", crown: "hat", beanie: "hat", "chef-hat": "hat", glasses: "eyes", "bow-tie": "neck", scarf: "neck", star: "chest", "hair-bow": "hair", "pencil-ear": "ear" };
+/** What a body needs for a costume to sit in each place (every character has eyes, so glasses need nothing more). */
+const NEEDS = { hat: "a head to sit on", neck: "a neck", chest: "a chest", hair: "hair", ear: "an ear" };
 
 /**
  * The outfits every character has from the shared costumes, by the part it plays on a board: a board can dress its
@@ -139,7 +148,14 @@ export function checkCharacter(raw) {
     need(`poses.${name}.body`, ok, `says only ${BODY_KEYS.join(", ")}: lean, bend, aim and turn in degrees (a turn about its pivot, [u, v]), stretch a share of its height, look as [x, y], shift as [du, dv], sway and pulse as [how much, seconds], ease in seconds`);
   }
   need("personality", c.personality && Array.isArray(c.personality.intros) && c.personality.intros.length && Array.isArray(c.personality.outros) && c.personality.outros.length, "lists its intros and outros");
-  need("wear", Array.isArray(c.wear), "lists the shared costumes it can wear");
+  need("wear", c.wear == null || Array.isArray(c.wear), "lists the shared costumes that fit its body (none when it is left out)");
+  // a costume is worn only where its body has a place for it (a hat needs a head, a bow tie a neck): the costumes were
+  // made for the marker's body, and every other character says where each one it wears sits on its own
+  if (raw !== marker)
+    for (const w of c.wear ?? []) {
+      const place = PLACES[w];
+      if (NEEDS[place] && !c.anchors?.[place]) out.push(`"wear" lists ${w}, which needs ${NEEDS[place]}: say where it sits on its body (anchors.${place}), or leave it out, for a costume is worn only where its body has a place for it`);
+    }
   need("skins", Array.isArray(c.skins) && c.skins.includes("plain"), "lists its skins, plain among them");
   need("hands", armless || typeof c.hands === "function", "returns its hands' shapes for what it wears");
   const wearable = [...(c.wear ?? []), ...Object.keys(c.costumes ?? {})];
