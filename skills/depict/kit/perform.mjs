@@ -473,6 +473,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
     rig: g.rig,
     ...(g.rig.armless ? { armless: true } : {}),
     ...(g.rig.views ? { views: g.rig.views } : {}),
+    ...(g.rig.personality?.travel?.length ? { travel: g.rig.personality.travel } : {}),
     hold: g.rig.hold,
     eyes: g.rig.eyes,
     shoulders: g.rig.shoulders,

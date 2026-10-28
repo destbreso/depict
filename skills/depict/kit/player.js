@@ -301,11 +301,11 @@
   // ball, twitches its ears and looks around; Stuart pushes his glasses up), taking turns with what any guide does
   // its own way (a hop and a wave, a jump, a spin, a cheer, a jiggle when it is soft). It plays on the real clock, over
   // whatever the board has it doing, playing or paused, and the board goes on under it.
-  const REACT = { hop: 1.8, jump: 1.6, spin: 1.1, jiggle: 1.7, cheer: 1.6, pose: 1.7, form: 2.4 };
+  const REACT = { hop: 1.8, jump: 1.6, spin: 1.1, jiggle: 1.7, cheer: 1.6, pose: 1.7, form: 2.4, flip: 1.4, roll: 1.4 };
   function reactionsOf(A) {
     const own = [...new Set(A.quirks || [])].filter((q) => A.forms?.includes(q) || A.fidgets?.[q] || A.poses?.[q]);
-    const ways = { wave: "hop", hop: "hop", bounce: "hop", jump: "jump", spin: "spin", jiggle: "jiggle" };
-    const any = [...new Set(["hop", ...(A.intros || []).map((i) => ways[i]).filter(Boolean), "cheer", "spin", ...((A.motion?.jelly ?? 0) >= 0.5 ? ["jiggle"] : [])])];
+    const ways = { wave: "hop", hop: "hop", bounce: "hop", jump: "jump", spin: "spin", jiggle: "jiggle", flip: "flip", roll: "roll" };
+    const any = [...new Set(["hop", ...(A.intros || []).map((i) => ways[i]).filter(Boolean), ...(A.travel || []).map((i) => ways[i]).filter(Boolean), "cheer", "spin", ...((A.motion?.jelly ?? 0) >= 0.5 ? ["jiggle"] : [])])];
     const list = [];
     for (let i = 0; i < Math.max(own.length, any.length); i++) {
       if (any[i]) list.push(any[i]);
@@ -366,6 +366,15 @@
         const bow = at(P.bow);
         st.front = { hand: [hand[0] + w * 0.055 * A.h, hand[1]], bow: [bow[0] + w * 0.03 * A.h, bow[1]], glove: "open" };
       }
+    } else if (k === "flip" || k === "roll") {
+      // over once about its middle: in the air for a flip, along the ground for a roll, landing with a squash
+      const len = k === "flip" ? 0.8 : 1.0;
+      const u = Math.min(1, d / len);
+      st.roll = 360 * easeInOut(u);
+      st.rollAt = -(0.99 - (A.views?.[st.view]?.middle ?? A.motion?.middle ?? 0.5)) * A.h;
+      st.lift = (st.lift || 0) + (k === "flip" ? arc(d, len, 95) : (A.motion?.roll ?? 0.25) * A.h * Math.abs(Math.sin(Math.PI * u)));
+      if (d > len) springy(d - len);
+      st.feel = "excited";
     } else if (k === "spin") {
       // turned round once, a little off the ground
       st.sx *= Math.cos((2 * Math.PI * d) / time);
@@ -442,7 +451,7 @@
     }
     reactNow(X, st);
     // a rise turns it about a point of its own (onto its toe, its tip), in its own frame
-    const rise = st.rise ? ` translate(${st.rise.shift[0]} ${st.rise.shift[1]}) rotate(${st.rise.turn} ${st.rise.pivot[0]} ${st.rise.pivot[1]})` : "";
+    const rise = (st.rise ? ` translate(${st.rise.shift[0]} ${st.rise.shift[1]}) rotate(${st.rise.turn} ${st.rise.pivot[0]} ${st.rise.pivot[1]})` : "") + (st.roll ? ` rotate(${st.roll} 0 ${st.rollAt})` : "");
     X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${st.facing * st.sx} ${st.sy})${rise}`);
     X.floor.setAttribute("transform", `translate(${st.x} ${st.y}) scale(${1 - 0.45 * st.air} 1)`);
     X.floor.setAttribute("opacity", 1 - 0.5 * st.air);

@@ -35,8 +35,8 @@ export const WEAR = [...HATS, "glasses", "bow-tie", "scarf", "star", "hair-bow",
 export const HOLD = ["pointer", "book", "pencil", "ruler", "coin", "clock", "magnifier", "flag", "balloon", "wrench", "calculator", "lightbulb"];
 export const SKINS = ["plain", "blue", "green", "sand", "pink", "stripes", "dots"];
 /** Every way a guide can arrive and leave; each character has its own few (its personality), and a soft one bounces and jiggles. */
-export const INTROS = ["wave", "hop", "spin", "bow", "tip", "jump", "bounce", "jiggle", "rub"];
-export const OUTROS = ["wave", "bow", "cheer", "salute", "tip", "spin", "bounce", "stroll"];
+export const INTROS = ["wave", "hop", "spin", "bow", "tip", "jump", "bounce", "jiggle", "rub", "flip", "roll"];
+export const OUTROS = ["wave", "bow", "cheer", "salute", "tip", "spin", "bounce", "stroll", "flip", "roll"];
 const SKIN_TINTS = { blue: "#d3e3f0", green: "#d6ead8", sand: "#f4e6c4", pink: "#f5d9df" };
 /** How far above the top of the marker's cap a costume reaches, in units of the guide's height: its spot keeps that paper free too. */
 const HAT_TOP = { "grad-cap": 0.09, "hard-hat": 0.09, headphones: 0.07, "party-hat": 0.28, crown: 0.1, beanie: 0.11, "chef-hat": 0.26, "hair-bow": 0.04, "pencil-ear": 0.07 };

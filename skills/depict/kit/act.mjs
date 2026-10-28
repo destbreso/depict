@@ -118,7 +118,12 @@ export function actorAt(actor, t) {
   let lift = 0;
   let air = 0;
   let settled = -Infinity; // when it last landed
+  // how it travels on the move under way, when it is not a hop (a flip, a roll, a slide, on tiptoe), and how far into it
+  let going = null;
+  let trip = 0;
   for (const m of tr.moves) {
+    const way = m.way ?? (actor.travel ? travelOf(actor, m, trip) : null);
+    if (actor.travel && (m.from[0] !== m.to[0] || m.from[1] !== m.to[1])) trip++;
     if (t < m.t0) break;
     if (t >= m.t1) {
       x = m.to[0];
@@ -143,6 +148,24 @@ export function actorAt(actor, t) {
     const phase = (u * m.hops) % 1;
     air = 4 * phase * (1 - phase);
     lift = m.height * air;
+    if (way && way !== "hop") {
+      going = { way, u, s, phase, dist: Math.hypot(m.to[0] - m.from[0], m.to[1] - m.from[1]) };
+      // a roll keeps to the ground, rising only as far as its body needs to turn over; a slide never leaves it;
+      // on tiptoe it takes many quick little steps
+      if (way === "roll") {
+        going.deg = 360 * (m.turns ?? Math.max(1, Math.round(going.dist / (2.2 * h)))) * s;
+        air = 0;
+        lift = (actor.motion?.roll ?? 0.25) * h * Math.abs(Math.sin((going.deg * Math.PI) / 180));
+      } else if (way === "slide") {
+        air = 0;
+        lift = 0;
+      } else if (way === "tiptoe") {
+        const n = Math.max(3, Math.round(going.dist / (0.3 * h)));
+        const q = (u * n) % 1;
+        air = 4 * q * (1 - q);
+        lift = 0.05 * h * air;
+      }
+    }
   }
   // a turn to face something, when it came after the last landing
   const turn = lastAt(tr.turns, t);
@@ -277,8 +300,20 @@ export function actorAt(actor, t) {
   // a fidget going on (its ears twitch, its tail wags), and how far into it: the parts that swing with it say how
   let fidget = null;
   for (const [f0, f1, name] of tr.fidgets ?? []) if (t >= f0 && t < f1) fidget = { name, e: envelope((t - f0) / (f1 - f0), 0.2) };
+  // a slide leans back into it; on tiptoe it rises into its tiptoe pose, when it has one
+  if (going?.way === "slide") lean -= 6 * envelope(going.u, 0.25);
+  if (going?.way === "tiptoe" && actor.poses?.tiptoe) {
+    const e = envelope(going.u, 0.2);
+    const b = bodyOf(actor, [0, "tiptoe"], x, y, facing, t) ?? STILL;
+    body = mixBody(body ?? STILL, { ...b, look: body?.look ?? null }, e);
+  }
   const st = { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, form, fidget, shown: t >= tr.appear[0] };
   if (view) st.view = view;
+  // a flip turns it over in the air, about its middle, once each hop; a roll turns it over along the ground
+  if (going?.way === "flip" || going?.way === "roll") {
+    st.roll = going.way === "flip" ? 360 * easeInOut(going.phase) : going.deg;
+    st.rollAt = -(0.99 - (actor.views?.[view]?.middle ?? actor.motion?.middle ?? 0.5)) * h;
+  }
   // a feeling that says where it looks (thinking) wins over where its body looks
   if (body) applyBody(st, override ? { ...body, look: null } : body, h);
   return st;
@@ -382,7 +417,22 @@ export function hosePath(sh, bow, hand, wobble) {
 // ------------------------------------------------------------------ the ways it arrives and leaves
 
 /** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
-export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110 };
+export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110, flip: 60, roll: 30 };
+
+/** The ways a character can travel from one place to another (personality.travel); a hop is every character's. */
+export const TRAVEL = ["hop", "flip", "roll", "slide", "tiptoe"];
+/**
+ * How a character travels on a move: a move that says its way (an arrival's flip) goes that way; a trip between ideas
+ * goes each of its own ways in turn, from the board's seed, and a step around the drawing only the ways that leave the
+ * ground (a hop, a flip), so it still passes over what is drawn. Null for a hop where it stands, or a character with
+ * no ways of its own.
+ */
+export function travelOf(actor, m, k) {
+  const ways = actor.travel;
+  if (!ways?.length || (m.from[0] === m.to[0] && m.from[1] === m.to[1])) return null;
+  const pool = m.step ? ways.filter((w) => w === "hop" || w === "flip") : ways;
+  return pool.length ? pool[(k + (actor.track.intro?.seed ?? 0)) % pool.length] : null;
+}
 
 /** How long it takes to turn from one view of it to another (facing the viewer, at rest on its side), in seconds. */
 export const VIEW_TURN = 0.32;
@@ -511,6 +561,24 @@ export const INTROS = {
     k.arms.push([a + 1.4, "wave"]);
     return a + 2.1;
   },
+  // a flip: it crouches, springs up, turns over once in the air about its middle, lands in a pose, and waves
+  flip: (k, a, at) => {
+    k.bounces.push([a, -0.9]);
+    k.moves.push({ ...hopHere(at, a + 0.12, a + 0.86, INTRO_HEIGHT.flip), way: "flip" });
+    k.bounces.push([a + 0.86, 1.15]);
+    k.arms.push([a + 0.05, "cheer"], [a + 1.6, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.9, "happy"]);
+    return a + 2.3;
+  },
+  // a roll: it tucks in and turns over along the ground where it stands, then waves
+  roll: (k, a, at) => {
+    k.bounces.push([a, -0.6]);
+    k.moves.push({ ...hopHere(at, a + 0.1, a + 1.0, INTRO_HEIGHT.roll), way: "roll" });
+    k.bounces.push([a + 1.0, 0.8]);
+    k.arms.push([a, "rest"], [a + 1.15, "wave"]);
+    k.feel.push([a, "excited"], [a + 1.6, "happy"]);
+    return a + 1.9;
+  },
   // it shakes itself awake like a jelly, arms out, then waves
   jiggle: (k, a) => {
     k.bounces.push([a, 1.1], [a + 0.32, -0.8], [a + 0.62, 0.6]);
@@ -556,6 +624,20 @@ export const OUTROS = {
     (k.fidgets ??= []).push([t + 0.15, iris.hold + 0.4, "wag"]);
     k.turns.push([t + fly - 0.65, -at.facing]);
     k.moves.push({ t0: t + fly - 0.55, t1: iris.hold + 0.3, from: [at.x, at.y], to: [at.x - at.facing * 0.12 * (iris.r ?? 160), at.y], hops: 3, height: 4, facing: -at.facing, land: -at.facing });
+  },
+  // a flip, and it leaves: it waves, turns away and flips off a little way, still inside the closing circle
+  flip: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.75, "cheer"]);
+    k.turns.push([t + fly - 0.7, -at.facing]);
+    k.moves.push({ t0: t + fly - 0.6, t1: t + fly + 0.15, from: [at.x, at.y], to: [at.x - at.facing * 0.14 * (iris.r ?? 160), at.y], hops: 1, height: 70, facing: -at.facing, land: -at.facing, way: "flip" });
+    k.bounces.push([t + fly + 0.15, 0.9]);
+    k.feel.push([t + 0.15, "excited"]);
+  },
+  // a roll, and it leaves: it waves, turns away and rolls off a little way as the circle closes
+  roll: (k, t, fly, iris, at) => {
+    k.arms.push([t + 0.15, "wave"], [t + fly - 0.75, "rest"]);
+    k.turns.push([t + fly - 0.7, -at.facing]);
+    k.moves.push({ t0: t + fly - 0.6, t1: iris.hold + 0.2, from: [at.x, at.y], to: [at.x - at.facing * 0.14 * (iris.r ?? 160), at.y], hops: 1, height: 0, facing: -at.facing, land: -at.facing, way: "roll", turns: 1 });
   },
   // a soft body's goodbye: two happy bounces, the second smaller, wobbling on as the circle closes
   bounce: (k, t, fly, iris, at) => {
@@ -873,6 +955,7 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     forms: look.forms,
     fidgets: look.fidgets,
     views: look.views,
+    travel: look.travel,
     // what it does when it is tapped comes from its own quirks and ways to arrive
     quirks: look.quirks,
     intros: look.intros,

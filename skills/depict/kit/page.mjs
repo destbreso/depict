@@ -112,6 +112,8 @@ function actorOf(a, color) {
     // who it is, for what it does when it is tapped: its quirks and its ways to arrive
     ...(rg.personality?.quirks?.length ? { quirks: rg.personality.quirks } : {}),
     ...(rg.personality?.intros?.length ? { intros: rg.personality.intros } : {}),
+    // how it travels from place to place, when not only in hops
+    ...(rg.personality?.travel?.length ? { travel: rg.personality.travel } : {}),
     ...(rg.reach !== 0.36 ? { reach: rg.reach } : {}),
   };
 }
