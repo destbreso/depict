@@ -18,6 +18,8 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
     h,
     ...(R.armless ? { armless: true } : {}),
     ...(R.views ? { views: R.views } : {}),
+    // a solid is drawn risen in its risen drawings (act.mjs, solidRise)
+    ...(R.yaw != null ? { yaw: R.yaw } : {}),
     eyes: R.eyes,
     shoulders: R.shoulders,
     poses: R.poses,

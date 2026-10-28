@@ -336,7 +336,9 @@
         // into the pose and out of it again, never at a jump (a slow rise onto its toe)
         const b = bodyOf(A, [0, name], st.x, st.y, st.facing, d);
         const e = envelope(d / time, Math.min(0.45, (b.ease ?? 0.24) / time));
-        return applyBody(st, { ...b, lean: b.lean * e, bend: b.bend * e, stretch: b.stretch * e, turn: b.turn * e, shift: [b.shift[0] * e, b.shift[1] * e] }, A.h);
+        applyBody(st, { ...b, lean: b.lean * e, bend: b.bend * e, stretch: b.stretch * e, turn: b.turn * e, shift: [b.shift[0] * e, b.shift[1] * e] }, A.h);
+        // a solid rises in its risen drawings
+        return A.yaw != null ? solidRise(A, st) : st;
       }
       if (!P) return;
       for (const side of ["front", "back"]) {

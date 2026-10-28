@@ -12,6 +12,7 @@ import { compose } from "../skills/depict/kit/compose.mjs";
 import { time } from "../skills/depict/kit/timeline.mjs";
 import { hand } from "../skills/depict/kit/fonts.mjs";
 import { sceneOf } from "../skills/depict/kit/page.mjs";
+import { figure } from "../skills/depict/kit/sheet.mjs";
 import * as ink from "../skills/depict/kit/ink.mjs";
 import { splitmix32 } from "../skills/depict/kit/rng.mjs";
 
@@ -95,4 +96,44 @@ test("a flat character turns as before, narrowing to its edge, and a look carrie
   assert.equal(lookOf(solid).yaw, 50);
   assert.equal(recast(S.actors[0], lookOf(turner), [...S.palette], S.elements).yaw, undefined, "a flat look cast in its place turns flat");
   assert.equal(recast(S.actors[0], lookOf(solid), [...S.palette], S.elements).yaw, 50);
+});
+
+// the solid risen onto its point: drawings at 15 and 30 degrees, each standing on its own point
+const RISEN = "#0a0b0c";
+const riser = {
+  ...solid,
+  id: "riser",
+  views: { ...solid.views, "rise-15": { yaw: 50, pitch: 15, pivot: [0.2, 0.99], between: true }, "rise-30": { yaw: 50, pitch: 30, pivot: [0.25, 0.99], between: true } },
+  poses: { ...solid.poses, tiptoe: { body: { pivot: [0.1, 0.99], turn: 28, shift: [-0.1, 0.05], ease: 0.3 } } },
+  draw(k) {
+    const out = solid.draw(k);
+    for (const v of ["rise-15", "rise-30"]) k.view(v, () => (k.shape("body", k.disc(0.1, 0.5, 0.2, 0.45), RISEN), { eyes: [k.P(0, 0.3), k.P(0.1, 0.3)] }));
+    return out;
+  },
+};
+
+test("a solid rises in its drawings risen onto its point, turned only by what is left about the point it stands on there", () => {
+  assert.deepEqual(checkCharacter(riser), []);
+  assert.match(checkCharacter({ ...riser, views: { ...riser.views, "rise-15": { yaw: 50, pitch: 15 } } }).join("\n"), /views\.rise-15\.pitch/);
+  const A = actorOf(riser, [[0, "rest"], [2, "tiptoe"], [9, "rest"]]);
+  assert.equal(actorAt(A, 1).rise, undefined);
+  const seen = [];
+  for (let t = 1.95; t < 2.4; t += 0.01) {
+    const st = actorAt(A, t);
+    if (seen.at(-1) !== (st.view ?? "standing")) seen.push(st.view ?? "standing");
+  }
+  assert.deepEqual(seen, ["standing", "rise-15", "rise-30"]);
+  const up = actorAt(A, 5);
+  assert.equal(up.view, "rise-30");
+  assert.equal(up.rise.turn, -2, "what is left of the rise turns it about its point there");
+  assert.deepEqual(up.rise.pivot, [0.25 * 300, 0]);
+  assert.deepEqual(up.rise.shift, [0, 0], "its drawings stand where they are drawn");
+  // its sheet draws it risen too, and one with no risen drawings still turns its drawing about its point
+  const r = rig(ink.pen(splitmix32(1), { width: 4 }), 300, "#c43f0a", { character: riser });
+  assert.ok(r.views["rise-30"].pitch === 30);
+  assert.ok(figure({ character: riser }, { pose: "tiptoe" }).includes(RISEN));
+  assert.ok(!figure({ character: riser }, { pose: "rest" }).includes(RISEN));
+  const flatRise = actorAt(actorOf({ ...solid, poses: riser.poses }, [[0, "rest"], [2, "tiptoe"]]), 5);
+  assert.equal(flatRise.view, undefined);
+  assert.equal(flatRise.rise.turn, 28);
 });

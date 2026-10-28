@@ -364,7 +364,7 @@ function seenFrom(actor, t, depth = 0) {
 export function solidTurn(actor, t, st) {
   const yaw = seenFrom(actor, t);
   let best = null;
-  const drawings = [[actor.yaw, null], ...Object.entries(actor.views ?? {}).filter(([, v]) => v.yaw != null).map(([k, v]) => [v.yaw, k])];
+  const drawings = [[actor.yaw, null], ...Object.entries(actor.views ?? {}).filter(([, v]) => v.yaw != null && v.pitch == null).map(([k, v]) => [v.yaw, k])];
   for (const [y, v] of drawings)
     for (const sign of [st.facing, -st.facing]) {
       const d = Math.abs((sign > 0 ? y : 180 - y) - yaw);
@@ -378,6 +378,25 @@ export function solidTurn(actor, t, st) {
     if (st.look) st.look = [-st.look[0], st.look[1]];
     if (st.roll) st.roll = -st.roll;
   }
+  return solidRise(actor, st);
+}
+
+/**
+ * A solid character rising onto a point of itself (a rise: `turn` degrees about its `pivot`) is drawn risen: it is
+ * seen in the drawing of the nearest angle it has risen to (`views.<name>: { yaw, pitch, pivot }`, its drawing at that
+ * yaw at 0, each placed by the character standing on its own point), turned only by what is left, about that
+ * drawing's point (the pose's own for the drawing at 0); the pose's shift is the drawings' to make.
+ */
+export function solidRise(actor, st) {
+  const r = st.rise;
+  if (!r || !r.turn || actor.yaw == null) return st;
+  const at = st.view ? actor.views?.[st.view]?.yaw ?? actor.yaw : actor.yaw;
+  let pick = { pitch: 0, view: st.view ?? null, pivot: r.pivot };
+  for (const [k, v] of Object.entries(actor.views ?? {}))
+    if (v.pitch != null && Math.abs(v.yaw - at) < 0.5 && Math.abs(v.pitch - r.turn) < Math.abs(pick.pitch - r.turn) - 1e-9) pick = { pitch: v.pitch, view: k, pivot: [v.pivot[0] * actor.h, (v.pivot[1] - 0.99) * actor.h] };
+  if (pick.pitch === 0 && !Object.values(actor.views ?? {}).some((v) => v.pitch != null && Math.abs(v.yaw - at) < 0.5)) return st;
+  if (pick.view) st.view = pick.view;
+  st.rise = { turn: r.turn - pick.pitch, pivot: pick.pivot, shift: [0, 0] };
   return st;
 }
 
