@@ -29,6 +29,35 @@ const handsOf = (r) => ({
   ...(r.gloveFill ? { gloveFill: r.gloveFill } : {}),
 });
 
+/**
+ * A look's strokes in the form its character asks for. As they are by default (version 1): each its own object, its
+ * points to a tenth of the page's unit. Compact, for a character that says the precision its drawing needs
+ * (`precision`, a share of its height; version 2): each stroke [part, n, width, color, layer, opacity, face, x0, y0,
+ * dx, dy, ...], its part and color indices into the look's `parts` and `colors`, its width in tenths and opacity in
+ * hundredths, and its points as whole steps of `unit` (the page's units), each from the one before.
+ */
+function packer(C, h) {
+  if (!C.precision) return { version: 1, pack: (list) => list.map(strokeOf), tables: () => ({}) };
+  const unit = Math.round(C.precision * h * 1e4) / 1e4;
+  const parts = [];
+  const colors = [];
+  const index = (list, x) => {
+    const i = list.indexOf(x);
+    return i >= 0 ? i : list.push(x) - 1;
+  };
+  const one = (s) => {
+    const out = [index(parts, s.part), s.n, Math.round(s.w * 10), index(colors, s.c), { under: 1, shadow: 2 }[s.l] ?? 0, Math.round(s.o * 100), s.face ? 1 : 0];
+    let [px, py] = [0, 0];
+    for (let i = 0; i < s.pts.length; i += 2) {
+      const [x, y] = [Math.round(s.pts[i] / unit), Math.round(s.pts[i + 1] / unit)];
+      out.push(x - px, y - py);
+      [px, py] = [x, y];
+    }
+    return out;
+  };
+  return { version: 2, pack: (list) => list.map(one), tables: () => ({ unit, parts, colors }) };
+}
+
 /** A character (an id the kit has, or a module) drawn as its look: the same look on every board of its body. */
 export function lookOf(character) {
   const C = characterOf({ character });
@@ -41,17 +70,19 @@ export function lookOf(character) {
   const handsFor = (w) => (C.arm === false ? null : C.hands(w, {}));
   const plain = JSON.stringify(handsFor([]));
   const wearable = [...DRESS.filter((w) => C.wear?.includes(w)), ...Object.keys(C.costumes ?? {})];
+  const packed = packer(C, h);
   const wear = {};
   const hands = { plain: handsOf(base) };
   for (const w of wearable) {
     const r = draw([w]);
     // what dressing it adds comes after its body (rig.mjs draws the body, then dresses it)
-    wear[w] = r.strokes.slice(base.strokes.length).map(strokeOf);
+    wear[w] = packed.pack(r.strokes.slice(base.strokes.length));
     if (JSON.stringify(handsFor([w])) !== plain) hands[w] = handsOf(r);
   }
+  const strokes = packed.pack(base.strokes.filter((s) => !s.copy));
   return {
     depict: "look",
-    version: 1,
+    version: packed.version,
     id: C.id,
     name: C.name,
     ...(C.arm === false ? { armless: true } : {}),
@@ -82,8 +113,9 @@ export function lookOf(character) {
     arm: { width: q(base.arm.width), hose: base.arm.hose.map(q), ...(base.arm.fill ? { fill: base.arm.fill, fillWidth: q(base.arm.fillWidth) } : {}) },
     armsAt: base.armsAt,
     // a view that shares the standing face says where it is (views.<name>.face): the page draws it there again
-    strokes: base.strokes.filter((s) => !s.copy).map(strokeOf),
+    strokes,
     wear,
+    ...packed.tables(),
     // how far above its head each costume reaches: a page puts one on only where the board kept the room
     tops: Object.fromEntries(wearable.map((w) => [w, Math.round(topOf(C, w) * 1000) / 1000])),
     hands,

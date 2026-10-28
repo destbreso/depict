@@ -161,6 +161,8 @@ export function checkCharacter(raw) {
   const wearable = [...(c.wear ?? []), ...Object.keys(c.costumes ?? {})];
   for (const o of c.outfits ?? []) need(`outfits.${o.name}`, o.name && Array.isArray(o.wear) && o.wear.every((w) => wearable.includes(w)), "is a name and things it can wear");
   need("draw", typeof c.draw === "function", "draws its body and face and returns its eyes");
+  // the finest step its look needs to keep a point to, as a share of its height: its look is then kept compact (look.mjs)
+  need("precision", c.precision == null || (num(c.precision) && c.precision > 0 && c.precision <= 0.005), "is the finest step its look keeps a point to, as a share of its height (more than 0, at most 0.005)");
   for (const [part, s] of Object.entries(c.swing ?? {}))
     need(`swing.${part}`, /^[a-z][a-z0-9-]*$/.test(part) && s && pair(s.pivot) && (s.deg == null || num(s.deg)) && (s.period == null || (num(s.period) && s.period > 0)) && (s.sides == null || (num(s.sides) && s.sides >= 2)) && (s.while == null || s.while === "wag" || Boolean(c.fidgets?.[s.while])), "gives the [u, v] it turns about (pivot), and how far (deg), how fast (period), how often it changes sides (sides, seconds) and, for a part that moves only during a fidget, which (while)");
   for (const [name, f] of Object.entries(c.fidgets ?? {}))

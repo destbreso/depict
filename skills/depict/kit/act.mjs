@@ -1041,6 +1041,26 @@ export function occasionsOn(date = new Date()) {
 export const affinePts = (m, pts) => pts.map((v, i) => (i % 2 ? m[1] * pts[i - 1] + m[3] * v + m[5] : m[0] * v + m[2] * pts[i + 1] + m[4]));
 /** How much an affine widens a line: the square root of how much it scales an area. */
 export const affineScale = (m) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+/**
+ * A look with its strokes as objects ({ part, n, w, c, l, o, pts, f }), whichever form it keeps them in (look.mjs):
+ * a compact look's (version 2) unpacked, its points back in the page's units.
+ */
+export function unpacked(look) {
+  if (look.version !== 2) return look;
+  const u = look.unit;
+  const one = (a) => {
+    const pts = [];
+    let [x, y] = [0, 0];
+    for (let i = 7; i < a.length; i += 2) {
+      x += a[i];
+      y += a[i + 1];
+      pts.push(Math.round(x * u * 1000) / 1000, Math.round(y * u * 1000) / 1000);
+    }
+    return { part: look.parts[a[0]], n: a[1], w: a[2] / 10, c: look.colors[a[3]], l: a[4], o: a[5] / 100, pts, ...(a[6] ? { f: 1 } : {}) };
+  };
+  return { ...look, strokes: look.strokes.map(one), wear: Object.fromEntries(Object.entries(look.wear || {}).map(([w, list]) => [w, list.map(one)])) };
+}
+
 /** Which of a shared face's affines a stroke of the standing face takes: its mouths the mouth's, the rest its eye's side. */
 export function faceSideOf(s, eyes) {
   if (/^mouth:/.test(s.part)) return "mouth";
@@ -1053,7 +1073,7 @@ export function faceSideOf(s, eyes) {
 
 /** Why a look cannot present a board in place of its guide A, or null when it can. */
 export function castProblem(A, look) {
-  if (!look || look.depict !== "look" || look.version !== 1) return "that is not a character's look (scripts/look.mjs makes one)";
+  if (!look || look.depict !== "look" || (look.version !== 1 && look.version !== 2)) return "that is not a character's look (scripts/look.mjs makes one)";
   if (!A.contract) return "this board was built before characters had bodies to share: build it again to cast another guide in it";
   if (look.contract !== A.contract) return `${look.name} has ${look.contract}'s body and this board's guide has ${A.contract}'s: a character presents only the boards made for its body`;
   if (Math.abs(look.h - A.h) > 0.5) return `${look.name} is drawn ${look.h} tall and this board's guide ${Math.round(A.h * 10) / 10}: make its look again with this board's kit`;
@@ -1077,6 +1097,7 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     return i;
   };
   const copy = (s) => ({ part: s.part, n: s.n, w: s.w, c: color(s.c), l: s.l, o: s.o, pts: s.pts });
+  look = unpacked(look);
   const strokes = look.strokes.map(copy);
   let next = Math.max(look.armsAt + 3, ...strokes.map((s) => s.n)) + 1;
   // a view that shares the standing face has it drawn again where the view says (views.<name>.face)
