@@ -58,7 +58,7 @@ const holding = armless ? null : opt("hold");
 
 /** A solid character's drawings in the order a turn from facing right to facing left passes them: [view, facing, yaw]. */
 function turning(C) {
-  const all = [[null, C.yaw], ...Object.entries(C.views ?? {}).map(([v, o]) => [v, o.yaw])];
+  const all = [[null, C.yaw], ...Object.entries(C.views ?? {}).filter(([, o]) => o.pitch == null).map(([v, o]) => [v, o.yaw])];
   const seen = all.flatMap(([v, y]) => [[v, 1, y], [v, -1, 180 - y]]).sort((a, b) => a[2] - b[2]);
   return seen.filter((d, i) => i === 0 || Math.abs(d[2] - seen[i - 1][2]) > 0.5);
 }

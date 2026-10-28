@@ -174,6 +174,8 @@ export function checkCharacter(raw) {
     const angle = (y) => num(y) && y >= 0 && y <= 180;
     need("yaw", angle(c.yaw), "is the angle its standing view is seen from, in degrees round its upright axis (its side 0, facing the viewer 90)");
     for (const [v, o] of Object.entries(views)) need(`views.${v}.yaw`, angle(o?.yaw) && (o.between == null || typeof o.between === "boolean"), "is the angle the view is seen from (0 to 180), for a character that turns by rotating, and between is true for a drawing only a turn passes through");
+    // its drawings risen onto a point of itself, which a rise passes through
+    for (const [v, o] of Object.entries(views)) if (o?.pitch != null) need(`views.${v}.pitch`, num(o.pitch) && o.pitch > 0 && pair(o.pivot) && o.between === true, "is the angle it has risen to in that drawing (degrees, more than 0), with the pivot it stands on there ([u, v]) and between: true, for no pose takes it");
     for (const w of ["spin"]) need(`personality: ${w}`, !c.personality?.intros?.includes(w) && !c.personality?.outros?.includes(w), "is not among its ways to arrive or leave: a spin would narrow it to its edge, and it turns by rotating, with drawings only round its front");
   }
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.view != null && views[P.view]?.between) out.push(`"poses.${name}.view" is ${P.view}, a drawing only a turn passes through: a pose takes one of its views`);
