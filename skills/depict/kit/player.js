@@ -320,7 +320,7 @@
     const k = r.kind;
     const fid = A.fidgets?.[k];
     const form = A.forms?.includes(k);
-    const time = form ? REACT.form : fid ? (fid.time ?? 1.6) + 0.2 : REACT[k] ?? REACT.pose;
+    const time = form ? REACT.form : fid ? (fid.time ?? 1.6) + 0.2 : REACT[k] ?? Math.max(REACT.pose, A.poses?.[k]?.hold ?? 0);
     const d = performance.now() / 1000 - r.at;
     if (d > time) {
       X.react = null;
@@ -331,7 +331,12 @@
     const arms = (name, wiggle = 0) => {
       const P = A.poses?.[name];
       // a character with no arms does it with its body: it leans, bends, stretches and looks
-      if (A.armless) return applyBody(st, bodyOf(A, [0, name], st.x, st.y, st.facing, d), A.h);
+      if (A.armless) {
+        // into the pose and out of it again, never at a jump (a slow rise onto its toe)
+        const b = bodyOf(A, [0, name], st.x, st.y, st.facing, d);
+        const e = envelope(d / time, Math.min(0.45, (b.ease ?? 0.24) / time));
+        return applyBody(st, { ...b, lean: b.lean * e, bend: b.bend * e, stretch: b.stretch * e, turn: b.turn * e, shift: [b.shift[0] * e, b.shift[1] * e] }, A.h);
+      }
       if (!P) return;
       for (const side of ["front", "back"]) {
         if (!P[side]) continue;

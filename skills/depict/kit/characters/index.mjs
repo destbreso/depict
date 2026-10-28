@@ -21,7 +21,7 @@ import { GESTURES } from "../act.mjs";
 export const CHARACTERS = { marker, stuart };
 
 /** The poses every character has: its hands' for one with arms, its body's for one without (GESTURES). */
-const POSE_NAMES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
+export const GUIDE_POSES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
 /** What a pose's body may say (act.mjs, bodyOf): how the whole figure leans, bends, stretches and looks. */
 const BODY_KEYS = ["lean", "bend", "stretch", "look", "aim", "sway", "pulse", "pivot", "turn", "shift", "ease"];
 
@@ -115,7 +115,7 @@ export function checkCharacter(raw) {
   const armless = armlessOf(c);
   need("arm", armless || (c.arm && num(c.arm.width) && (c.arm.fill == null || num(c.arm.fillWidth))), "gives its width (and fillWidth with a fill), or is false for a character with no arms");
   need("capPivot", pair(c.capPivot), "is the [u, v] its hat tips about");
-  for (const pose of POSE_NAMES) {
+  for (const pose of GUIDE_POSES) {
     const P = c.poses?.[pose];
     if (armless) need(`poses.${pose}`, P && !P.front && !P.back, "is its body's, with no hands: a character with no arms leans, bends and looks (body)");
     else need(`poses.${pose}`, P && ["front", "back"].every((s) => P[s] && pair(P[s].hand) && pair(P[s].bow) && ["open", "fist", "point"].includes(P[s].glove)), "gives each hand's hand, bow and glove");
@@ -149,10 +149,11 @@ export function checkCharacter(raw) {
     need(`swing.${part}`, /^[a-z][a-z0-9-]*$/.test(part) && s && pair(s.pivot) && (s.deg == null || num(s.deg)) && (s.period == null || (num(s.period) && s.period > 0)) && (s.sides == null || (num(s.sides) && s.sides >= 2)) && (s.while == null || s.while === "wag" || Boolean(c.fidgets?.[s.while])), "gives the [u, v] it turns about (pivot), and how far (deg), how fast (period), how often it changes sides (sides, seconds) and, for a part that moves only during a fidget, which (while)");
   for (const [name, f] of Object.entries(c.fidgets ?? {}))
     need(`fidgets.${name}`, /^[a-z][a-z0-9-]*$/.test(name) && name !== "wag" && f && (f.time == null || (num(f.time) && f.time > 0)) && (f.look == null || f.look === "around"), "gives how long it lasts (time) and whether it looks around (look: \"around\")");
-  need("forms", c.forms == null || (Array.isArray(c.forms) && c.forms.every((f) => /^[a-z][a-z0-9-]*$/.test(f) && !POSE_NAMES.includes(f))), "lists the names of its whole-body forms (drawn as form:<name>), none a pose's name");
+  need("forms", c.forms == null || (Array.isArray(c.forms) && c.forms.every((f) => /^[a-z][a-z0-9-]*$/.test(f) && !GUIDE_POSES.includes(f))), "lists the names of its whole-body forms (drawn as form:<name>), none a pose's name");
   // its other views, each drawn in draw() inside k.view(name, ...), and the poses taken in them
   const views = c.views ?? {};
   need("views", c.views == null || (typeof c.views === "object" && Object.entries(views).every(([v, o]) => /^[a-z][a-z0-9-]*$/.test(v) && !(c.forms ?? []).includes(v) && o && (o.hat == null || pair(o.hat)) && (o.wear == null || pair(o.wear)) && (o.middle == null || num(o.middle)))), "names its other views, each { hat, wear } (where its costumes move to, [du, dv]) and its middle, none a form's name");
+  for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.hold != null) need(`poses.${name}.hold`, num(P.hold) && P.hold > 0, "is how long a quirk holds the pose while the moment stays quiet, in seconds");
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.view != null) need(`poses.${name}.view`, Object.hasOwn(views, P.view), `is one of its views (${Object.keys(views).join(", ") || "it has none"})`);
   for (const q of c.personality?.quirks ?? []) need(`personality.quirks.${q}`, Boolean(c.poses?.[q]) || (c.forms ?? []).includes(q) || Boolean(c.fidgets?.[q]), "is one of its poses, its forms or its fidgets");
   return out;

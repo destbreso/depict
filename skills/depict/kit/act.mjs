@@ -418,7 +418,10 @@ export function quirk(track, name, q0, q1, C) {
     return true;
   }
   if (C.poses?.[name]) {
-    track.arms.push([q0, name], [q1, "rest"]);
+    // a pose of its own for a moment, or for as long as it says while the moment stays quiet (balancing on its tip)
+    const hold = C.poses[name].hold;
+    const end = hold ? Math.max(q1, quietTill(track, q0, hold) - 0.1) : q1;
+    track.arms.push([q0, name], [end, "rest"]);
     track.look.push([q0, null]);
     return true;
   }

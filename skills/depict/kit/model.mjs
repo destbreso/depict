@@ -8,7 +8,7 @@ import { hand } from "./fonts.mjs";
 import { POSE_NAMES, FACES, HAIRS, HATS, TINTS } from "./people.mjs";
 import { flattenPath } from "./svgpath.mjs";
 import { ACTS, FEELINGS, HATS as GUIDE_HATS, HOLD } from "./rig.mjs";
-import { CHARACTERS, characterOf, checkCharacter, outfitsOf } from "./characters/index.mjs";
+import { CHARACTERS, GUIDE_POSES, characterOf, checkCharacter, outfitsOf } from "./characters/index.mjs";
 import { hash32 } from "./rng.mjs";
 
 /** Typographic marks a hand writes the plain way; anything else outside its glyphs is a problem. */
@@ -236,7 +236,8 @@ export function normalize(input) {
     // how the guide feels in this beat, and what it does
     if (bt.feel != null && !(bt.feel in FEELINGS)) err(`${where}: feel "${bt.feel}": use ${Object.keys(FEELINGS).join(", ")}`);
     // a gesture every guide has, or one of its own guide's forms (a cat sits) or fidgets (its ears twitch)
-    const acts = [...ACTS, ...(C.forms ?? []), ...Object.keys(C.fidgets ?? {})];
+    // and the poses of its own (Stuart's glasses, a shoe rising onto its toe)
+    const acts = [...ACTS, ...(C.forms ?? []), ...Object.keys(C.fidgets ?? {}), ...Object.keys(C.poses ?? {}).filter((p) => !GUIDE_POSES.includes(p))];
     if (bt.act != null && !acts.includes(bt.act)) err(`${where}: act "${bt.act}": use ${acts.join(", ")}`);
     if (bt.open != null) {
       const it = b.regions.flatMap((r) => r.items).find((x) => x.id === bt.open);
