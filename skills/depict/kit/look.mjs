@@ -71,6 +71,7 @@ export function lookOf(character) {
     intros: C.personality?.intros ?? ["wave"],
     outros: C.personality?.outros ?? ["wave"],
     quirks: C.personality?.quirks ?? [],
+    ...(C.personality?.shy ? { shy: C.personality.shy } : {}),
     // its own outfits, then the parts it can dress for (characters/index.mjs, ROLES)
     outfits: outfitsOf(C).map((o) => ({ name: o.name, wear: o.wear })),
     arm: { width: q(base.arm.width), hose: base.arm.hose.map(q), ...(base.arm.fill ? { fill: base.arm.fill, fillWidth: q(base.arm.fillWidth) } : {}) },

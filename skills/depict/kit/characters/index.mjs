@@ -155,6 +155,7 @@ export function checkCharacter(raw) {
   need("views", c.views == null || (typeof c.views === "object" && Object.entries(views).every(([v, o]) => /^[a-z][a-z0-9-]*$/.test(v) && !(c.forms ?? []).includes(v) && o && (o.hat == null || pair(o.hat)) && (o.wear == null || pair(o.wear)) && (o.middle == null || num(o.middle)))), "names its other views, each { hat, wear } (where its costumes move to, [du, dv]) and its middle, none a form's name");
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.hold != null) need(`poses.${name}.hold`, num(P.hold) && P.hold > 0, "is how long a quirk holds the pose while the moment stays quiet, in seconds");
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.view != null) need(`poses.${name}.view`, Object.hasOwn(views, P.view), `is one of its views (${Object.keys(views).join(", ") || "it has none"})`);
+  if (c.personality?.shy != null) need("personality.shy", Boolean(c.poses?.[c.personality.shy]), "is a pose of its own it takes, shy, as it arrives and in its first quiet moment (a glance away)");
   for (const q of c.personality?.quirks ?? []) need(`personality.quirks.${q}`, Boolean(c.poses?.[q]) || (c.forms ?? []).includes(q) || Boolean(c.fidgets?.[q]), "is one of its poses, its forms or its fidgets");
   return out;
 }

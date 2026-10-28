@@ -11,7 +11,7 @@
 import { hash32, splitmix32 } from "./rng.mjs";
 import { FEELINGS, feetBox, reachAbove, spotBox } from "./rig.mjs";
 import { overlaps, pad } from "./geom.mjs";
-import { INTROS, keepClear, quirk } from "./act.mjs";
+import { INTROS, keepClear, quirk, quirkAt, shyOf, SHY_TIME } from "./act.mjs";
 
 /** The acts that aim at a thing: past something in the way they would seem to aim at that, so there it only looks. */
 const AIMED = new Set(["point", "present"]);
@@ -149,10 +149,17 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   };
 
   // it comes alive, the way the board's cast says (or its seed chose), and then waves hello
-  const ready = INTROS[board.cast?.intro ?? "wave"](track, alive, start);
+  let ready = INTROS[board.cast?.intro ?? "wave"](track, alive, start);
+  // a shy one, once it has arrived, takes its shy pose a moment before it presents (it glances away)
+  const shyPose = shyOf(g.rig);
+  const shyAt = ready;
+  if (shyPose) {
+    track.arms.push([ready, shyPose]);
+    ready += SHY_TIME;
+  }
   // what it did and from where: a page that casts another character in its place has that one arrive its own way
   // (act.mjs, personalize), chosen among its own with the board's own seed
-  track.intro = { kind: board.cast?.intro ?? "wave", at: alive, from: { x: start.x, y: start.y, facing: start.facing }, seed: hash32(`${board.seed}:${board.title}:intro`) };
+  track.intro = { kind: board.cast?.intro ?? "wave", at: alive, from: { x: start.x, y: start.y, facing: start.facing }, seed: hash32(`${board.seed}:${board.title}:intro`), ...(shyPose ? { shy: [shyAt, shyPose] } : {}) };
   track.look.push([alive, null]);
   // the title: it presents it as it is written
   const title = span.get("title");
@@ -415,7 +422,9 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
       const busy = track.arms.some((key) => key[0] > q0 - 0.3 && key[0] < q1 + 0.3) || track.moves.some((m) => m.t0 < q1 + 0.2 && m.t1 > q0 - 0.2);
       if (busy || (before && before[1] !== "rest") || rq() < 0.45) return;
       track.quirks.push([q0, q1]);
-      if (quirks.length) quirk(track, quirks[(track.quirks.length - 1) % quirks.length], q0, q1, g.rig);
+      // a shy one's first quiet moment is its shy pose; its quirks take turns after it
+      const name = quirkAt(track.quirks.length - 1, quirks, shyPose);
+      if (name) quirk(track, name, q0, q1, g.rig);
       lastQuirk = q0;
     });
   }

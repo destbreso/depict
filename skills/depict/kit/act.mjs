@@ -387,6 +387,16 @@ export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110 };
 /** How long it takes to turn from one view of it to another (facing the viewer, at rest on its side), in seconds. */
 export const VIEW_TURN = 0.32;
 
+/** How long a shy character keeps its shy pose once it has arrived, before it presents, in seconds. */
+export const SHY_TIME = 1.2;
+/** A shy character's shy pose (personality.shy on a character, shy on a look), when it has the pose. */
+export const shyOf = (C) => {
+  const shy = C?.personality ? C.personality.shy : C?.shy;
+  return shy && C.poses?.[shy] ? shy : null;
+};
+/** The quirk of the i-th quiet moment: a shy character's shy pose first, then its quirks in turn. */
+export const quirkAt = (i, quirks, shy) => (shy && i === 0 ? shy : quirks.length ? quirks[(i - (shy ? 1 : 0)) % quirks.length] : null);
+
 /** How long a form taken in a quiet moment is held at most, in seconds (a cat sits a while, then gets up). */
 export const FORM_TIME = 2.8;
 
@@ -701,22 +711,32 @@ export function personalize(track, look) {
     return fit.length ? fit[old.seed % fit.length] : old.kind;
   };
   const arrive = track.intro;
+  // a shy one takes its shy pose once it has arrived, before it presents; the board's own guide's shyness goes
+  const shy = shyOf(look);
   if (arrive && INTROS[arrive.kind]) {
     const high = INTRO_HEIGHT[arrive.kind] ?? 0;
     const kind = choose(arrive, look.intros || [], (x) => INTROS[x] && (INTRO_HEIGHT[x] ?? 0) <= high);
-    if (kind !== arrive.kind) {
+    if (kind !== arrive.kind || shy || arrive.shy) {
       const was = blank();
-      const ready0 = INTROS[arrive.kind](was, arrive.at, arrive.from);
+      let ready0 = INTROS[arrive.kind](was, arrive.at, arrive.from);
+      if (arrive.shy) {
+        was.arms.push([arrive.shy[0], arrive.shy[1]]);
+        ready0 += SHY_TIME;
+      }
       take(was);
       const now = blank();
-      const ready1 = INTROS[kind](now, arrive.at, arrive.from);
+      let ready1 = INTROS[kind](now, arrive.at, arrive.from);
+      if (shy) {
+        now.arms.push([ready1, shy]);
+        ready1 += SHY_TIME;
+      }
       put(now);
       // it presents the title once it is ready, its own arrival done
       if (arrive.title != null) {
         const [a, b] = [Math.max(arrive.title, ready0), Math.max(arrive.title, ready1)];
         for (const key of k.arms) if (key[1] === "present" && Math.abs(key[0] - a) < 1e-9) key[0] = b;
       }
-      k.intro = { ...arrive, kind };
+      k.intro = { ...arrive, kind, shy: shy ? [ready1 - SHY_TIME, shy] : undefined };
     }
   }
   const leave = track.outro;
@@ -744,7 +764,8 @@ export function personalize(track, look) {
     k.arms = k.arms.filter((x) => !at.has(x[0]));
     k.look = k.look.filter((x) => x[1] !== "dir");
     quiet.forEach(([a, b], i) => {
-      if (mine.length) quirk(k, mine[i % mine.length], a, b, look);
+      const name = quirkAt(i, mine, shy);
+      if (name) quirk(k, name, a, b, look);
     });
   }
   for (const key of ["arms", "feel", "look", "bounces", "spins", "leans", "caps", "forms"]) k[key].sort((a, b) => a[0] - b[0]);
