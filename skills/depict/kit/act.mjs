@@ -1037,6 +1037,20 @@ export function occasionsOn(date = new Date()) {
   return out;
 }
 
+/** Points [x, y, ...] through an affine [a, b, c, d, e, f]: x' = a x + c y + e, y' = b x + d y + f. */
+export const affinePts = (m, pts) => pts.map((v, i) => (i % 2 ? m[1] * pts[i - 1] + m[3] * v + m[5] : m[0] * v + m[2] * pts[i + 1] + m[4]));
+/** How much an affine widens a line: the square root of how much it scales an area. */
+export const affineScale = (m) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+/** Which of a shared face's affines a stroke of the standing face takes: its mouths the mouth's, the rest its eye's side. */
+export function faceSideOf(s, eyes) {
+  if (/^mouth:/.test(s.part)) return "mouth";
+  let x = 0;
+  for (let i = 0; i < s.pts.length; i += 2) x += s.pts[i];
+  x /= s.pts.length / 2;
+  const mid = (eyes[0][0] + eyes[1][0]) / 2;
+  return x < mid === eyes[0][0] < mid ? "eye0" : "eye1";
+}
+
 /** Why a look cannot present a board in place of its guide A, or null when it can. */
 export function castProblem(A, look) {
   if (!look || look.depict !== "look" || look.version !== 1) return "that is not a character's look (scripts/look.mjs makes one)";
@@ -1065,6 +1079,15 @@ export function recast(A, look, palette, elements = [], dress = {}) {
   const copy = (s) => ({ part: s.part, n: s.n, w: s.w, c: color(s.c), l: s.l, o: s.o, pts: s.pts });
   const strokes = look.strokes.map(copy);
   let next = Math.max(look.armsAt + 3, ...strokes.map((s) => s.n)) + 1;
+  // a view that shares the standing face has it drawn again where the view says (views.<name>.face)
+  for (const [v, o] of Object.entries(look.views || {})) {
+    if (!o.face) continue;
+    for (const s of look.strokes) {
+      if (!s.f || s.part.charCodeAt(0) === 64) continue;
+      const m = o.face[faceSideOf(s, look.eyes)];
+      if (m) strokes.push({ ...copy(s), part: `@${v}:${s.part}`, n: next++, w: s.w * affineScale(m), pts: affinePts(m, s.pts) });
+    }
+  }
   // what it wears: an outfit the host asks for (today's: its Halloween in October), when it has one; else, for an
   // outfit the board's guide wears (its winter, a builder's), its own outfit of that name; else the costumes the board
   // wears that it has. A costume goes on only where the board kept the room over its head; each is drawn in its turn

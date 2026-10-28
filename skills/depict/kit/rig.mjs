@@ -12,6 +12,7 @@
 // fingers, y toward the thumb).
 import * as ink from "./ink.mjs";
 import { smooth } from "./geom.mjs";
+import { affinePts, affineScale, faceSideOf } from "./act.mjs";
 import { PLACES, characterOf, contractOf, slotOf } from "./characters/index.mjs";
 
 const PAPER = "#fbfaf7";
@@ -108,6 +109,15 @@ function insideUV([u, v], poly) {
   return inside;
 }
 
+/**
+ * A view's face, shared with the standing one: the affine [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f,
+ * in the figure's frame) for the strokes on each eye's side of the face and for its mouths; null where that part of
+ * the face is hidden in the view. One affine is the whole face's.
+ */
+export function faceMatrices(face) {
+  if (Array.isArray(face)) return { eye0: face, eye1: face, mouth: face };
+  return { eye0: face.eye0 ?? null, eye1: face.eye1 ?? null, mouth: face.mouth ?? null };
+}
 export function rig(p, h, accent, cast = {}) {
   const { wear = [], skin = "plain" } = cast;
   const C = characterOf(cast);
@@ -123,9 +133,11 @@ export function rig(p, h, accent, cast = {}) {
   let armsAt = 0;
   // the view being drawn: what is drawn inside k.view(name, ...) is that view's, its parts named @<name>:<part>
   let prefix = "";
+  // while its face is drawn (k.face), each stroke is marked as the standing face's, for its other views to share
+  let drawingFace = false;
   /** A stroke of a component, in the order the pen draws it when the guide first appears. */
   const add = (part, role, lines, width, color = INK, layer = "ink", opacity = 1) => {
-    for (const pts_ of lines) strokes.push({ part: prefix + part, role, pts: pts_, w: width, c: color, l: layer, o: opacity, n: order++ });
+    for (const pts_ of lines) strokes.push({ part: prefix + part, role, pts: pts_, w: width, c: color, l: layer, o: opacity, n: order++, ...(drawingFace ? { face: 1 } : {}) });
   };
   const curve = (a, c, b, n = 14) => {
     const out = [];
@@ -201,14 +213,37 @@ export function rig(p, h, accent, cast = {}) {
   const colors = { PAPER, INK, GREY, DARK, STEEL, YELLOW, SAND, PINK, BLUE, GREEN, SKIN_TINTS };
   /** Another view of it (facing the viewer, at rest on its side): its body and face drawn in `draw`, which returns { eyes }. */
   const seen = {};
+  // the standing face (k.face): its eyes, and where its middle is across
+  let faceEyes = null;
+  const face = (draw) => {
+    drawingFace = true;
+    const out = draw();
+    drawingFace = false;
+    faceEyes = (Array.isArray(out) ? out : out?.eyes) ?? null;
+    return out;
+  };
+  const faces = {};
   const view = (name, draw) => {
     prefix = `@${name}:`;
     const out = draw() ?? {};
     prefix = "";
     seen[name] = out.eyes ?? [];
+    // a view that shares the standing face says where it is in this view (an affine for the whole face, or one for
+    // each eye's side and one for the mouths): the standing face's strokes are drawn again there, as this view's
+    if (out.face && faceEyes) {
+      const M = faceMatrices(out.face);
+      faces[name] = M;
+      for (const s of strokes.filter((x) => x.face && !x.copy && x.part.charCodeAt(0) !== 64)) {
+        const m = M[faceSideOf(s, faceEyes)];
+        if (!m) continue;
+        const { face: _, ...own } = s;
+        strokes.push({ ...own, part: `@${name}:${s.part}`, pts: affinePts(m, s.pts), w: s.w * affineScale(m), n: order++, copy: 1 });
+      }
+      if (!out.eyes) seen[name] = faceEyes.map((e, i) => (M[i ? "eye1" : "eye0"] ? affinePts(M[i ? "eye1" : "eye0"], e) : e));
+    }
     return out;
   };
-  const kit = { p, h, accent, skin, wear, P, pts, W, fine, add, curve, rrect, closed, shape, line, disc, slot, ink, smooth, colors, view, arms: () => ((armsAt = order), (order += 4)) };
+  const kit = { p, h, accent, skin, wear, P, pts, W, fine, add, curve, rrect, closed, shape, line, disc, slot, ink, smooth, colors, view, face, arms: () => ((armsAt = order), (order += 4)) };
 
   // its body, face, legs and shadow, as the character draws them
   const { eyes } = C.draw(kit);
@@ -274,7 +309,7 @@ export function rig(p, h, accent, cast = {}) {
     // the whole-body forms it can take in place of standing (a cat sits, curls up into a ball), drawn as form:<name>
     ...(C.forms?.length ? { forms: [...C.forms] } : {}),
     // its other views (facing the viewer, at rest as it stands): their eyes, where costumes move to on each, its middle
-    ...(C.views ? { views: Object.fromEntries(Object.entries(C.views).map(([v, o]) => [v, { eyes: seen[v] ?? [], hat: [(o.hat?.[0] ?? 0) * h, (o.hat?.[1] ?? 0) * h], wear: [(o.wear?.[0] ?? 0) * h, (o.wear?.[1] ?? 0) * h], ...(o.middle != null ? { middle: o.middle } : {}), ...(o.yaw != null ? { yaw: o.yaw } : {}), ...(o.pitch != null ? { pitch: o.pitch, pivot: o.pivot } : {}), ...(o.between ? { between: true } : {}) }])) } : {}),
+    ...(C.views ? { views: Object.fromEntries(Object.entries(C.views).map(([v, o]) => [v, { eyes: seen[v] ?? [], hat: [(o.hat?.[0] ?? 0) * h, (o.hat?.[1] ?? 0) * h], wear: [(o.wear?.[0] ?? 0) * h, (o.wear?.[1] ?? 0) * h], ...(o.middle != null ? { middle: o.middle } : {}), ...(o.yaw != null ? { yaw: o.yaw } : {}), ...(o.pitch != null ? { pitch: o.pitch, pivot: o.pivot } : {}), ...(o.between ? { between: true } : {}), ...(faces[v] ? { face: faces[v] } : {}) }])) } : {}),
     // a character drawn from a modelled shape: the angle its standing view is seen from (it turns by rotating)
     ...(C.yaw != null ? { yaw: C.yaw } : {}),
     // the fidgets of its own it does in a quiet moment (its ears twitch while it looks around)

@@ -19,7 +19,10 @@ export const ACCENT = "accent";
 const DRESS = ["grad-cap", "hard-hat", "headphones", "party-hat", "crown", "beanie", "chef-hat", "hair-bow", "pencil-ear", "glasses", "bow-tie", "scarf", "star"];
 
 const q = (v) => Math.round(v * 10) / 10;
-const strokeOf = (s) => ({ part: s.part, n: s.n, w: q(s.w), c: s.c, l: { under: 1, shadow: 2 }[s.l] ?? 0, o: s.o, pts: s.pts.map(q) });
+const strokeOf = (s) => ({ part: s.part, n: s.n, w: q(s.w), c: s.c, l: { under: 1, shadow: 2 }[s.l] ?? 0, o: s.o, pts: s.pts.map(q), ...(s.face ? { f: 1 } : {}) });
+// an affine of a view's shared face (rig.mjs, faceMatrices), kept to the precision it needs
+const qm = (m) => m && m.map((v, i) => (i < 4 ? Math.round(v * 1e4) / 1e4 : q(v)));
+const facesOf = (f) => Object.fromEntries(Object.entries(f).map(([k, m]) => [k, qm(m)]));
 const handsOf = (r) => ({
   gloves: Object.fromEntries(Object.entries(r.gloves).map(([k, g]) => [k, { lines: g.lines.map((l) => l.map(q)), fill: g.fill.map((l) => l.map(q)), fillWidth: q(g.fillWidth) }])),
   gloveWidth: q(r.gloveWidth),
@@ -63,7 +66,7 @@ export function lookOf(character) {
     // the parts that move on their own (a tail), its whole-body forms and its fidgets
     ...(base.swing ? { swing: Object.fromEntries(Object.entries(base.swing).map(([k, s]) => [k, { ...s, at: s.at.map(q) }])) } : {}),
     ...(base.forms ? { forms: base.forms } : {}),
-    ...(base.views ? { views: Object.fromEntries(Object.entries(base.views).map(([k, v]) => [k, { ...v, eyes: v.eyes.map((e) => e.map(q)), hat: v.hat.map(q), wear: v.wear.map(q) }])) } : {}),
+    ...(base.views ? { views: Object.fromEntries(Object.entries(base.views).map(([k, v]) => [k, { ...v, eyes: v.eyes.map((e) => e.map(q)), hat: v.hat.map(q), wear: v.wear.map(q), ...(v.face ? { face: facesOf(v.face) } : {}) }])) } : {}),
     ...(base.fidgets ? { fidgets: base.fidgets } : {}),
     ...(base.yaw != null ? { yaw: base.yaw } : {}),
     reach: C.reach ?? 0.36,
@@ -78,7 +81,8 @@ export function lookOf(character) {
     outfits: outfitsOf(C).map((o) => ({ name: o.name, wear: o.wear })),
     arm: { width: q(base.arm.width), hose: base.arm.hose.map(q), ...(base.arm.fill ? { fill: base.arm.fill, fillWidth: q(base.arm.fillWidth) } : {}) },
     armsAt: base.armsAt,
-    strokes: base.strokes.map(strokeOf),
+    // a view that shares the standing face says where it is (views.<name>.face): the page draws it there again
+    strokes: base.strokes.filter((s) => !s.copy).map(strokeOf),
     wear,
     // how far above its head each costume reaches: a page puts one on only where the board kept the room
     tops: Object.fromEntries(wearable.map((w) => [w, Math.round(topOf(C, w) * 1000) / 1000])),
