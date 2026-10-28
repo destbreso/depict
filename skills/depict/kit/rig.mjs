@@ -11,8 +11,8 @@
 // each glove's outline in a frame of its own (x from the wrist out through the
 // fingers, y toward the thumb).
 import * as ink from "./ink.mjs";
-import { smooth } from "./geom.mjs";
-import { affinePts, affineScale, faceSideOf } from "./act.mjs";
+import { lean, smooth } from "./geom.mjs";
+import { affinePts, affineScale, faceSideOf, keptFill, keptLine, keptSeed, KEPT_EDGE } from "./act.mjs";
 import { PLACES, characterOf, contractOf, slotOf } from "./characters/index.mjs";
 
 const PAPER = "#fbfaf7";
@@ -129,6 +129,9 @@ export function rig(p, h, accent, cast = {}) {
   const W = h * 0.019; // the outline's nib
   const fine = h * 0.015;
   const strokes = [];
+  // the fills its look keeps as shapes (shape's keep), for the page to color in, and the lines as their paths (line's keep)
+  const keptFills = [];
+  const keptLines = [];
   let order = 0;
   let armsAt = 0;
   // the view being drawn: what is drawn inside k.view(name, ...) is that view's, its parts named @<name>:<part>
@@ -172,10 +175,24 @@ export function rig(p, h, accent, cast = {}) {
    * under a body or a body under a head joins it with no seam, only the silhouette drawn (every outline of a part
    * lies over every fill of it, so an overlap would otherwise show its line through the shape in front).
    */
-  const shape = (part, uv, color, { T = P, nib = h * 0.03, angle = -35, line = fine, opacity = 0.95, round = false, behind = null } = {}) => {
+  const shape = (part, uv, color, { T = P, nib = h * 0.03, angle = -35, line = fine, opacity = 0.95, round = false, behind = null, keep = null } = {}) => {
     let flat = uv.flatMap(([u, v]) => T(u, v));
     if (round) flat = smooth([...flat, flat[0], flat[1]], 3);
-    if (color) {
+    if (color && keep != null && C.precision) {
+      // a fill its look keeps as its shape, to within keep (the page's units), for the page to color in itself with a
+      // pen of its own; the shared pen spends what it would have, so every stroke after it is drawn as before
+      ink.fill(p, flat, { nib, angle, edge: 0.12 });
+      // (the step its look keeps points to: look.mjs)
+      const unit = Math.round(C.precision * h * 1e4) / 1e4;
+      const poly = lean(flat, keep).map((v) => Math.round(v / unit) * unit);
+      const k = { part: prefix + part, poly, nib: Math.round(nib * 1000) / 1000, angle, edge: KEPT_EDGE, seed: keptSeed(C.id, keptFills.length), c: color, o: opacity, n: order };
+      const f = keptFill(k);
+      k.count = f.strokes.length;
+      keptFills.push(k);
+      const from = strokes.length;
+      add(part, "color", f.strokes, f.width, color, "under", opacity);
+      for (let i = from; i < strokes.length; i++) strokes[i].kept = 1;
+    } else if (color) {
       const f = ink.fill(p, flat, { nib, angle, edge: 0.12 });
       add(part, "color", f.strokes, f.width, color, "under", opacity);
     }
@@ -203,7 +220,18 @@ export function rig(p, h, accent, cast = {}) {
     for (const r of runs) add(part, "outline", [ink.wobble(p, r.flatMap(([u, v]) => T(u, v)), { amp: Math.min(0.8, 0.2 * line) })], line);
   };
   /** An open line in the figure's frame (or another). */
-  const line = (part, uv, width, color = INK, T = P) => add(part, "outline", [ink.wobble(p, uv.flatMap(([u, v]) => T(u, v)), { amp: 0.35 })], width, color);
+  const line = (part, uv, width, color = INK, T = P, { keep = null } = {}) => {
+    const flat = uv.flatMap(([u, v]) => T(u, v));
+    if (keep == null || !C.precision) return add(part, "outline", [ink.wobble(p, flat, { amp: 0.35 })], width, color);
+    // a line its look keeps as the path it is drawn along, to within keep (the page's units), for the page to draw
+    // with a pen of its own; the shared pen spends what it would have, so every stroke after it is drawn as before
+    ink.wobble(p, flat, { amp: 0.35 });
+    const unit = Math.round(C.precision * h * 1e4) / 1e4;
+    const k = { part: prefix + part, pts: lean(flat, keep).map((v) => Math.round(v / unit) * unit), amp: 0.35, pen: Math.round(p.width * 10) / 10, seed: keptSeed(C.id, keptLines.length, "line"), c: color, w: width, n: order };
+    keptLines.push(k);
+    add(part, "outline", [keptLine(k)], width, color);
+    strokes.at(-1).kept = 1;
+  };
   const disc = (u, v, ru, rv = ru, n = 22) => Array.from({ length: n }, (_, k) => [u + Math.cos((2 * Math.PI * k) / n) * ru, v + Math.sin((2 * Math.PI * k) / n) * rv]);
   /** A place on the character, for a costume made for the marker: scaled about the marker's frame and moved, or the marker's own frame. */
   const slot = (name) => {
@@ -243,7 +271,23 @@ export function rig(p, h, accent, cast = {}) {
     }
     return out;
   };
-  const kit = { p, h, accent, skin, wear, P, pts, W, fine, add, curve, rrect, closed, shape, line, disc, slot, ink, smooth, colors, view, face, arms: () => ((armsAt = order), (order += 4)) };
+  // something drawn once and drawn again elsewhere, the same (a costume in each drawing of a solid): k.drawn(draw) is
+  // what draw adds, and k.again(that, part, m) adds it again as `part`, moved by the affine m ([a, b, c, d, e, f]), its
+  // lines as much wider; a compact look keeps it once and says where it is again
+  const drawn = (draw) => {
+    const from = strokes.length;
+    draw();
+    return [from, strokes.length];
+  };
+  let agains = 0;
+  const again = ([from, to], part, m) => {
+    agains++;
+    for (let i = from; i < to; i++) {
+      const s = strokes[i];
+      strokes.push({ part, role: s.role, pts: affinePts(m, s.pts), w: s.w * affineScale(m), c: s.c, l: s.l, o: s.o, n: order++, again: [i, m, agains] });
+    }
+  };
+  const kit = { p, h, accent, skin, wear, P, pts, W, fine, add, curve, rrect, closed, shape, line, disc, slot, ink, smooth, colors, view, face, drawn, again, arms: () => ((armsAt = order), (order += 4)) };
 
   // its body, face, legs and shadow, as the character draws them
   const { eyes } = C.draw(kit);
@@ -312,6 +356,8 @@ export function rig(p, h, accent, cast = {}) {
     ...(C.views ? { views: Object.fromEntries(Object.entries(C.views).map(([v, o]) => [v, { eyes: seen[v] ?? [], hat: [(o.hat?.[0] ?? 0) * h, (o.hat?.[1] ?? 0) * h], wear: [(o.wear?.[0] ?? 0) * h, (o.wear?.[1] ?? 0) * h], ...(o.middle != null ? { middle: o.middle } : {}), ...(o.yaw != null ? { yaw: o.yaw } : {}), ...(o.pitch != null ? { pitch: o.pitch, pivot: o.pivot } : {}), ...(o.between ? { between: true } : {}), ...(faces[v] ? { face: faces[v] } : {}) }])) } : {}),
     // a character drawn from a modelled shape: the angle its standing view is seen from (it turns by rotating)
     ...(C.yaw != null ? { yaw: C.yaw } : {}),
+    ...(keptFills.length ? { fills: keptFills } : {}),
+    ...(keptLines.length ? { lines: keptLines } : {}),
     // the fidgets of its own it does in a quiet moment (its ears twitch while it looks around)
     ...(C.fidgets ? { fidgets: C.fidgets } : {}),
   };

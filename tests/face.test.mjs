@@ -65,7 +65,8 @@ test("a view that shares the standing face has it drawn again where it says, eac
 test("a look keeps the shared face once, and a page casting it draws it again in each view as the board does", () => {
   const look = lookOf(sharer);
   assert.ok(!look.strokes.some((s) => /^@(front|side):(eye|pupil|brows|mouth)/.test(s.part)));
-  assert.deepEqual(look.views.front.face, { eye0: BIG, eye1: BIG, mouth: BIG });
+  // (one affine for the whole face, as it said)
+  assert.deepEqual(look.views.front.face, BIG);
   assert.equal(look.views.side.face.eye1, null);
   const A = { h: 205.2, contract: sharer.id, accent: 0, wear: [], strokes: [], reveal: {}, track: { start: [0, 0, 1], appear: [0, 1], moves: [], turns: [], arms: [], feel: [[0, "happy"]], look: [], bounces: [], blinks: [], leans: [], spins: [], caps: [], intro: null }, slot: null };
   const cast = recast(A, look, ["#1b1b19"]);

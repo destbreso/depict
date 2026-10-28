@@ -102,6 +102,153 @@ export function applyBody(st, b, h) {
   return st;
 }
 
+// ------------------------------------------------------------------ the pen a page colors a look's shapes in with
+
+/**
+ * A fill a look keeps as its shape ({ poly, nib, angle, edge, seed }: rig.mjs, shape's keep), colored in with a pen
+ * of its own seeded as it says: the same strokes on the board that drew it and on a page that casts its look.
+ */
+/**
+ * A hand's wobble over an existing polyline (an icon's line, a traced
+ * shape): resampled evenly, then nudged sideways by a slow wave whose phase
+ * and length are the pen's own. Small details survive; long lines stop being
+ * ruler-straight.
+ */
+export function wobble(p, pts, { amp = null, wave = null } = {}) {
+  const a = amp ?? Math.min(1.6, 0.35 * p.width * p.roughness);
+  const lam = wave ?? p.r(70, 130);
+  const phase = p.r(0, Math.PI * 2);
+  const phase2 = p.r(0, Math.PI * 2);
+  const step = Math.max(2, p.width * 0.8);
+  // resample at an even step so the wave is even along the line
+  const out = [];
+  let s = 0;
+  const n = pts.length / 2;
+  const ex = p.off(a * 0.6);
+  const ey = p.off(a * 0.6);
+  for (let i = 0; i < n - 1; i++) {
+    const x0 = pts[2 * i], y0 = pts[2 * i + 1], x1 = pts[2 * i + 2], y1 = pts[2 * i + 3];
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len === 0) continue;
+    const nx = -(y1 - y0) / len;
+    const ny = (x1 - x0) / len;
+    const k = Math.max(1, Math.ceil(len / step));
+    for (let j = i === 0 ? 0 : 1; j <= k; j++) {
+      const t = j / k;
+      const d = s + len * t;
+      const off = a * (0.7 * Math.sin((2 * Math.PI * d) / lam + phase) + 0.3 * Math.sin((2 * Math.PI * d) / (lam * 0.37) + phase2));
+      out.push(x0 + (x1 - x0) * t + nx * off + ex, y0 + (y1 - y0) * t + ny * off + ey);
+    }
+    s += len;
+  }
+  return out.length >= 4 ? out : pts;
+}
+
+/** A pen of its own for a stroke a look keeps as its shape, seeded as it says, as wide as the pen that drew the rest. */
+const seededPen = (seed, width = 4) => {
+  const rng = splitmix32(seed);
+  const r = (lo, hi) => lo + (hi - lo) * rng();
+  return { rng, r, off: (max) => r(-max, max), roughness: 1, bowing: 1, width };
+};
+/** A line a look keeps as the path it is drawn along ({ pts, amp, pen, seed }: rig.mjs, line's keep), wobbled by its own pen. */
+export const keptLine = (k) => wobble(seededPen(k.seed, k.pen), k.pts, { amp: k.amp });
+
+/** How far inside its shape a kept fill's strokes end, a share of its nib (as every shape of a character's: rig.mjs). */
+export const KEPT_EDGE = 0.12;
+/** The seed of a character's i-th kept fill (or line): the same on the board that drew it and on a page that casts its look. */
+export const keptSeed = (id, i, kind = "fill") => hash32(`${id}:${kind}:${i}`);
+export const keptFill = (k) => fill(seededPen(k.seed), k.poly, { nib: k.nib, angle: k.angle, edge: k.edge });
+
+/** Stable 32-bit hash of a string (FNV-1a), to derive one stream per element from one seed (rng.mjs has it from here). */
+export function hash32(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/** splitmix32: small, fast and well spread; returns floats in [0, 1) (rng.mjs has it from here). */
+export function splitmix32(seed) {
+  let a = seed >>> 0;
+  return function next() {
+    a = (a + 0x9e3779b9) >>> 0;
+    let z = a;
+    z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
+    z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
+    z = (z ^ (z >>> 16)) >>> 0;
+    return z / 4294967296;
+  };
+}
+
+/**
+ * A marker fill inside a polygon: the area colored in with a broad nib, back
+ * and forth, each pass a little irregular and kept just inside the outline.
+ * The passes are scanlines at an angle; consecutive passes that overlap are
+ * one zigzag stroke, so a curved or hollow shape is filled in a few strokes
+ * and no stroke jumps across paper. Returns the strokes and the nib width.
+ */
+export function fill(p, poly, { nib = 16, angle = -38, edge = 0.34 } = {}) {
+  // a thin shape (a bar, a stem) is colored in with a finer nib, as a thinner marker would do it
+  const thick = thickness(poly);
+  if (thick < nib * 1.2) nib = Math.max(2.5, thick * 0.8);
+  const gap = nib * 0.8;
+  const a = (angle * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const rot = [];
+  for (let i = 0; i < poly.length; i += 2) rot.push(poly[i] * cos + poly[i + 1] * sin, -poly[i] * sin + poly[i + 1] * cos);
+  const n = rot.length / 2;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (let i = 1; i < rot.length; i += 2) {
+    y0 = Math.min(y0, rot[i]);
+    y1 = Math.max(y1, rot[i]);
+  }
+  const back = (x, y) => [x * cos - y * sin, x * sin + y * cos];
+  const strips = []; // { last: [xa, xb], row, pts, flip }
+  let row = 0;
+  for (let y = y0 + gap * 0.5; y < y1 - gap * 0.2; y += gap, row++) {
+    const xs = [];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const [ax, ay, bx, by] = [rot[2 * i], rot[2 * i + 1], rot[2 * j], rot[2 * j + 1]];
+      if ((ay <= y && by > y) || (by <= y && ay > y)) xs.push(ax + ((y - ay) / (by - ay)) * (bx - ax));
+    }
+    xs.sort((m, k) => m - k);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const xa = xs[i] + nib * edge;
+      const xb = xs[i + 1] - nib * edge;
+      if (xb - xa < nib * 0.15) continue;
+      const strip = strips.find((st) => st.row === row - 1 && st.last[0] < xb && xa < st.last[1]);
+      const jy = p.off(gap * 0.06);
+      if (strip) {
+        const [sa, sb] = strip.flip ? [xb, xa] : [xa, xb];
+        strip.pts.push(...back(sa + p.off(1.5), y + jy), ...back(sb + p.off(1.5), y + jy));
+        strip.flip = !strip.flip;
+        strip.last = [xa, xb];
+        strip.row = row;
+      } else strips.push({ last: [xa, xb], row, pts: [...back(xa, y + jy), ...back(xb, y + jy)], flip: true });
+    }
+  }
+  return { strokes: strips.map((st) => st.pts), width: nib };
+}
+
+/** How thick a polygon is: twice its area over its perimeter (a bar's width, a disc's radius). */
+function thickness(poly) {
+  const n = poly.length / 2;
+  let a = 0;
+  let per = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    a += poly[2 * i] * poly[2 * j + 1] - poly[2 * j] * poly[2 * i + 1];
+    per += Math.hypot(poly[2 * j] - poly[2 * i], poly[2 * j + 1] - poly[2 * i + 1]);
+  }
+  return per ? Math.abs(a) / per : 0;
+}
+
+
 /**
  * The state of an actor at time t: { x, y, facing, lift, sx, sy, lean,
  * front, back, feel, look, blink, cap, shown }. Hands are { hand, bow, glove } in
@@ -1048,6 +1195,26 @@ export const affineScale = (m) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]))
 export function unpacked(look) {
   if (look.version !== 2) return look;
   const u = look.unit;
+  // strokes drawn again elsewhere ([-1, part, n, which, count, a, b, c, d, e, f], or [-2, part, n, which, count, e, f]
+  // when only moved: look.mjs) of strokes before them in their list
+  const list = (packed) => {
+    const out = [];
+    const at = [];
+    for (const a of packed) {
+      if (a[0] >= 0) {
+        at.push(out.length);
+        out.push(one(a));
+        continue;
+      }
+      const m = a[0] === -2 ? [1, 0, 0, 1, a[5] * u, a[6] * u] : [a[5] / 1e4, a[6] / 1e4, a[7] / 1e4, a[8] / 1e4, a[9] * u, a[10] * u];
+      at.push(out.length);
+      for (let j = 0; j < a[4]; j++) {
+        const s = out[at[a[3]] + j];
+        out.push({ ...s, part: look.parts[a[1]], n: a[2] + j, w: s.w * affineScale(m), pts: affinePts(m, s.pts) });
+      }
+    }
+    return out;
+  };
   const one = (a) => {
     const pts = [];
     let [x, y] = [0, 0];
@@ -1058,7 +1225,32 @@ export function unpacked(look) {
     }
     return { part: look.parts[a[0]], n: a[1], w: a[2] / 10, c: look.colors[a[3]], l: a[4], o: a[5] / 100, pts, ...(a[6] ? { f: 1 } : {}) };
   };
-  return { ...look, strokes: look.strokes.map(one), wear: Object.fromEntries(Object.entries(look.wear || {}).map(([w, list]) => [w, list.map(one)])) };
+  // and the fills it keeps as their shapes, colored in again as the board that drew it colored them, each in its place
+  const filled = [];
+  for (const [i, a] of (look.fills || []).entries()) {
+    const poly = [];
+    let [x, y] = [0, 0];
+    for (let i = 6; i < a.length; i += 2) {
+      x += a[i];
+      y += a[i + 1];
+      poly.push(x * u, y * u);
+    }
+    const f = keptFill({ poly, nib: a[2] / 1000, angle: a[3], edge: KEPT_EDGE, seed: keptSeed(look.id, i) });
+    f.strokes.forEach((pts, j) => filled.push({ part: look.parts[a[0]], n: a[1] + j, w: f.width, c: look.colors[a[4]], l: 1, o: a[5] / 100, pts }));
+  }
+  // and the lines it keeps as the paths they are drawn along, drawn again as the board that drew it drew them
+  for (const [i, a] of (look.lines || []).entries()) {
+    const pts = [];
+    let [x, y] = [0, 0];
+    for (let j = 6; j < a.length; j += 2) {
+      x += a[j];
+      y += a[j + 1];
+      pts.push(x * u, y * u);
+    }
+    filled.push({ part: look.parts[a[0]], n: a[1], w: a[2] / 10, c: look.colors[a[3]], l: 0, o: 1, pts: keptLine({ pts, amp: a[5] / 100, pen: a[4] / 10, seed: keptSeed(look.id, i, "line") }) });
+  }
+  const strokes = [...list(look.strokes), ...filled].sort((p, q) => p.n - q.n);
+  return { ...look, strokes, wear: Object.fromEntries(Object.entries(look.wear || {}).map(([w, packed]) => [w, list(packed)])) };
 }
 
 /** Which of a shared face's affines a stroke of the standing face takes: its mouths the mouth's, the rest its eye's side. */
@@ -1105,7 +1297,7 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     if (!o.face) continue;
     for (const s of look.strokes) {
       if (!s.f || s.part.charCodeAt(0) === 64) continue;
-      const m = o.face[faceSideOf(s, look.eyes)];
+      const m = Array.isArray(o.face) ? o.face : o.face[faceSideOf(s, look.eyes)];
       if (m) strokes.push({ ...copy(s), part: `@${v}:${s.part}`, n: next++, w: s.w * affineScale(m), pts: affinePts(m, s.pts) });
     }
   }

@@ -38,3 +38,72 @@ test("its look keeps every stroke to that precision, compact, and a page unpacks
   assert.equal(castProblem(A, look), null);
   assert.equal(recast(A, look, ["#1b1b19"]).strokes.length, plain.strokes.length);
 });
+
+// the stump with its body's fill kept as its shape, to within a unit of the page
+const kept = {
+  ...fine,
+  draw(k) {
+    const shape = k.shape;
+    return fine.draw({ ...k, shape: (part, uv, color, o = {}) => shape(part, uv, color, { ...o, keep: 1 }) });
+  },
+};
+
+test("a fill its look keeps as its shape is colored in by the page as the board that drew it colored it", async () => {
+  const { rig } = await import("../skills/depict/kit/rig.mjs");
+  const ink = await import("../skills/depict/kit/ink.mjs");
+  const { splitmix32 } = await import("../skills/depict/kit/rng.mjs");
+  const { SIZE, W } = await import("../skills/depict/kit/compose.mjs");
+  const { hash32 } = await import("../skills/depict/kit/rng.mjs");
+  const { characterOf } = await import("../skills/depict/kit/characters/index.mjs");
+  const h = SIZE.guide * (characterOf({ character: kept }).size ?? 1);
+  const look = lookOf(kept);
+  assert.ok(look.fills.length > 0);
+  assert.ok(look.strokes.length < lookOf(fine).strokes.length);
+  // the look's own drawing, as the board draws it: the same strokes, the kept fills colored in again by the page
+  const r = rig(ink.pen(splitmix32(hash32(`look:${kept.id}`)), { width: W.icon }), h, "accent", { character: kept });
+  const back = unpacked(look).strokes;
+  assert.deepEqual(back.map((s) => [s.part, s.n]), r.strokes.map((s) => [s.part, s.n]));
+  r.strokes.forEach((s, i) => {
+    if (!s.kept) return;
+    assert.equal(back[i].pts.length, s.pts.length);
+    s.pts.forEach((v, j) => assert.ok(Math.abs(v - back[i].pts[j]) < 1e-6));
+  });
+  // and every stroke it does not keep is drawn as it would have been with the fill drawn as any other (the shared pen
+  // spends what it would have)
+  const plain = rig(ink.pen(splitmix32(hash32(`look:${kept.id}`)), { width: W.icon }), h, "accent", { character: fine });
+  r.strokes.forEach((s, i) => !s.kept && assert.deepEqual(s.pts, plain.strokes[i].pts));
+});
+
+test("what is drawn once and drawn again elsewhere is kept once, and a page draws it again where it was", () => {
+  // the stump with a star on its body drawn again, moved, in three places (and once turned)
+  const starred = {
+    ...fine,
+    costumes: {
+      stars: {
+        top: 0,
+        draw(k) {
+          const once = k.drawn(() => k.shape("wear", k.disc(0, 0.5, 0.05, 0.05, 10), "#f2c23a"));
+          k.again(once, "wear", [1, 0, 0, 1, 20, 0]);
+          k.again(once, "wear", [1, 0, 0, 1, -20, 0]);
+          k.again(once, "wear", [0, 1, -1, 0, 0, -30]);
+        },
+      },
+    },
+    outfits: [{ name: "stars", wear: ["stars"] }],
+  };
+  const look = lookOf(starred);
+  const packed = look.wear.stars;
+  assert.equal(packed.filter((a) => a[0] < 0).length, 3);
+  const back = unpacked(look).wear.stars;
+  const first = back.filter((s, i) => i < packed[0].length);
+  const n = back.length / 4;
+  assert.equal(back.length % 4, 0);
+  for (let j = 0; j < n; j++) {
+    const s = back[j];
+    const moved = back[n + j];
+    moved.pts.forEach((v, i) => assert.ok(Math.abs(v - (s.pts[i] + (i % 2 ? 0 : 20))) <= look.unit, `${i}`));
+    const turned = back[3 * n + j];
+    turned.pts.forEach((v, i) => assert.ok(Math.abs(v - (i % 2 ? s.pts[i - 1] - 30 : -s.pts[i + 1])) <= look.unit));
+  }
+  assert.ok(first.length);
+});

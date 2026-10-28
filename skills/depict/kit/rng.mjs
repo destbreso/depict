@@ -2,28 +2,9 @@
 // same wobble in every line, so a page, its video and a test all see the
 // same drawing.
 
-/** splitmix32: small, fast and well spread; returns floats in [0, 1). */
-export function splitmix32(seed) {
-  let a = seed >>> 0;
-  return function next() {
-    a = (a + 0x9e3779b9) >>> 0;
-    let z = a;
-    z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
-    z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
-    z = (z ^ (z >>> 16)) >>> 0;
-    return z / 4294967296;
-  };
-}
-
-/** Stable 32-bit hash of a string (FNV-1a), to derive one stream per element from one seed. */
-export function hash32(text) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h >>> 0;
-}
+/** splitmix32 and hash32 (act.mjs, where a page that colors a look's shapes in itself has them too). */
+import { hash32, splitmix32 } from "./act.mjs";
+export { hash32, splitmix32 };
 
 /**
  * One independent stream per name (an idea, a link, a label). Editing one

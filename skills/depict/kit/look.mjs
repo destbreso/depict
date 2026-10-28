@@ -22,7 +22,12 @@ const q = (v) => Math.round(v * 10) / 10;
 const strokeOf = (s) => ({ part: s.part, n: s.n, w: q(s.w), c: s.c, l: { under: 1, shadow: 2 }[s.l] ?? 0, o: s.o, pts: s.pts.map(q), ...(s.face ? { f: 1 } : {}) });
 // an affine of a view's shared face (rig.mjs, faceMatrices), kept to the precision it needs
 const qm = (m) => m && m.map((v, i) => (i < 4 ? Math.round(v * 1e4) / 1e4 : q(v)));
-const facesOf = (f) => Object.fromEntries(Object.entries(f).map(([k, m]) => [k, qm(m)]));
+// (one affine for the whole face when its sides and its mouth have the same)
+const facesOf = (f) => {
+  const out = Object.fromEntries(Object.entries(f).map(([k, m]) => [k, qm(m)]));
+  const same = out.eye0 && JSON.stringify(out.eye0) === JSON.stringify(out.eye1) && JSON.stringify(out.eye0) === JSON.stringify(out.mouth);
+  return same ? out.eye0 : out;
+};
 const handsOf = (r) => ({
   gloves: Object.fromEntries(Object.entries(r.gloves).map(([k, g]) => [k, { lines: g.lines.map((l) => l.map(q)), fill: g.fill.map((l) => l.map(q)), fillWidth: q(g.fillWidth) }])),
   gloveWidth: q(r.gloveWidth),
@@ -37,7 +42,7 @@ const handsOf = (r) => ({
  * hundredths, and its points as whole steps of `unit` (the page's units), each from the one before.
  */
 function packer(C, h) {
-  if (!C.precision) return { version: 1, pack: (list) => list.map(strokeOf), tables: () => ({}) };
+  if (!C.precision) return { version: 1, pack: (list) => list.filter((s) => !s.copy).map(strokeOf), fills: () => [], lines: () => [], tables: () => ({}) };
   const unit = Math.round(C.precision * h * 1e4) / 1e4;
   const parts = [];
   const colors = [];
@@ -55,7 +60,63 @@ function packer(C, h) {
     }
     return out;
   };
-  return { version: 2, pack: (list) => list.map(one), tables: () => ({ unit, parts, colors }) };
+  // a fill kept as its shape (rig.mjs, shape's keep): [part, n, nib, angle, color, opacity, x0, y0, dx, dy, ...], its
+  // nib in thousandths, its opacity in hundredths, its outline in whole steps of unit (the i-th is colored in with the
+  // pen of keptSeed(id, i), and its edge is KEPT_EDGE)
+  const fill = (k) => {
+    const out = [index(parts, k.part), k.n, Math.round(k.nib * 1000), k.angle, index(colors, k.c), Math.round(k.o * 100)];
+    let [px, py] = [0, 0];
+    for (let i = 0; i < k.poly.length; i += 2) {
+      const [x, y] = [Math.round(k.poly[i] / unit), Math.round(k.poly[i + 1] / unit)];
+      out.push(x - px, y - py);
+      [px, py] = [x, y];
+    }
+    return out;
+  };
+  // what is drawn again elsewhere (rig.mjs, k.again) of strokes earlier in the same list, kept as where it is again:
+  // [-1, part, n, which, count, a, b, c, d, e, f], the count strokes from `which` (their place in the list as kept)
+  // moved by the affine (a to d in ten-thousandths, e and f in whole steps of unit), or [-2, part, n, which, count, e, f]
+  // when it is only moved (`from`: where the list begins among the strokes the character was drawn with)
+  const pack = (list, from = 0) => {
+    const at = new Map();
+    const out = [];
+    let run = null;
+    list.forEach((s, i) => {
+      if (s.kept || s.copy) return;
+      // (drawn again only from strokes kept as they are)
+      const src = s.again && out[at.get(s.again[0])]?.[0] >= 0 ? at.get(s.again[0]) : undefined;
+      if (src == null) {
+        run = null;
+        out.push(one(s));
+      } else if (run && run.group === s.again[2] && src === run.next && s.n === run.n) {
+        run.rec[4]++;
+        run.next++;
+        run.n++;
+      } else {
+        const m = s.again[1];
+        const moved = [Math.round(m[4] / unit), Math.round(m[5] / unit)];
+        const rec = m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1 ? [-2, index(parts, s.part), s.n, src, 1, ...moved] : [-1, index(parts, s.part), s.n, src, 1, ...m.slice(0, 4).map((v) => Math.round(v * 1e4)), ...moved];
+        out.push(rec);
+        run = { group: s.again[2], next: src + 1, n: s.n + 1, rec };
+      }
+      at.set(from + i, out.length - 1);
+    });
+    return out;
+  };
+  // a line kept as the path it is drawn along (rig.mjs, line's keep): [part, n, width, color, pen, amp, x0, y0, dx, dy,
+  // ...], its width and its pen's in tenths, its wobble in hundredths, its path in whole steps of unit (the i-th is
+  // drawn with the pen of keptSeed(id, i, "line"))
+  const line = (k) => {
+    const out = [index(parts, k.part), k.n, Math.round(k.w * 10), index(colors, k.c), Math.round(k.pen * 10), Math.round(k.amp * 100)];
+    let [px, py] = [0, 0];
+    for (let i = 0; i < k.pts.length; i += 2) {
+      const [x, y] = [Math.round(k.pts[i] / unit), Math.round(k.pts[i + 1] / unit)];
+      out.push(x - px, y - py);
+      [px, py] = [x, y];
+    }
+    return out;
+  };
+  return { version: 2, pack, fills: (list) => list.map(fill), lines: (list) => list.map(line), tables: () => ({ unit, parts, colors }) };
 }
 
 /** A character (an id the kit has, or a module) drawn as its look: the same look on every board of its body. */
@@ -76,10 +137,10 @@ export function lookOf(character) {
   for (const w of wearable) {
     const r = draw([w]);
     // what dressing it adds comes after its body (rig.mjs draws the body, then dresses it)
-    wear[w] = packed.pack(r.strokes.slice(base.strokes.length));
+    wear[w] = packed.pack(r.strokes.slice(base.strokes.length), base.strokes.length);
     if (JSON.stringify(handsFor([w])) !== plain) hands[w] = handsOf(r);
   }
-  const strokes = packed.pack(base.strokes.filter((s) => !s.copy));
+  const strokes = packed.pack(base.strokes);
   return {
     depict: "look",
     version: packed.version,
@@ -114,6 +175,9 @@ export function lookOf(character) {
     armsAt: base.armsAt,
     // a view that shares the standing face says where it is (views.<name>.face): the page draws it there again
     strokes,
+    // the fills it keeps as their shapes, colored in by the page that casts it, as the board that drew it did
+    ...(base.fills ? { fills: packed.fills(base.fills) } : {}),
+    ...(base.lines ? { lines: packed.lines(base.lines) } : {}),
     wear,
     ...packed.tables(),
     // how far above its head each costume reaches: a page puts one on only where the board kept the room

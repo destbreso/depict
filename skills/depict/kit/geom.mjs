@@ -119,3 +119,31 @@ export function pathOf(pts) {
   for (let i = 2; i < pts.length; i += 2) d += `L${pts[i].toFixed(1)} ${pts[i + 1].toFixed(1)}`;
   return d;
 }
+
+/** A polyline [x, y, ...] kept to the points it needs: no point left out lies further than tol from it (Douglas and Peucker). */
+export function lean(pts, tol) {
+  const n = pts.length / 2;
+  if (n < 3) return pts.slice();
+  const keep = new Uint8Array(n);
+  keep[0] = keep[n - 1] = 1;
+  const stack = [[0, n - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    const [ax, ay, bx, by] = [pts[2 * a], pts[2 * a + 1], pts[2 * b], pts[2 * b + 1]];
+    const len = Math.hypot(bx - ax, by - ay);
+    let far = -1;
+    let at = -1;
+    for (let i = a + 1; i < b; i++) {
+      const [x, y] = [pts[2 * i], pts[2 * i + 1]];
+      const d = len ? Math.abs((bx - ax) * (ay - y) - (ax - x) * (by - ay)) / len : Math.hypot(x - ax, y - ay);
+      if (d > far) [far, at] = [d, i];
+    }
+    if (far > tol) {
+      keep[at] = 1;
+      stack.push([a, at], [at, b]);
+    }
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) if (keep[i]) out.push(pts[2 * i], pts[2 * i + 1]);
+  return out;
+}

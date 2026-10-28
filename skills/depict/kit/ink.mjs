@@ -291,41 +291,9 @@ export function banner(p, b) {
   return [...band, ...left, ...right];
 }
 
-/**
- * A hand's wobble over an existing polyline (an icon's line, a traced
- * shape): resampled evenly, then nudged sideways by a slow wave whose phase
- * and length are the pen's own. Small details survive; long lines stop being
- * ruler-straight.
- */
-export function wobble(p, pts, { amp = null, wave = null } = {}) {
-  const a = amp ?? Math.min(1.6, 0.35 * p.width * p.roughness);
-  const lam = wave ?? p.r(70, 130);
-  const phase = p.r(0, Math.PI * 2);
-  const phase2 = p.r(0, Math.PI * 2);
-  const step = Math.max(2, p.width * 0.8);
-  // resample at an even step so the wave is even along the line
-  const out = [];
-  let s = 0;
-  const n = pts.length / 2;
-  const ex = p.off(a * 0.6);
-  const ey = p.off(a * 0.6);
-  for (let i = 0; i < n - 1; i++) {
-    const x0 = pts[2 * i], y0 = pts[2 * i + 1], x1 = pts[2 * i + 2], y1 = pts[2 * i + 3];
-    const len = Math.hypot(x1 - x0, y1 - y0);
-    if (len === 0) continue;
-    const nx = -(y1 - y0) / len;
-    const ny = (x1 - x0) / len;
-    const k = Math.max(1, Math.ceil(len / step));
-    for (let j = i === 0 ? 0 : 1; j <= k; j++) {
-      const t = j / k;
-      const d = s + len * t;
-      const off = a * (0.7 * Math.sin((2 * Math.PI * d) / lam + phase) + 0.3 * Math.sin((2 * Math.PI * d) / (lam * 0.37) + phase2));
-      out.push(x0 + (x1 - x0) * t + nx * off + ex, y0 + (y1 - y0) * t + ny * off + ey);
-    }
-    s += len;
-  }
-  return out.length >= 4 ? out : pts;
-}
+// A hand's wobble over an existing polyline (act.mjs, where a page that draws a look's lines itself has it too).
+import { wobble } from "./act.mjs";
+export { wobble };
 
 /**
  * A soft closed shape through points (a bean of a body, a blob, a cloud of an
@@ -369,71 +337,8 @@ export function dot(p, cx, cy, r) {
   return [pts];
 }
 
-/**
- * A marker fill inside a polygon: the area colored in with a broad nib, back
- * and forth, each pass a little irregular and kept just inside the outline.
- * The passes are scanlines at an angle; consecutive passes that overlap are
- * one zigzag stroke, so a curved or hollow shape is filled in a few strokes
- * and no stroke jumps across paper. Returns the strokes and the nib width.
- */
-export function fill(p, poly, { nib = 16, angle = -38, edge = 0.34 } = {}) {
-  // a thin shape (a bar, a stem) is colored in with a finer nib, as a thinner marker would do it
-  const thick = thickness(poly);
-  if (thick < nib * 1.2) nib = Math.max(2.5, thick * 0.8);
-  const gap = nib * 0.8;
-  const a = (angle * Math.PI) / 180;
-  const cos = Math.cos(a);
-  const sin = Math.sin(a);
-  const rot = [];
-  for (let i = 0; i < poly.length; i += 2) rot.push(poly[i] * cos + poly[i + 1] * sin, -poly[i] * sin + poly[i + 1] * cos);
-  const n = rot.length / 2;
-  let y0 = Infinity;
-  let y1 = -Infinity;
-  for (let i = 1; i < rot.length; i += 2) {
-    y0 = Math.min(y0, rot[i]);
-    y1 = Math.max(y1, rot[i]);
-  }
-  const back = (x, y) => [x * cos - y * sin, x * sin + y * cos];
-  const strips = []; // { last: [xa, xb], row, pts, flip }
-  let row = 0;
-  for (let y = y0 + gap * 0.5; y < y1 - gap * 0.2; y += gap, row++) {
-    const xs = [];
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      const [ax, ay, bx, by] = [rot[2 * i], rot[2 * i + 1], rot[2 * j], rot[2 * j + 1]];
-      if ((ay <= y && by > y) || (by <= y && ay > y)) xs.push(ax + ((y - ay) / (by - ay)) * (bx - ax));
-    }
-    xs.sort((m, k) => m - k);
-    for (let i = 0; i + 1 < xs.length; i += 2) {
-      const xa = xs[i] + nib * edge;
-      const xb = xs[i + 1] - nib * edge;
-      if (xb - xa < nib * 0.15) continue;
-      const strip = strips.find((st) => st.row === row - 1 && st.last[0] < xb && xa < st.last[1]);
-      const jy = p.off(gap * 0.06);
-      if (strip) {
-        const [sa, sb] = strip.flip ? [xb, xa] : [xa, xb];
-        strip.pts.push(...back(sa + p.off(1.5), y + jy), ...back(sb + p.off(1.5), y + jy));
-        strip.flip = !strip.flip;
-        strip.last = [xa, xb];
-        strip.row = row;
-      } else strips.push({ last: [xa, xb], row, pts: [...back(xa, y + jy), ...back(xb, y + jy)], flip: true });
-    }
-  }
-  return { strokes: strips.map((st) => st.pts), width: nib };
-}
-
-/** How thick a polygon is: twice its area over its perimeter (a bar's width, a disc's radius). */
-function thickness(poly) {
-  const n = poly.length / 2;
-  let a = 0;
-  let per = 0;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    a += poly[2 * i] * poly[2 * j + 1] - poly[2 * j] * poly[2 * i + 1];
-    per += Math.hypot(poly[2 * j] - poly[2 * i], poly[2 * j + 1] - poly[2 * i + 1]);
-  }
-  return per ? Math.abs(a) / per : 0;
-}
+// A marker fill inside a polygon (act.mjs, where a page that colors a look's shapes in itself has it too).
+export { fill } from "./act.mjs";
 
 /** A polygon shrunk toward its centroid by about d (enough for the convex-ish shapes it is used on). */
 export function inset(poly, d) {
