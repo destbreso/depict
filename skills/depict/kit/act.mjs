@@ -336,8 +336,14 @@ export function actorAt(actor, t, flat = false) {
   const breath = Math.sin((2 * Math.PI * t) / (mo.breathPeriod ?? 2.7));
   const stretch = lift > 0 ? (0.09 * air - 0.03) * (mo.stretch ?? 1) : 0;
   const deep = mo.breath ?? 1;
-  const sy = (1 - 0.13 * soft * squash + stretch) * (1 + 0.011 * deep * breath);
-  const sx = (1 + 0.11 * soft * squash - stretch * 0.6) * (1 - 0.005 * deep * breath);
+  let sy = (1 - 0.13 * soft * squash + stretch) * (1 + 0.011 * deep * breath);
+  let sx = (1 + 0.11 * soft * squash - stretch * 0.6) * (1 - 0.005 * deep * breath);
+  // a twirl's own squash and stretch: its crouch, its spring into the air, and its soft landing
+  const tw = twirlAt(actor, t);
+  if (tw) {
+    sy = (1 - 0.13 * soft * squash - tw.squash) * (1 + 0.011 * deep * breath);
+    sx = (1 + 0.11 * soft * squash + 0.75 * tw.squash) * (1 - 0.005 * deep * breath);
+  }
   // a soft body's top sways over its feet like a jelly on a plate (its skew, in degrees, top toward +x when positive):
   // it lags as it sets off, sloshes on past its feet when it lands, and sways a little on its own
   let skew = 0;
@@ -357,11 +363,17 @@ export function actorAt(actor, t, flat = false) {
     }
     skew += mo.jelly * 1.4 * Math.sin((2 * Math.PI * t) / 3.4);
   }
-  let lean = lift > 0 ? 7 * air : 0; // leaning into the hop, in degrees
+  let lean = lift > 0 && !tw ? 7 * air : 0; // leaning into the hop (not a twirl, which goes straight up), in degrees
   // a bow: the whole figure leans forward about its feet, and back up
   for (const [t0, t1, deg] of tr.leans ?? []) if (t >= t0 && t < t1) lean += deg * envelope((t - t0) / (t1 - t0));
   // a spin: it turns round where it is, narrowing to its edge and back, as a drawing turns
   let turnScale = 1;
+  // a twirl turns a flat drawing round as a spin does (a solid's turns by rotating: solidTurn)
+  if (tw && actor.yaw == null) {
+    const c = Math.cos((tw.angle * Math.PI) / 180);
+    turnScale = Math.max(0.05, Math.abs(c));
+    if (c < 0) facing = -facing;
+  }
   for (const [t0, t1, turns] of tr.spins ?? []) {
     if (t < t0 || t >= t1) continue;
     const c = Math.cos(2 * Math.PI * turns * easeInOut((t - t0) / (t1 - t0)));
@@ -458,6 +470,7 @@ export function actorAt(actor, t, flat = false) {
     body = mixBody(body ?? STILL, { ...b, look: body?.look ?? null }, e);
   }
   const st = { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, form, fidget, shown: t >= tr.appear[0] };
+  if (tw && actor.yaw != null) st.twirl = tw.angle;
   if (view) st.view = view;
   // a flip turns it over in the air, about its middle, once each hop; a roll turns it over along the ground
   if (going?.way === "flip" || going?.way === "roll") {
@@ -529,12 +542,14 @@ function seenFrom(actor, t, depth = 0) {
  * with it: its eyes look the same way, and it flips over the same way.
  */
 export function solidTurn(actor, t, st) {
-  const [yaw, turn] = seenFrom(actor, t);
+  const [seen, turn] = seenFrom(actor, t);
+  // a twirl turns it round on top of that, through its drawings all the way round
+  const yaw = seen + (st.twirl ?? 0);
   let best = null;
   const drawings = [[actor.yaw, null], ...Object.entries(actor.views ?? {}).filter(([, v]) => v.yaw != null && v.pitch == null).map(([k, v]) => [v.yaw, k])];
   for (const [y, v] of drawings)
     for (const sign of [st.facing, -st.facing]) {
-      const d = Math.abs((sign > 0 ? y : 180 - y) - yaw);
+      const d = Math.abs(((((sign > 0 ? y : 180 - y) - yaw) % 360) + 540) % 360 - 180);
       if (!best || d < best.d - 1e-9) best = { d, v, sign };
     }
   if (best.v) st.view = best.v;
@@ -681,7 +696,59 @@ export function hosePath(sh, bow, hand, wobble) {
 // ------------------------------------------------------------------ the ways it arrives and leaves
 
 /** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
-export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110, flip: 60, roll: 30 };
+export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110, flip: 60, roll: 30, twirl: 95 };
+
+/**
+ * A twirl: how long it crouches before it springs up (s), how long it is in the air, how far it winds up (degrees,
+ * turning back a little as it crouches) and how fast its turn is still going as it lands, beside its mean speed.
+ */
+export const TWIRL = { crouch: 0.24, air: 0.62, wind: 10, land: 0.6 };
+/**
+ * A twirl at t, or null: it crouches (eased in, winding up a little against the way it will turn), springs up out of
+ * its crouch into a stretch, turns round once about its upright axis in the air (setting off from still, quickest in
+ * the middle, still turning as it lands), round in the middle of its flight and a little stretched as it comes down,
+ * and lands soft: the landing taken up in a squash that grows from nothing, and settling in a bounce or two as its
+ * material does (motion: freq, damp), its turn carrying on a little past and coming back. Keys [t0, up, down, turns]:
+ * when it begins to crouch, leaves the ground, lands. Returns { squash (a share of its height: squashed above 0,
+ * stretched below), angle (degrees it has turned) }.
+ */
+function twirlAt(actor, t) {
+  for (const [t0, up, down, turns = 1] of actor.track.twirls ?? []) {
+    if (t < t0 || t > down + 2.5) continue;
+    const mo = actor.motion ?? {};
+    const soft = mo.squash ?? 1;
+    const stretchy = mo.stretch ?? 1;
+    const W = TWIRL.wind;
+    const total = 360 * turns;
+    const air = down - up;
+    const ramp = (x, a, b) => easeInOut(clamp01((x - a) / (b - a)));
+    // its crouch, and its push off the floor out of it into a stretch, as it leaves the ground and goes up; round at
+    // the top, a little stretched again as it comes down
+    const push = up - 0.07;
+    const crouch = 0.1 * soft * (t < push ? ramp(t, t0, push) : 1 - ramp(t, push, up + 0.1));
+    const u = (t - up) / air;
+    const stretch = t < down ? stretchy * (0.08 * ramp(t, up - 0.04, up + 0.12) * (1 - ramp(u, 0.2, 0.5)) + 0.04 * Math.exp(-(((u - 0.92) / 0.12) ** 2))) : 0;
+    // (wound up as it crouches, against the way it will turn)
+    if (t < up) return { squash: crouch - stretch, angle: -W * ramp(t, t0, push) };
+    if (t < down) {
+      // its turn: from still, quickest in the middle, still going as it lands
+      const r = TWIRL.land;
+      const S = -2 * u ** 3 + 3 * u ** 2 + r * (u ** 3 - u ** 2);
+      return { squash: crouch - stretch, angle: -W * (1 - S) + total * S };
+    }
+    // landed: the squash grows from the stretch it came down in, and settles as its material does; its turn, still
+    // going, carries on a little and comes back
+    const d = t - down;
+    const freq = mo.freq ?? 13;
+    const damp = mo.damp ?? 5.5;
+    const came = -stretchy * 0.04 * Math.exp(-((0.08 / 0.12) ** 2));
+    // (taken up softly: the squash's first moment eased in, a cushion and not a blow)
+    const squash = Math.exp(-damp * d) * (came * Math.cos(freq * d) + 0.2 * soft * Math.sin(freq * d) * (1 - Math.exp(-d / 0.035)));
+    const v = (TWIRL.land * (total + W)) / air;
+    return { squash, angle: total + (v / 14) * Math.exp(-9 * d) * Math.sin(14 * d) };
+  }
+  return null;
+}
 
 /** The ways a character can travel from one place to another (personality.travel); a hop is every character's. */
 export const TRAVEL = ["hop", "flip", "roll", "slide", "tiptoe"];
@@ -861,6 +928,16 @@ export const INTROS = {
     k.arms.push([a + 0.05, "cheer"], [a + 1.6, "wave"]);
     k.feel.push([a, "excited"], [a + 1.9, "happy"]);
     return a + 2.3;
+  },
+  // a twirl: it crouches, springs up, turns round once on itself in the air, lands soft and settles, and waves
+  twirl: (k, a, at) => {
+    const up = a + TWIRL.crouch;
+    const down = up + TWIRL.air;
+    (k.twirls ??= []).push([a, up, down, 1]);
+    k.moves.push(hopHere(at, up, down, INTRO_HEIGHT.twirl));
+    k.arms.push([a, "rest"], [down + 0.4, "wave"]);
+    k.feel.push([a, "excited"], [down + 0.7, "happy"]);
+    return down + 1.1;
   },
   // a roll: it tucks in and turns over along the ground where it stands, then waves
   roll: (k, a, at) => {
@@ -1066,7 +1143,7 @@ export function personalize(track, look) {
   const k = { ...track, moves: (track.moves || []).map((m) => ({ ...m })) };
   // every list an arrival or a goodbye may write to, whether or not the board's own guide used it (a guide that never
   // turned has no turns; a cat's goodbye turns it away)
-  const LISTS = ["arms", "feel", "look", "bounces", "spins", "leans", "caps", "turns", "fidgets", "forms"];
+  const LISTS = ["arms", "feel", "look", "bounces", "spins", "leans", "caps", "turns", "fidgets", "forms", "twirls"];
   for (const key of LISTS) k[key] = tuples(track[key]);
   const blank = () => ({ moves: [], ...Object.fromEntries(LISTS.map((key) => [key, []])) });
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -1298,7 +1375,7 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     for (const s of look.strokes) {
       if (!s.f || s.part.charCodeAt(0) === 64) continue;
       const m = Array.isArray(o.face) ? o.face : o.face[faceSideOf(s, look.eyes)];
-      if (m) strokes.push({ ...copy(s), part: `@${v}:${s.part}`, n: next++, w: s.w * affineScale(m), pts: affinePts(m, s.pts) });
+      if (m) strokes.push({ ...copy(s), part: `@${v}:${/^(eye|pupil|squint|brows:|mouth:)/.test(s.part) ? s.part : "face"}`, n: next++, w: s.w * affineScale(m), pts: affinePts(m, s.pts) });
     }
   }
   // what it wears: an outfit the host asks for (today's: its Halloween in October), when it has one; else, for an

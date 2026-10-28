@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { needsWebSocketFlag, open } from "./chrome.mjs";
-import { CHARACTERS, GUIDE_POSES, checkCharacter, resolve } from "../kit/characters/index.mjs";
+import { CHARACTERS, GUIDE_POSES, allRound, checkCharacter, resolve } from "../kit/characters/index.mjs";
 import { fitsContract } from "../kit/look.mjs";
 import { sheet } from "../kit/sheet.mjs";
 import { normalize } from "../kit/model.mjs";
@@ -63,6 +63,16 @@ function turning(C) {
   return seen.filter((d, i) => i === 0 || Math.abs(d[2] - seen[i - 1][2]) > 0.5);
 }
 
+/** A solid character's drawings all the way round, once, from the angle it stands at, in two rows: [view, facing, yaw]. */
+function round(C) {
+  const from = (y) => (((y - C.yaw) % 360) + 360) % 360;
+  const list = turning(C)
+    .sort((a, b) => from(a[2]) - from(b[2]))
+    .filter((d, i, all) => i === 0 || from(d[2]) - from(all[i - 1][2]) > 0.5);
+  const half = Math.ceil(list.length / 2);
+  return [list.slice(0, half), list.slice(half)];
+}
+
 // the sheet: every feeling, every pose, and the costumes it has (its own first; only the shared ones that fit its body)
 const cast = (wear = []) => ({ character, wear });
 const feels = ["happy", "excited", "surprised", "worried", "thinking", "proud", "wink", "sad"];
@@ -92,8 +102,10 @@ const rows = [
   ...(C.forms?.length ? [{ title: "forms", cells: C.forms.map((f) => ({ label: f, cast: cast(), form: f })) }] : []),
   // its views: standing, and each other one (facing the viewer, at rest as it stands), happy and surprised
   ...(C.views ? [{ title: "views", cells: [null, ...Object.keys(C.views).filter((v) => !C.views[v].between)].flatMap((v) => ["happy", "surprised"].map((feel) => ({ label: `${v ?? "standing"}, ${feel}`, cast: cast(), view: v, feel }))) }] : []),
-  // a character drawn from a modelled shape turns by rotating it: its drawings from facing right to facing left
-  ...(C.yaw != null ? [{ title: "turning", cells: turning(C).map(([v, facing, yaw]) => ({ label: `${Math.round(yaw)} degrees`, cast: cast(), view: v, facing })) }] : []),
+  // a character drawn from a modelled shape turns by rotating it: its drawings from facing right to facing left, or,
+  // with drawings all the way round, once round from where it stands, in two rows
+  ...(C.yaw != null && !allRound(C) ? [{ title: "turning", cells: turning(C).map(([v, facing, yaw]) => ({ label: `${Math.round(yaw)} degrees`, cast: cast(), view: v, facing })) }] : []),
+  ...(C.yaw != null && allRound(C) ? round(C).map((cells, i) => ({ title: i ? "turning, on round" : "turning round", cells: cells.map(([v, facing, yaw]) => ({ label: `${Math.round(((yaw % 360) + 360) % 360)} degrees`, cast: cast(), view: v, facing })) })) : []),
 ];
 const svgFile = path.join(out, `${C.id}-sheet.svg`);
 const named = C.name.charAt(0).toUpperCase() + C.name.slice(1);

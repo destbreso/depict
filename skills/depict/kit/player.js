@@ -186,6 +186,10 @@
   };
   const INKC = "#1b1b19";
   const PAPERC = "#fbfaf7";
+  // the outlines a view's shared face is drawn within (makeActor)
+  const defs = document.createElementNS(NS, "defs");
+  svg.append(defs);
+  let clips = 0;
   /** An actor's rig, drawn once into the page: its strokes, arms and gloves, ready to be moved every frame. */
   function makeActor(A) {
     const floor = node("g", {}, shadow);
@@ -206,6 +210,15 @@
       const g = node("g", {}, root);
       viewG[v] = { g, under: node("g", {}, g), ink: node("g", {}, g), face: node("g", {}, g) };
       g.style.display = "none";
+      // a view that shares the standing face draws it within its own outline, so a face turning round its edge goes
+      // behind it
+      const clip = A.views[v].face?.clip;
+      if (clip) {
+        const id = `dp-face-${++clips}`;
+        const cp = node("clipPath", { id, clipPathUnits: "userSpaceOnUse" }, defs);
+        node("path", { d: pathOf(clip, clip.length) + "Z" }, cp);
+        viewG[v].face.setAttribute("clip-path", `url(#${id})`);
+      }
     }
     // the cap, with whatever hat is on it: one group, so it can be lifted and tipped
     const capG = node("g", {}, root);

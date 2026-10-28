@@ -36,7 +36,7 @@ export const WEAR = [...HATS, "glasses", "bow-tie", "scarf", "star", "hair-bow",
 export const HOLD = ["pointer", "book", "pencil", "ruler", "coin", "clock", "magnifier", "flag", "balloon", "wrench", "calculator", "lightbulb"];
 export const SKINS = ["plain", "blue", "green", "sand", "pink", "stripes", "dots"];
 /** Every way a guide can arrive and leave; each character has its own few (its personality), and a soft one bounces and jiggles. */
-export const INTROS = ["wave", "hop", "spin", "bow", "tip", "jump", "bounce", "jiggle", "rub", "flip", "roll"];
+export const INTROS = ["wave", "hop", "spin", "bow", "tip", "jump", "bounce", "jiggle", "rub", "flip", "roll", "twirl"];
 export const OUTROS = ["wave", "bow", "cheer", "salute", "tip", "spin", "bounce", "stroll", "flip", "roll"];
 const SKIN_TINTS = { blue: "#d3e3f0", green: "#d6ead8", sand: "#f4e6c4", pink: "#f5d9df" };
 /** How far above the top of the marker's cap a costume reaches, in units of the guide's height: its spot keeps that paper free too. */
@@ -118,6 +118,9 @@ export function faceMatrices(face) {
   if (Array.isArray(face)) return { eye0: face, eye1: face, mouth: face };
   return { eye0: face.eye0 ?? null, eye1: face.eye1 ?? null, mouth: face.mouth ?? null };
 }
+/** The parts of a face: its eyes, pupils and squints, and its brows and mouths for the feelings. */
+export const facePart = (part) => /^(eye|pupil|squint|brows:|mouth:)/.test(part);
+
 export function rig(p, h, accent, cast = {}) {
   const { wear = [], skin = "plain" } = cast;
   const C = characterOf(cast);
@@ -260,12 +263,13 @@ export function rig(p, h, accent, cast = {}) {
     // each eye's side and one for the mouths): the standing face's strokes are drawn again there, as this view's
     if (out.face && faceEyes) {
       const M = faceMatrices(out.face);
-      faces[name] = M;
+      faces[name] = { ...M, ...(out.face.clip ? { clip: out.face.clip } : {}) };
       for (const s of strokes.filter((x) => x.face && !x.copy && x.part.charCodeAt(0) !== 64)) {
         const m = M[faceSideOf(s, faceEyes)];
         if (!m) continue;
         const { face: _, ...own } = s;
-        strokes.push({ ...own, part: `@${name}:${s.part}`, pts: affinePts(m, s.pts), w: s.w * affineScale(m), n: order++, copy: 1 });
+        // (what the face draws on its body, its cheeks, is the view's face: drawn with it, within its outline)
+        strokes.push({ ...own, part: `@${name}:${facePart(s.part) ? s.part : "face"}`, pts: affinePts(m, s.pts), w: s.w * affineScale(m), n: order++, copy: 1 });
       }
       if (!out.eyes) seen[name] = faceEyes.map((e, i) => (M[i ? "eye1" : "eye0"] ? affinePts(M[i ? "eye1" : "eye0"], e) : e));
     }

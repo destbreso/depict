@@ -10,6 +10,7 @@ import { splitmix32 } from "./rng.mjs";
 const PAPERC = "#fbfaf7";
 const INKC = "#1b1b19";
 
+let clips = 0;
 /** The guide `cast` names, in one pose and one feeling, as SVG in its own frame (its feet at the origin), `h` tall. */
 export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null, form = null, view, facing = 1 } = {}) {
   const pen = ink.pen(splitmix32((seed * 7919 + 13) >>> 0), { width: 4 });
@@ -55,7 +56,8 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
   const parts = (pred) => R.strokes.filter((s) => pred(s.part) && shown(s.part));
   // its body and face in the view it is drawn in
   const seen = (pred) => R.strokes.filter((s) => own(s.part) && pred(bare(s.part)) && shown(bare(s.part)));
-  const facePart = (p) => /^(eye|pupil|squint|brows:|mouth:)/.test(p);
+  // (a view that shares the standing face has what it draws on its body, its cheeks, as its own part "face")
+  const facePart = (p) => /^(eye|pupil|squint|brows:|mouth:)/.test(p) || (V && p === "face");
   const eyeT = (i) => {
     const [cx, cy] = (V ? R.views[V].eyes : R.eyes)[i] ?? [0, 0];
     const wide = F.eyes === "wide" ? 1.12 : 1;
@@ -71,6 +73,10 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
       return `<g transform="${eyeT(Number(m[2]))}">${inner}</g>`;
     })
     .join("");
+  // a view that shares the standing face draws it within its own outline, so a face turning round its edge goes behind it
+  const clip = V ? R.views[V].face?.clip : null;
+  const clipId = clip ? `face-${++clips}` : null;
+  const faceSvg = clip ? `<clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><path d="${d(clip)}Z"/></clipPath><g clip-path="url(#${clipId})">${face}</g>` : face;
   const gloveSvg = (side, arm) => {
     if (R.armless) return "";
     const kind = side === "front" && R.hold === "pointer" ? "fist" : arm.glove;
@@ -115,7 +121,7 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
     layer(seen((p) => p === "body"), true) +
     layer(seen((p) => p === "body"), false) +
     moved("hat", group((p) => p === "cap" || p === "hat")) +
-    face +
+    faceSvg +
     moved("wear", group((p) => p === "wear")) +
     armSvg("front") +
     pointer +

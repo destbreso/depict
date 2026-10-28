@@ -103,6 +103,16 @@ export function slotOf(cast = {}) {
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** What a character module must say, checked before a board is built with it: every problem at once. */
+/** The widest a solid's drawings may be apart, round it (degrees), and still have it turn round on itself. */
+export const ALL_ROUND = 40;
+/** Whether a solid character has drawings all the way round: its angles, facing either way, never further apart than ALL_ROUND. */
+export function allRound(c) {
+  const ys = [c.yaw, ...Object.values(c.views ?? {}).filter((o) => o?.yaw != null && o.pitch == null).map((o) => o.yaw)].filter((y) => typeof y === "number");
+  const all = [...new Set(ys.flatMap((y) => [y, 180 - y]).map((y) => (((y % 360) + 360) % 360)))].sort((a, b) => a - b);
+  if (all.length < 2) return false;
+  return all.every((y, i) => (i ? y - all[i - 1] : y + 360 - all.at(-1)) <= ALL_ROUND);
+}
+
 export function checkCharacter(raw) {
   const out = [];
   const need = (k, ok, what) => {
@@ -173,12 +183,13 @@ export function checkCharacter(raw) {
   need("views", c.views == null || (typeof c.views === "object" && Object.entries(views).every(([v, o]) => /^[a-z][a-z0-9-]*$/.test(v) && !(c.forms ?? []).includes(v) && o && (o.hat == null || pair(o.hat)) && (o.wear == null || pair(o.wear)) && (o.middle == null || num(o.middle)))), "names its other views, each { hat, wear } (where its costumes move to, [du, dv]) and its middle, none a form's name");
   // a character drawn from a modelled shape: the angle each of its drawings is seen from, so it turns by rotating
   if (c.yaw != null || Object.values(views).some((o) => o?.yaw != null || o?.between != null)) {
-    const angle = (y) => num(y) && y >= 0 && y <= 180;
-    need("yaw", angle(c.yaw), "is the angle its standing view is seen from, in degrees round its upright axis (its side 0, facing the viewer 90)");
-    for (const [v, o] of Object.entries(views)) need(`views.${v}.yaw`, angle(o?.yaw) && (o.between == null || typeof o.between === "boolean"), "is the angle the view is seen from (0 to 180), for a character that turns by rotating, and between is true for a drawing only a turn passes through");
+    const angle = (y) => num(y) && y >= -180 && y <= 180;
+    need("yaw", angle(c.yaw), "is the angle its standing view is seen from, in degrees round its upright axis (its side 0, facing the viewer 90, its back -90)");
+    for (const [v, o] of Object.entries(views)) need(`views.${v}.yaw`, angle(o?.yaw) && (o.between == null || typeof o.between === "boolean"), "is the angle the view is seen from (-180 to 180), for a character that turns by rotating, and between is true for a drawing only a turn passes through");
     // its drawings risen onto a point of itself, which a rise passes through
     for (const [v, o] of Object.entries(views)) if (o?.pitch != null) need(`views.${v}.pitch`, num(o.pitch) && o.pitch > 0 && pair(o.pivot) && o.between === true, "is the angle it has risen to in that drawing (degrees, more than 0), with the pivot it stands on there ([u, v]) and between: true, for no pose takes it");
-    for (const w of ["spin"]) need(`personality: ${w}`, !c.personality?.intros?.includes(w) && !c.personality?.outros?.includes(w), "is not among its ways to arrive or leave: a spin would narrow it to its edge, and it turns by rotating, with drawings only round its front");
+    // it turns round on itself (a spin, a twirl) only with drawings all the way round
+    if (!allRound(c)) for (const w of ["spin", "twirl"]) need(`personality: ${w}`, !c.personality?.intros?.includes(w) && !c.personality?.outros?.includes(w), "is not among its ways to arrive or leave: it turns by rotating, and to turn round on itself it needs drawings all the way round (no two angles in a row, facing either way, more than ALL_ROUND degrees apart)");
   }
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.view != null && views[P.view]?.between) out.push(`"poses.${name}.view" is ${P.view}, a drawing only a turn passes through: a pose takes one of its views`);
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.hold != null) need(`poses.${name}.hold`, num(P.hold) && P.hold > 0, "is how long a quirk holds the pose while the moment stays quiet, in seconds");

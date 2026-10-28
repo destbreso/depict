@@ -24,9 +24,9 @@ const strokeOf = (s) => ({ part: s.part, n: s.n, w: q(s.w), c: s.c, l: { under: 
 const qm = (m) => m && m.map((v, i) => (i < 4 ? Math.round(v * 1e4) / 1e4 : q(v)));
 // (one affine for the whole face when its sides and its mouth have the same)
 const facesOf = (f) => {
-  const out = Object.fromEntries(Object.entries(f).map(([k, m]) => [k, qm(m)]));
+  const out = Object.fromEntries(Object.entries(f).map(([k, m]) => [k, k === "clip" ? m.map(q) : qm(m)]));
   const same = out.eye0 && JSON.stringify(out.eye0) === JSON.stringify(out.eye1) && JSON.stringify(out.eye0) === JSON.stringify(out.mouth);
-  return same ? out.eye0 : out;
+  return same && !out.clip ? out.eye0 : out;
 };
 const handsOf = (r) => ({
   gloves: Object.fromEntries(Object.entries(r.gloves).map(([k, g]) => [k, { lines: g.lines.map((l) => l.map(q)), fill: g.fill.map((l) => l.map(q)), fillWidth: q(g.fillWidth) }])),
@@ -186,13 +186,14 @@ export function lookOf(character) {
   };
 }
 
-/** The box it takes on its spot at rest, in its own frame (its feet at 0, up negative): its drawing (the shadow on the floor left out) and its hands where its rest pose puts them. */
+/** The box it takes on its spot at rest, in its own frame (its feet at 0, up negative): its standing drawing (the shadow on the floor left out) and its hands where its rest pose puts them. */
 function restBox(character, h) {
   const C = characterOf({ character });
   const r = rig(ink.pen(splitmix32(7), { width: W.icon }), h, ACCENT, { character });
   let [x0, y0, x1] = [Infinity, Infinity, -Infinity];
   const take = (x, y) => ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)));
-  for (const s of r.strokes) if (s.part !== "floor") for (let i = 0; i < s.pts.length; i += 2) take(s.pts[i], s.pts[i + 1]);
+  // (its standing drawing: its other views are taken in poses and turns, not at rest)
+  for (const s of r.strokes) if (s.part !== "floor" && s.part.charCodeAt(0) !== 64) for (let i = 0; i < s.pts.length; i += 2) take(s.pts[i], s.pts[i + 1]);
   const hand = C.arm === false ? 0 : C.hands([], {}).size * h * 1.3;
   for (const side of C.arm === false ? [] : ["front", "back"]) {
     const [u, v] = C.poses.rest[side].hand;
