@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { stump } from "./fixtures.mjs";
 import pencil from "../skills/depict/examples/friends/pencil.mjs";
 import { checkCharacter } from "../skills/depict/kit/characters/index.mjs";
-import { quirkAt, recast, SHY_TIME } from "../skills/depict/kit/act.mjs";
+import { keepShy, quirkAt, recast, shyHello, SHY_MIN, SHY_TIME } from "../skills/depict/kit/act.mjs";
 import { lookOf } from "../skills/depict/kit/look.mjs";
 import { normalize } from "../skills/depict/kit/model.mjs";
 import { compose } from "../skills/depict/kit/compose.mjs";
@@ -33,13 +33,28 @@ test("its first quiet moment is shy, and its quirks take turns after it", () => 
   assert.deepEqual([0, 1, 2].map((i) => quirkAt(i, ["sit", "curl"], null)), ["sit", "curl", "sit"], "as before, for one that is not shy");
 });
 
-test("once it has arrived it glances away before it presents the title", () => {
+test("once it has arrived it glances away before it presents the title, its glance its hello", () => {
   const A = build({ character: shyOne }).actors[0];
-  const [at, pose] = A.track.intro.shy;
+  const [at, pose, end] = A.track.intro.shy;
   assert.equal(pose, "glance");
   assert.ok(A.track.arms.some((k) => k[0] === at && k[1] === "glance"));
+  assert.ok(!A.track.arms.some((k) => k[1] === "wave" && k[0] <= end), "its shy glance is its hello: it does not wave as it arrives");
+  assert.ok(!A.track.arms.some((k) => k[0] > at && k[0] < end - 1e-9), "nothing cuts its shy moment short");
   const present = A.track.arms.find((k) => k[1] === "present");
-  assert.ok(present[0] >= at + SHY_TIME - 1e-9, "it presents once its shy moment is over");
+  assert.ok(present[0] >= end - 1e-9, "it presents once its shy moment is over");
+});
+
+test("its shy moment lasts until just before it sets off, never less than a moment, and what falls in it waits", () => {
+  const trip = (t0) => ({ t0, t1: t0 + 0.8, from: [0, 0], to: [500, 0] });
+  const k = { arms: [[1, "cheer"], [2.6, "wave"]] };
+  assert.deepEqual(shyHello(k, 1, 3.3, "glance", [trip(9)]), [2.6, 2.6 + SHY_TIME, 9 - 0.12]);
+  assert.deepEqual(k.arms, [[1, "cheer"], [2.6, "glance"]], "in place of its wave");
+  const soon = shyHello({ arms: [[2.6, "wave"]] }, 1, 3.3, "glance", [trip(3.6)]);
+  assert.ok(Math.abs(soon[1] - (3.6 - 0.12 - 0.05)) < 1e-9, "until just before it sets off");
+  assert.equal(shyHello({ arms: [[2.6, "wave"]] }, 1, 3.3, "glance", [trip(2.8)])[1], 2.6 + SHY_MIN);
+  const track = { arms: [[2.6, "glance"], [2.9, "rest"], [3.1, "point", 10, 20], [4, "present"]] };
+  keepShy(track, [2.6, 3.8, "glance"]);
+  assert.deepEqual(track.arms, [[2.6, "glance"], [4, "present"], [3.8, "point", 10, 20]]);
 });
 
 test("cast into a board, a shy look glances as it arrives there, and one that is not shy does not", () => {

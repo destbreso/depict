@@ -11,7 +11,7 @@
 import { hash32, splitmix32 } from "./rng.mjs";
 import { FEELINGS, feetBox, reachAbove, spotBox } from "./rig.mjs";
 import { overlaps, pad } from "./geom.mjs";
-import { INTROS, keepClear, quirk, quirkAt, shyOf, SHY_TIME } from "./act.mjs";
+import { INTROS, keepClear, keepShy, quirk, quirkAt, shyHello, shyOf, SHY_SOON } from "./act.mjs";
 
 /** The acts that aim at a thing: past something in the way they would seem to aim at that, so there it only looks. */
 const AIMED = new Set(["point", "present"]);
@@ -150,22 +150,21 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
 
   // it comes alive, the way the board's cast says (or its seed chose), and then waves hello
   let ready = INTROS[board.cast?.intro ?? "wave"](track, alive, start);
-  // a shy one, once it has arrived, takes its shy pose a moment before it presents (it glances away)
+  // a shy one's hello is its shy pose: where it would wave, it glances away a moment (until just before it sets off),
+  // and then presents
   const shyPose = shyOf(g.rig);
-  const shyAt = ready;
-  if (shyPose) {
-    track.arms.push([ready, shyPose]);
-    ready += SHY_TIME;
-  }
+  const shyMoment = shyPose ? shyHello(track, alive, ready, shyPose, track.moves) : null;
+  if (shyMoment) ready = shyMoment[1];
   // what it did and from where: a page that casts another character in its place has that one arrive its own way
   // (act.mjs, personalize), chosen among its own with the board's own seed
-  track.intro = { kind: board.cast?.intro ?? "wave", at: alive, from: { x: start.x, y: start.y, facing: start.facing }, seed: hash32(`${board.seed}:${board.title}:intro`), ...(shyPose ? { shy: [shyAt, shyPose] } : {}) };
+  track.intro = { kind: board.cast?.intro ?? "wave", at: alive, from: { x: start.x, y: start.y, facing: start.facing }, seed: hash32(`${board.seed}:${board.title}:intro`), ...(shyMoment ? { shy: [shyMoment[0], shyPose, shyMoment[1]] } : {}) };
   track.look.push([alive, null]);
   // the title: it presents it as it is written
   const title = span.get("title");
   if (title) {
     const tb = els.get("title").box;
-    track.arms.push([Math.max(title[0] + 0.4, ready), "present", tb.x + Math.min(tb.w * 0.25, 320), tb.y + tb.h * 0.5]);
+    // (a shy one that sets off as soon as its shy moment is over presents nothing on the way)
+    if (!shyMoment || shyMoment[2] - Math.max(title[0] + 0.4, ready) >= SHY_SOON) track.arms.push([Math.max(title[0] + 0.4, ready), "present", tb.x + Math.min(tb.w * 0.25, 320), tb.y + tb.h * 0.5]);
     track.intro.title = title[0] + 0.4;
     track.look.push([title[0], tb.x + tb.w * 0.4, tb.y + tb.h / 2]);
   }
@@ -453,6 +452,9 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
     track.arms.push([end + 2.6, "rest"]);
     track.feel.push([end + 2.6, "happy"]);
   }
+
+  // nothing cuts its shy moment short
+  if (shyMoment) keepShy(track, [shyMoment[0], shyMoment[1], shyPose]);
 
   // blinks, at its own uneven pace
   const rng = splitmix32((board.seed * 2654435761) >>> 0);
