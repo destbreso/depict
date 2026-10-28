@@ -76,6 +76,7 @@ export function normalize(input) {
   if (hats.length > 1) err(`the guide wears ${hats.join(" and ")}: one hat at a time`);
   if (wear.length > 3) err(`the guide wears ${wear.length} things: three at most, or it stops looking like itself`);
   if (cast.hold != null && !HOLD.includes(cast.hold)) err(`the guide holds "${cast.hold}": it can hold ${HOLD.join(", ")}`);
+  if (cast.hold != null && C.arm === false) err(`${who} has no arms to hold "${cast.hold}": it shows things with its eyes and its body`);
   const skins = C.skins ?? ["plain"];
   if (cast.skin != null && !skins.includes(cast.skin)) err(`${who}'s skin "${cast.skin}": use ${skins.join(", ")}`);
   const intros = C.personality?.intros ?? ["wave"];

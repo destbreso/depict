@@ -82,6 +82,7 @@ function actorOf(a, color) {
     h: a.h,
     // who it is, the body it has, and what it wears on this board: a look of the same body can be cast in its place
     character: rg.character,
+    ...(rg.armless ? { armless: true } : {}),
     contract: rg.contract,
     // the slot it was directed by: the shoulder and reach its gestures were worked out with
     slot: { front: rg.slot.shoulders.front.map(q), reach: rg.slot.reach },

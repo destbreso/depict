@@ -310,6 +310,8 @@
     const at = ([u, v]) => [u * A.h, (v - 0.99) * A.h];
     const arms = (name, wiggle = 0) => {
       const P = A.poses?.[name];
+      // a character with no arms does it with its body: it leans, bends, stretches and looks
+      if (A.armless) return applyBody(st, bodyOf(A, [0, name], st.x, st.y, st.facing, d), A.h);
       if (!P) return;
       for (const side of ["front", "back"]) {
         if (!P[side]) continue;
@@ -331,6 +333,7 @@
       st.lift = (st.lift || 0) + arc(d, k === "jump" ? 0.7 : 0.5, k === "jump" ? 120 : 70);
       st.feel = "excited";
       if (k === "jump") arms("cheer");
+      else if (A.armless) arms("wave");
       else {
         const w = Math.sin(2 * Math.PI * 2.4 * d);
         const P = A.poses.wave.front;
@@ -504,8 +507,8 @@
     }
     // what it holds goes where its back hand goes, upright
     X.heldG.setAttribute("transform", `translate(${st.back.hand[0]} ${st.back.hand[1]}) rotate(-6)`);
-    // the arms, bent anew to wherever the hands are, and the gloves on them
-    for (const side of ["back", "front"]) {
+    // the arms, bent anew to wherever the hands are, and the gloves on them (a character with no arms has none)
+    for (const side of A.armless ? [] : ["back", "front"]) {
       const arm = st[side];
       const n = side === "back" ? X.backArm : X.frontArm;
       const nf = side === "back" ? X.backArmFill : X.frontArmFill;

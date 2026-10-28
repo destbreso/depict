@@ -19,6 +19,76 @@ const lastAt = (keys, t) => {
 };
 
 /**
+ * What the body of a character with no arms does in each pose, the kit's own (a character may say its own, `body` on
+ * a pose): it shows a thing by bending toward it and looking at it (aim, in degrees), waves by rocking (sway: degrees
+ * and seconds a rock), cheers by stretching up and bobbing (pulse: a share of its height and seconds a bob), shrugs
+ * by sinking a little, thinks leaning back, and nods for a salute or a bow. Lean and bend are degrees toward where it
+ * faces, stretch a share of its height (less than 0 sinks), look the pupils' [x, y] (each -1 to 1).
+ */
+export const GESTURES = {
+  rest: {},
+  point: { aim: 9 },
+  present: { aim: 7, stretch: 0.03 },
+  wave: { sway: [7, 0.46] },
+  cheer: { stretch: 0.05, pulse: [0.035, 0.42] },
+  shrug: { stretch: -0.06, bend: -3 },
+  scratch: { lean: -4, bend: -5, look: [0.4, -1] },
+  salute: { lean: 7 },
+  tip: { lean: 12 },
+};
+
+/**
+ * What its body does for an arms key [t, pose, tx, ty] at time t (null when the pose says nothing of its body): how
+ * far it leans about its feet and bends its top (degrees toward where it faces), how much it stretches, and where it
+ * looks. Aimed at a thing, it bends toward it from its middle, stretching up to one above it and sinking to one below.
+ */
+export function bodyOf(actor, key, x, y, facing, t) {
+  const [t0, pose, tx, ty] = key;
+  const P = actor.poses?.[pose];
+  const B = P?.body ?? (actor.armless ? GESTURES[pose] ?? GESTURES.rest : null);
+  if (!B) return null;
+  const h = actor.h;
+  let lean = B.lean ?? 0;
+  let bend = B.bend ?? 0;
+  let stretch = B.stretch ?? 0;
+  let look = B.look ?? null;
+  if (B.aim && tx != null) {
+    const mid = (0.99 - (actor.motion?.middle ?? 0.5)) * h;
+    const dx = (tx - x) * facing;
+    const dy = ty - (y - mid);
+    const l = Math.hypot(dx, dy) || 1;
+    bend += B.aim * (dx / l);
+    lean += B.aim * 0.3 * (dx / l);
+    stretch -= 0.05 * (dy / l);
+  }
+  const d = Math.max(0, t - t0);
+  if (B.sway) lean += B.sway[0] * Math.sin((2 * Math.PI * d) / B.sway[1]);
+  if (B.pulse) stretch += B.pulse[0] * Math.abs(Math.sin((Math.PI * d) / B.pulse[1]));
+  return { lean, bend, stretch, look };
+}
+
+const mixBody = (a, b, u) => ({
+  lean: a.lean + (b.lean - a.lean) * u,
+  bend: a.bend + (b.bend - a.bend) * u,
+  stretch: a.stretch + (b.stretch - a.stretch) * u,
+  look: u < 0.5 ? a.look : b.look,
+});
+const STILL = { lean: 0, bend: 0, stretch: 0, look: null };
+
+/** A body's gesture laid onto a frame's state: it leans, bends its top toward where it faces, stretches, looks. */
+export function applyBody(st, b, h) {
+  if (!b) return st;
+  st.lean += b.lean;
+  if (b.bend) st.skew = (st.skew || 0) + b.bend * st.facing;
+  if (b.stretch) {
+    st.sy *= 1 + b.stretch;
+    st.sx *= 1 - 0.6 * b.stretch;
+  }
+  if (b.look) st.look = [b.look[0] * 0.018 * h, b.look[1] * 0.014 * h];
+  return st;
+}
+
+/**
  * The state of an actor at time t: { x, y, facing, lift, sx, sy, lean,
  * front, back, feel, look, blink, cap, shown }. Hands are { hand, bow, glove } in
  * the figure's own frame (x toward the way it faces, y down, origin between
@@ -139,6 +209,17 @@ export function actorAt(actor, t) {
       back = mixHand(p.back, a.back, b);
     }
   }
+  // its body's gesture: a character with no arms shows things with its whole body (and any pose may move a body too)
+  let body = null;
+  const bodied = (key) => key && actor.poses?.[key[1]]?.body;
+  if (actor.armless || bodied(cur) || bodied(prev)) {
+    const bodyAt = (key) => bodyOf(actor, key ?? [0, "rest"], x, y, facing, t) ?? STILL;
+    body = bodyAt(cur);
+    if (prev) {
+      const b = easeInOut(clamp01((t - cur[0]) / 0.24));
+      if (b < 1) body = mixBody(bodyAt(prev), body, b);
+    }
+  }
   // what it feels, and where it looks
   const feelKey = lastAt(tr.feel, t);
   const feel = feelKey ? feelKey[1] : "happy";
@@ -166,7 +247,10 @@ export function actorAt(actor, t) {
   // a fidget going on (its ears twitch, its tail wags), and how far into it: the parts that swing with it say how
   let fidget = null;
   for (const [f0, f1, name] of tr.fidgets ?? []) if (t >= f0 && t < f1) fidget = { name, e: envelope((t - f0) / (f1 - f0), 0.2) };
-  return { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, form, fidget, shown: t >= tr.appear[0] };
+  const st = { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, form, fidget, shown: t >= tr.appear[0] };
+  // a feeling that says where it looks (thinking) wins over where its body looks
+  if (body) applyBody(st, override ? { ...body, look: null } : body, h);
+  return st;
 }
 
 /** The point a share u of the way along a polyline, and which way it is heading there (left or right). */
@@ -189,6 +273,8 @@ function along(pts, u) {
 /** The hands for an arms key [t, pose, tx, ty]: the pose's own, or a hand aimed at the target (in board units). */
 function armsFor(actor, key, x, y, facing, t) {
   const [t0, pose, tx, ty] = key;
+  // a character with no arms has no hands to place: its body shows things (bodyOf)
+  if (actor.armless) return { front: { hand: [0, 0], bow: [0, 0], glove: "open" }, back: { hand: [0, 0], bow: [0, 0], glove: "open" } };
   const most = key[4] ?? Infinity; // how far the arm may reach before something in its way
   const P = actor.poses[pose] ?? actor.poses.rest;
   const at = ([u, v]) => [u * actor.h, (v - 0.99) * actor.h];
@@ -453,10 +539,10 @@ const lengthOf = (pts) => {
  * and color, each for a time in proportion to its length, as the timeline times a guide (timeline.mjs, drawGuide).
  * Sets t0 and t1 on each stroke and returns the arms' and gloves' spans.
  */
-export function drawOn(strokes, armsAt, h, t0, t1) {
+export function drawOn(strokes, armsAt, h, t0, t1, armless = false) {
   const items = [];
   for (const s of strokes) if (!WAITING.test(s.part)) items.push({ n: s.n, s, len: lengthOf(s.pts) * (s.l === 0 ? 1 : 0.3) });
-  ["armBack", "gloveBack", "armFront", "gloveFront"].forEach((name, i) => items.push({ n: armsAt + i, name, len: name.startsWith("arm") ? 0.42 * h : 0.5 * h }));
+  if (!armless) ["armBack", "gloveBack", "armFront", "gloveFront"].forEach((name, i) => items.push({ n: armsAt + i, name, len: name.startsWith("arm") ? 0.42 * h : 0.5 * h }));
   items.sort((a, b) => a.n - b.n);
   const total = items.reduce((a, x) => a + x.len, 0) || 1;
   const lift = 0.015;
@@ -494,7 +580,8 @@ function drawnIn(A) {
  */
 export function keepClear(A, elements) {
   const S = A.slot;
-  if (!S) return A;
+  // a character with no arms crosses nothing to show a thing: it looks at it and bends toward it where it stands
+  if (!S || A.armless) return A;
   const reach = (A.reach ?? 0.36) * A.h;
   if (S.front[0] === A.shoulders.front[0] && S.front[1] === A.shoulders.front[1] && Math.abs(S.reach * A.h - reach) < 0.5) return A;
   const h = A.h;
@@ -702,10 +789,11 @@ export function recast(A, look, palette, elements = [], dress = {}) {
   const wears = plain ? [] : fits.length ? fits : wearing(find(A.outfit));
   const worn = plain ? null : fits.length ? day.name : find(A.outfit) ? find(A.outfit).name : null;
   for (const w of wears) for (const s of look.wear[w]) strokes.push({ ...copy(s), n: next++ });
-  // what it holds is the board's: drawn in its hand's own frame, so the same in any hand, and drawn last
-  for (const s of A.strokes) if (s.part === "held" || s.part === "pointer") strokes.push({ ...s, n: next++ });
+  // what it holds is the board's: drawn in its hand's own frame, so the same in any hand, and drawn last (a character
+  // with no arms holds nothing)
+  if (!look.armless) for (const s of A.strokes) if (s.part === "held" || s.part === "pointer") strokes.push({ ...s, n: next++ });
   const [t0, t1] = drawnIn(A);
-  const reveal = drawOn(strokes, look.armsAt, A.h, t0, t1);
+  const reveal = drawOn(strokes, look.armsAt, A.h, t0, t1, look.armless);
   const hands = look.hands[wears.find((w) => look.hands[w]) ?? "plain"];
   // its own arrival, goodbye and quirks; and any pose it does not have (another's quirk) rests
   const played = personalize(A.track, look);
@@ -714,6 +802,9 @@ export function recast(A, look, palette, elements = [], dress = {}) {
   return keepClear({
     ...A,
     character: look.id,
+    // a character with no arms holds nothing, and one with arms cast where one without was has its arms again
+    armless: look.armless ? true : undefined,
+    ...(look.armless ? { hold: null } : {}),
     // what it wears on this board, and the outfit that is, if any
     dressed: { outfit: worn, wear: wears },
     eyes: look.eyes,

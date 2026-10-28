@@ -69,7 +69,7 @@ function drawGuide(r, t0, t1) {
   // the arms and gloves, at their place in the order: hose, glove, hose, glove
   const arm = 0.42 * r.h;
   const glove = 0.5 * r.h;
-  ["armBack", "gloveBack", "armFront", "gloveFront"].forEach((name, i) => items.push({ n: r.armsAt + i, name, len: name.startsWith("arm") ? arm : glove }));
+  if (!r.armless) ["armBack", "gloveBack", "armFront", "gloveFront"].forEach((name, i) => items.push({ n: r.armsAt + i, name, len: name.startsWith("arm") ? arm : glove }));
   items.sort((a, b) => a.n - b.n);
   const total = items.reduce((a, x) => a + x.len, 0) || 1;
   const lift = 0.015;

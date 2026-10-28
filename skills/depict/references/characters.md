@@ -80,6 +80,16 @@ What a character is (a cat, a cloud, a dog) often says how it moves beyond its a
 
 A character cast in a board's place does its own forms and fidgets in that board's quiet moments, as it does its own quirks; a board made for another guide needs no building again for it.
 
+## A character with no arms
+
+Some characters have no arms (a shoe, a ball, a drop of water), and they still present a board: they show things with their eyes and their whole body. Say `arm: false`, and leave out `hands` and the hand poses; never draw arms it does not have to give it something to point with. Each pose is then its body's (`poses.<name>.body`), the kit's own where the character says none (`GESTURES` in kit/act.mjs):
+
+- **It shows a thing** (`point`, `present`) by bending toward it from its middle and looking at it (`aim`, in degrees), stretching up a little to a thing above it and sinking to one below. A board needs nothing else: where another guide would point, it leans in and looks.
+- **It waves** by rocking (`sway: [degrees, seconds a rock]`), **cheers** by stretching up and bobbing (`pulse: [share of its height, seconds a bob]`), **shrugs** by sinking a little, **thinks** leaning back, and **nods** for a salute or a bow.
+- **A pose of its own** (a quirk, a tap's reaction) says `lean` and `bend` (degrees toward where it faces), `stretch` (a share of its height, less than 0 to sink) and `look` (where its pupils go, `[x, y]` from -1 to 1): a shy glance to the side is `{ body: { bend: -4, look: [-1, 0.2] } }`.
+
+It holds nothing (a board that gives it a pointer or a book is refused, and a look of it cast where another guide held one leaves the thing out), its tap reactions are its body's, and the hands of the slot it is drawn to are not measured. Any pose of a character with arms may also say a `body`, which moves the whole figure as its hands go.
+
 ## The module, field by field
 
 A character is a module whose default export holds these fields. `scripts/character.mjs` checks every one.
@@ -92,11 +102,11 @@ A character is a module whose default export holds these fields. `scripts/charac
 | `size` | Optional: its height beside the marker's (1). A wide character stands a little shorter, so the shots keep their size. |
 | `measures` | The paper it takes, in units of its height, from the point between its feet: `back` and `front` at rest (arms and hands included), and `reach`, to the tip of a pointing finger. The kit keeps that paper free for it beside each idea. |
 | `shoulders` | `{ front, back }` as `[u, v]`: where its arms come out of its body. |
-| `arm` | `{ width }` in units of the outline's nib; a limb with a color of its own adds `fill` (a color) and `fillWidth` (its arms are then an ink outline round that color). |
+| `arm` | `{ width }` in units of the outline's nib; a limb with a color of its own adds `fill` (a color) and `fillWidth` (its arms are then an ink outline round that color). `false` for a character with no arms (A character with no arms). |
 | `reach`, `tip` | How far its arm reaches from its shoulder, and how long its pointing finger is, in units of its height (the marker: 0.36 and 0.13; Stuart's short arms: 0.21 and 0.1). |
 | `capPivot` | `[u, v]`: what a hat tips about (the marker's cap rim; the top of Stuart's head). |
-| `poses` | Where its hands go, for its own body: `rest`, `present`, `wave`, `cheer`, `shrug`, `scratch`, `salute`, `tip` and `point`, each `{ front, back }` with `hand` and `bow` (the hose's curve) as `[u, v]` and a hand shape (`open`, `fist`, `point`); and any pose its quirks need (Stuart's `glasses`). |
-| `hands(wear, colors)` | Its hands for what it wears: `{ size, shapes: { open, fist, point }, cuffs, knuckle, fill }`, the shapes as outlines in units of the hand's size, `fill` a color or `"paper"` (white gloves). Stuart's become green mittens when he wears `mittens`. |
+| `poses` | For a character with no arms, what its body does in each (`body`: lean, bend, stretch, look, aim, sway, pulse), the kit's own where it says none. Otherwise, where its hands go, for its own body: `rest`, `present`, `wave`, `cheer`, `shrug`, `scratch`, `salute`, `tip` and `point`, each `{ front, back }` with `hand` and `bow` (the hose's curve) as `[u, v]` and a hand shape (`open`, `fist`, `point`); and any pose its quirks need (Stuart's `glasses`). |
+| `hands(wear, colors)` | Not for a character with no arms. Its hands for what it wears: `{ size, shapes: { open, fist, point }, cuffs, knuckle, fill }`, the shapes as outlines in units of the hand's size, `fill` a color or `"paper"` (white gloves). Stuart's become green mittens when he wears `mittens`. |
 | `draw(k)` | Its body, face, legs and shadow, drawn with the kit's pen in the order a hand would draw them; it returns `{ eyes }`, the centers of its eyes. `k` gives the pen (`p`), its height (`h`), `P(u, v)` (its frame to the board's), the outline's nib `W` and a `fine` one, `add(part, role, lines, width, color, layer, opacity)`, `shape`, `line`, `disc`, `curve`, `rrect`, `closed`, `ink`, the colors, and `arms()`, called at the point in the pen's order where its arms and hands are drawn. Parts the player moves: `body`, `cap` (tips), `eye0`/`eye1` (blink), `pupil0`/`pupil1` (look), `squint0`/`squint1`, `brows:<name>` and `mouth:<name>` for the feelings (`up`, `high`, `worried`, `quizzical`, `sad`; `smile`, `grin`, `wow`, `wavy`, `side`, `frown`), and `floor`. |
 | `anchors` | Where each shared costume goes on it, as a scale and a shift of the place it was made for on the marker: `hat`, `neck` (a bow tie, a scarf), `chest` (a star), `hair` (a bow), `ear` (a pencil): `{ s, du, dv }`. |
 | `wear`, `skins` | The shared costumes it can wear (`glasses` only if it has none of its own; a scarf only if it has a neck) and its skins (`plain` at least). |

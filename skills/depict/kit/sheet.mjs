@@ -16,6 +16,7 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
   const R = rig(pen, h, accent, { ...cast, hold });
   const actor = {
     h,
+    ...(R.armless ? { armless: true } : {}),
     eyes: R.eyes,
     shoulders: R.shoulders,
     poses: R.poses,
@@ -62,6 +63,7 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
     })
     .join("");
   const gloveSvg = (side, arm) => {
+    if (R.armless) return "";
     const kind = side === "front" && R.hold === "pointer" ? "fist" : arm.glove;
     const gl = R.gloves[kind];
     const ang = (Math.atan2(arm.hand[1] - arm.bow[1], arm.hand[0] - arm.bow[0]) * 180) / Math.PI;
@@ -69,6 +71,7 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
     return `<g transform="translate(${arm.hand[0]} ${arm.hand[1]}) rotate(${ang}) scale(1 ${side === "front" ? 1 : -1})">${gl.fill.map((f) => path(f, gl.fillWidth, fill)).join("")}${gl.lines.map((l) => path(l, R.gloveWidth, INKC)).join("")}</g>`;
   };
   const armSvg = (side) => {
+    if (R.armless) return "";
     const arm = st[side];
     const pts = hosePath(R.shoulders[side], arm.bow, arm.hand, R.arm.hose);
     return path(pts, R.arm.width, INKC) + (R.arm.fill ? path(pts, R.arm.fillWidth, R.arm.fill) : "");
@@ -83,11 +86,13 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
       : "";
   const held = R.hold && R.hold !== "pointer" ? `<g transform="translate(${st.back.hand[0]} ${st.back.hand[1]}) rotate(-6)">${group((p) => p === "held")}</g>` : "";
   const floor = R.strokes.filter((s) => s.part === "floor").map((s) => path(s.pts, s.w, s.c, s.o)).join("");
+  // its body's gesture, as the page leans and bends it (a character with no arms shows things this way)
+  const body = st.lean || st.skew ? `rotate(${(st.lean * st.facing).toFixed(2)}) skewX(${(-st.skew).toFixed(2)}) ` : "";
   // a whole-body form it has taken (sitting, curled up): that drawing alone, on its shadow
   if (form) return floor + `<g transform="scale(${st.facing * st.sx} ${st.sy})">${R.strokes.filter((s) => s.part === `form:${form}`).map((s) => path(s.pts, s.w, s.c, s.o)).join("")}</g>`;
   return (
     floor +
-    `<g transform="scale(${st.facing * st.sx} ${st.sy})">` +
+    `<g transform="${body}scale(${st.facing * st.sx} ${st.sy})">` +
     armSvg("back") +
     gloveSvg("back", st.back) +
     group((p) => Boolean(R.swing?.[p])) +

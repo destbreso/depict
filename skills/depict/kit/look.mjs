@@ -34,7 +34,9 @@ export function lookOf(character) {
   const pen = () => ink.pen(splitmix32(hash32(`look:${C.id}`)), { width: W.icon });
   const draw = (wear) => rig(pen(), h, ACCENT, { character, wear });
   const base = draw([]);
-  const plain = JSON.stringify(C.hands([], {}));
+  // a character with no arms has no hands to change with what it wears
+  const handsFor = (w) => (C.arm === false ? null : C.hands(w, {}));
+  const plain = JSON.stringify(handsFor([]));
   const wearable = [...DRESS.filter((w) => C.wear?.includes(w)), ...Object.keys(C.costumes ?? {})];
   const wear = {};
   const hands = { plain: handsOf(base) };
@@ -42,13 +44,14 @@ export function lookOf(character) {
     const r = draw([w]);
     // what dressing it adds comes after its body (rig.mjs draws the body, then dresses it)
     wear[w] = r.strokes.slice(base.strokes.length).map(strokeOf);
-    if (JSON.stringify(C.hands([w], {})) !== plain) hands[w] = handsOf(r);
+    if (JSON.stringify(handsFor([w])) !== plain) hands[w] = handsOf(r);
   }
   return {
     depict: "look",
     version: 1,
     id: C.id,
     name: C.name,
+    ...(C.arm === false ? { armless: true } : {}),
     about: C.about ?? "",
     ...(C.credit ? { credit: C.credit } : {}),
     contract: contractOf(C),
@@ -86,8 +89,8 @@ function restBox(character, h) {
   let [x0, y0, x1] = [Infinity, Infinity, -Infinity];
   const take = (x, y) => ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)));
   for (const s of r.strokes) if (s.part !== "floor") for (let i = 0; i < s.pts.length; i += 2) take(s.pts[i], s.pts[i + 1]);
-  const hand = C.hands([], {}).size * h * 1.3;
-  for (const side of ["front", "back"]) {
+  const hand = C.arm === false ? 0 : C.hands([], {}).size * h * 1.3;
+  for (const side of C.arm === false ? [] : ["front", "back"]) {
     const [u, v] = C.poses.rest[side].hand;
     take(u * h - hand, (v - 0.99) * h);
     take(u * h + hand, (v - 0.99) * h);
@@ -129,7 +132,7 @@ export function fitsContract(character) {
     if (top > limit + 0.02) out.push(`its ${w} reaches ${(top - limit).toFixed(2)} of its height higher than ${refTops[w] != null ? `${ref.name}'s` : `${ref.name}'s highest costume`}`);
   }
   const size = (c) => c.hands([], {}).size;
-  if (size(C) > size(ref) * 1.25) out.push(`its hands are ${Math.round((size(C) / size(ref) - 1) * 100)}% bigger than ${ref.name}'s`);
+  if (C.arm !== false && size(C) > size(ref) * 1.25) out.push(`its hands are ${Math.round((size(C) / size(ref) - 1) * 100)}% bigger than ${ref.name}'s`);
   return out;
 }
 

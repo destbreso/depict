@@ -108,8 +108,11 @@ function insideUV([u, v], poly) {
 }
 
 export function rig(p, h, accent, cast = {}) {
-  const { wear = [], hold = null, skin = "plain" } = cast;
+  const { wear = [], skin = "plain" } = cast;
   const C = characterOf(cast);
+  // a character with no arms (`arm: false`) shows things with its eyes and its body, and holds nothing
+  const armless = C.arm === false;
+  const hold = armless ? null : cast.hold ?? null;
   const P = (u, v) => [u * h, (v - 0.99) * h];
   const pts = (...uv) => uv.flatMap(([u, v]) => P(u, v));
   const W = h * 0.019; // the outline's nib
@@ -200,7 +203,7 @@ export function rig(p, h, accent, cast = {}) {
   dress(wear, hold, { ...kit, eyes, slot }, C);
 
   // its hands, in a frame of their own, in units of the board: white gloves, bare hands, mittens, as the character says
-  const hands = C.hands(wear, colors);
+  const hands = armless ? { size: 0, shapes: {}, fill: "paper" } : C.hands(wear, colors);
   const r = h * hands.size;
   // (across, along) in units of r becomes (x along the arm, y across toward the thumb)
   const G = (a, b) => [b * r, a * r];
@@ -217,7 +220,7 @@ export function rig(p, h, accent, cast = {}) {
     gloves[kind] = { lines, fill: fill.strokes, fillWidth: fill.width };
   }
   // the hose's own wobble: a fixed sideways jitter along it, so an arm drawn anew every frame keeps its hand
-  const hose = Array.from({ length: 19 }, () => p.off(Math.min(1.4, 0.3 * W)));
+  const hose = armless ? [] : Array.from({ length: 19 }, () => p.off(Math.min(1.4, 0.3 * W)));
   const [su, sv] = C.shoulders.front;
   const [bu, bv] = C.shoulders.back;
   // the slot the board keeps for it: the paper, the shoulders and the reach it is laid out and directed by (its own,
@@ -227,6 +230,7 @@ export function rig(p, h, accent, cast = {}) {
   return {
     h,
     character: C.id,
+    ...(armless ? { armless: true } : {}),
     // the body it has (any character of the same contract can be cast in its place), what it wears and the accent
     contract: contractOf(C),
     slot: kept,
@@ -239,7 +243,7 @@ export function rig(p, h, accent, cast = {}) {
     armsAt,
     eyes,
     shoulders: { front: P(su, sv), back: P(bu, bv) },
-    arm: { width: W * C.arm.width, hose, ...(C.arm.fill ? { fill: C.arm.fill, fillWidth: W * C.arm.fillWidth } : {}) },
+    arm: armless ? { width: 0, hose } : { width: W * C.arm.width, hose, ...(C.arm.fill ? { fill: C.arm.fill, fillWidth: W * C.arm.fillWidth } : {}) },
     gloves,
     gloveWidth: fine * 1.05,
     ...(hands.fill !== "paper" ? { gloveFill: hands.fill } : {}),

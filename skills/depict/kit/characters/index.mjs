@@ -16,8 +16,14 @@
 // (kit/look.mjs, scripts/look.mjs), with no board built again.
 import marker from "./marker.mjs";
 import stuart from "./stuart.mjs";
+import { GESTURES } from "../act.mjs";
 
 export const CHARACTERS = { marker, stuart };
+
+/** The poses every character has: its hands' for one with arms, its body's for one without (GESTURES). */
+const POSE_NAMES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
+/** What a pose's body may say (act.mjs, bodyOf): how the whole figure leans, bends, stretches and looks. */
+const BODY_KEYS = ["lean", "bend", "stretch", "look", "aim", "sway", "pulse"];
 
 /** What every character of a contract shares: its height, so the slot's height (`size`, beside the marker's). */
 export const SHARED = ["size"];
@@ -45,17 +51,27 @@ export function outfitsOf(C) {
 export const contractOf = (c) => c?.contract ?? c?.id;
 
 const resolved = new WeakMap();
-/** A character as the kit uses it: one drawn to another's slot stands as tall, and has the other's body and defaults where it says nothing of its own. */
+/** A character with no arms (`arm: false`): it shows things with its eyes and its whole body. */
+export const armlessOf = (c) => c?.arm === false;
+/**
+ * A character as the kit uses it: one drawn to another's slot stands as tall, and has the other's body and defaults
+ * where it says nothing of its own. One with no arms takes none of the other's hands or hand poses: its poses are its
+ * body's, the kit's own (GESTURES) where it says nothing of its own.
+ */
 export function resolve(c) {
-  if (!c || typeof c !== "object" || !c.contract || c.contract === c.id) return c;
+  if (!c || typeof c !== "object") return c;
+  const armless = armlessOf(c);
+  if (!armless && (!c.contract || c.contract === c.id)) return c;
   if (resolved.has(c)) return resolved.get(c);
-  const ref = CHARACTERS[c.contract];
-  if (!ref) return c;
-  const own = (k) => c[k] === undefined && ref[k] !== undefined;
-  const defaults = Object.fromEntries([...BODY, ...DEFAULTS].filter(own).map((k) => [k, ref[k]]));
-  const shared = Object.fromEntries(SHARED.filter((k) => ref[k] !== undefined).map((k) => [k, ref[k]]));
+  const ref = c.contract && c.contract !== c.id ? CHARACTERS[c.contract] : null;
+  if (!ref && !armless) return c;
+  const own = (k) => c[k] === undefined && ref?.[k] !== undefined;
+  const handed = (k) => !armless || (k !== "poses" && k !== "hands");
+  const defaults = Object.fromEntries([...BODY, ...DEFAULTS].filter((k) => own(k) && handed(k)).map((k) => [k, ref[k]]));
+  const shared = Object.fromEntries(SHARED.filter((k) => ref?.[k] !== undefined).map((k) => [k, ref[k]]));
   // poses it gives join the ones it takes: a friend adds its own (a quirk's) without saying again those it shares
-  const poses = c.poses && ref.poses ? { poses: { ...ref.poses, ...c.poses } } : {};
+  const body = Object.fromEntries(Object.entries(GESTURES).map(([k, g]) => [k, { body: g }]));
+  const poses = armless ? { poses: { ...body, ...c.poses } } : c.poses && ref.poses ? { poses: { ...ref.poses, ...c.poses } } : {};
   const out = { ...defaults, ...c, ...poses, ...shared };
   resolved.set(c, out);
   return out;
@@ -96,16 +112,32 @@ export function checkCharacter(raw) {
   need("name", typeof c.name === "string", "is how a sentence names it");
   need("measures", c.measures && ["back", "front", "reach"].every((k) => num(c.measures[k]) && c.measures[k] > 0 && c.measures[k] < 1.5), "gives back, front and reach, in units of its height");
   need("shoulders", c.shoulders && pair(c.shoulders.front) && pair(c.shoulders.back), "gives front and back as [u, v]");
-  need("arm", c.arm && num(c.arm.width) && (c.arm.fill == null || num(c.arm.fillWidth)), "gives its width (and fillWidth with a fill)");
+  const armless = armlessOf(c);
+  need("arm", armless || (c.arm && num(c.arm.width) && (c.arm.fill == null || num(c.arm.fillWidth))), "gives its width (and fillWidth with a fill), or is false for a character with no arms");
   need("capPivot", pair(c.capPivot), "is the [u, v] its hat tips about");
-  for (const pose of ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"]) {
+  for (const pose of POSE_NAMES) {
     const P = c.poses?.[pose];
-    need(`poses.${pose}`, P && ["front", "back"].every((s) => P[s] && pair(P[s].hand) && pair(P[s].bow) && ["open", "fist", "point"].includes(P[s].glove)), "gives each hand's hand, bow and glove");
+    if (armless) need(`poses.${pose}`, P && !P.front && !P.back, "is its body's, with no hands: a character with no arms leans, bends and looks (body)");
+    else need(`poses.${pose}`, P && ["front", "back"].every((s) => P[s] && pair(P[s].hand) && pair(P[s].bow) && ["open", "fist", "point"].includes(P[s].glove)), "gives each hand's hand, bow and glove");
+  }
+  // what a pose's body does: how the whole figure leans, bends, stretches and looks while the pose lasts
+  const pulse = (v) => Array.isArray(v) && v.length === 2 && v.every(num) && v[1] > 0;
+  for (const [name, P] of Object.entries(c.poses ?? {})) {
+    const B = P?.body;
+    if (B == null) continue;
+    const ok =
+      typeof B === "object" &&
+      Object.keys(B).every((k) => BODY_KEYS.includes(k)) &&
+      ["lean", "bend", "stretch", "aim"].every((k) => B[k] == null || num(B[k])) &&
+      (B.look == null || pair(B.look)) &&
+      (B.sway == null || pulse(B.sway)) &&
+      (B.pulse == null || pulse(B.pulse));
+    need(`poses.${name}.body`, ok, `says only ${BODY_KEYS.join(", ")}: lean, bend and aim in degrees, stretch a share of its height, look as [x, y], sway and pulse as [how much, seconds]`);
   }
   need("personality", c.personality && Array.isArray(c.personality.intros) && c.personality.intros.length && Array.isArray(c.personality.outros) && c.personality.outros.length, "lists its intros and outros");
   need("wear", Array.isArray(c.wear), "lists the shared costumes it can wear");
   need("skins", Array.isArray(c.skins) && c.skins.includes("plain"), "lists its skins, plain among them");
-  need("hands", typeof c.hands === "function", "returns its hands' shapes for what it wears");
+  need("hands", armless || typeof c.hands === "function", "returns its hands' shapes for what it wears");
   const wearable = [...(c.wear ?? []), ...Object.keys(c.costumes ?? {})];
   for (const o of c.outfits ?? []) need(`outfits.${o.name}`, o.name && Array.isArray(o.wear) && o.wear.every((w) => wearable.includes(w)), "is a name and things it can wear");
   need("draw", typeof c.draw === "function", "draws its body and face and returns its eyes");
@@ -113,7 +145,7 @@ export function checkCharacter(raw) {
     need(`swing.${part}`, /^[a-z][a-z0-9-]*$/.test(part) && s && pair(s.pivot) && (s.deg == null || num(s.deg)) && (s.period == null || (num(s.period) && s.period > 0)) && (s.sides == null || (num(s.sides) && s.sides >= 2)) && (s.while == null || s.while === "wag" || Boolean(c.fidgets?.[s.while])), "gives the [u, v] it turns about (pivot), and how far (deg), how fast (period), how often it changes sides (sides, seconds) and, for a part that moves only during a fidget, which (while)");
   for (const [name, f] of Object.entries(c.fidgets ?? {}))
     need(`fidgets.${name}`, /^[a-z][a-z0-9-]*$/.test(name) && name !== "wag" && f && (f.time == null || (num(f.time) && f.time > 0)) && (f.look == null || f.look === "around"), "gives how long it lasts (time) and whether it looks around (look: \"around\")");
-  need("forms", c.forms == null || (Array.isArray(c.forms) && c.forms.every((f) => /^[a-z][a-z0-9-]*$/.test(f) && !["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"].includes(f))), "lists the names of its whole-body forms (drawn as form:<name>), none a pose's name");
+  need("forms", c.forms == null || (Array.isArray(c.forms) && c.forms.every((f) => /^[a-z][a-z0-9-]*$/.test(f) && !POSE_NAMES.includes(f))), "lists the names of its whole-body forms (drawn as form:<name>), none a pose's name");
   for (const q of c.personality?.quirks ?? []) need(`personality.quirks.${q}`, Boolean(c.poses?.[q]) || (c.forms ?? []).includes(q) || Boolean(c.fidgets?.[q]), "is one of its poses, its forms or its fidgets");
   return out;
 }

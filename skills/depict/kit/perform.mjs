@@ -455,13 +455,14 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
   // arm would not make cleanly (it would cross something, or its shorter finger stop beside another thing) is a look
   if (g.rig.contract !== g.rig.character) {
     const elements = [...els.entries()].filter(([, e]) => e.box).map(([id, e]) => ({ kind: e.kind, t0: span.get(id)?.[0] ?? Infinity, box: [e.box.x, e.box.y, e.box.w, e.box.h] }));
-    const own = { h: g.h, hold: g.rig.hold, eyes: g.rig.eyes, shoulders: g.rig.shoulders, reach: g.rig.reach, poses: g.rig.poses, feelings: FEELINGS, motion: g.rig.motion, slot: { front: g.rig.slot.shoulders.front, reach: g.rig.slot.reach }, track };
+    const own = { h: g.h, armless: g.rig.armless, hold: g.rig.hold, eyes: g.rig.eyes, shoulders: g.rig.shoulders, reach: g.rig.reach, poses: g.rig.poses, feelings: FEELINGS, motion: g.rig.motion, slot: { front: g.rig.slot.shoulders.front, reach: g.rig.slot.reach }, track };
     track.arms = keepClear(own, elements).track.arms;
   }
   return {
     id: "guide",
     h: g.h,
     rig: g.rig,
+    ...(g.rig.armless ? { armless: true } : {}),
     hold: g.rig.hold,
     eyes: g.rig.eyes,
     shoulders: g.rig.shoulders,

@@ -52,7 +52,9 @@ const character = CHARACTERS[raw.id] === raw ? raw.id : raw;
 const own = Object.keys(C.costumes ?? {});
 const shared = (C.wear ?? []).filter((w) => w !== "glasses");
 const asked = opt("wear") ? opt("wear").split(",") : null;
-const holding = opt("hold");
+// a character with no arms holds nothing: its sheet and its tests show it as it is
+const armless = C.arm === false;
+const holding = armless ? null : opt("hold");
 
 // the sheet: every feeling, every pose, and its costumes (its own first)
 const cast = (wear = []) => ({ character, wear });
@@ -67,7 +69,10 @@ const dressed = [
   ...hats.slice(0, 4).map((w, i) => ({ label: w + (i === 1 ? " + book" : ""), wear: [w], hold: i === 1 ? "book" : null })),
   ...(shared.includes("bow-tie") ? [{ label: "bow-tie + pencil", wear: ["bow-tie"], hold: "pencil" }] : []),
   { label: "pointer", wear: [], hold: "pointer", pose: "point" },
-].slice(0, 9);
+]
+  .map((d) => (armless ? { ...d, hold: null, label: d.label.replace(/ \+ (book|pencil)$/, "") } : d))
+  .filter((d) => !(armless && d.label === "pointer"))
+  .slice(0, 9);
 const rows = [
   { title: "feelings", cells: feels.map((f) => ({ label: f, cast: cast(), feel: f })) },
   { title: "poses", cells: poses.map((p) => ({ label: p, cast: cast(), pose: p })) },
@@ -91,7 +96,7 @@ const intros = C.personality.intros;
 const outros = C.personality.outros;
 const props = HOLD.filter((x) => x !== "pointer");
 // as it is first, then in each of its outfits, then in a shared hat holding something, three in all
-const looks = [{ wear: asked ?? [], hold: holding }, ...outfits.map((o) => ({ wear: o.wear, hold: null })), { wear: hats.slice(0, 1), hold: "book" }, { wear: hats.slice(-1), hold: props[2] }].slice(0, 3);
+const looks = [{ wear: asked ?? [], hold: holding }, ...outfits.map((o) => ({ wear: o.wear, hold: null })), { wear: hats.slice(0, 1), hold: armless ? null : "book" }, { wear: hats.slice(-1), hold: armless ? null : props[2] }].slice(0, 3);
 const variants = looks.map((v, i) => ({ ...v, intro: intros[i % intros.length], outro: outros[i % outros.length] }));
 const icon = (id, name, label) => ({ id, icon: name, label, size: "large" });
 const test = (v, n) => ({
