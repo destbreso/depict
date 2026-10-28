@@ -506,6 +506,34 @@ export const shyOf = (C) => {
   const shy = C?.personality ? C.personality.shy : C?.shy;
   return shy && C.poses?.[shy] ? shy : null;
 };
+/** The shortest a shy moment is, when the board has it set off soon after it arrives, in seconds. */
+export const SHY_MIN = 0.6;
+/** How soon after its shy moment it may set off and still present the title first, in seconds. */
+export const SHY_SOON = 0.35;
+/**
+ * A shy character's hello is its shy pose: where its arrival (its keys in k from `from`) would wave hello, it glances
+ * away instead, for SHY_TIME or until just before it next sets off on one of `moves`, and never less than SHY_MIN.
+ * Writes the pose into k.arms and returns the moment, [start, end, when it next sets off]: it is ready to present once
+ * it is over, and presents nothing when it sets off at once.
+ */
+export function shyHello(k, from, ready, pose, moves) {
+  const wave = k.arms.filter((x) => x[0] >= from - 1e-9 && x[1] === "wave").at(-1);
+  const start = wave ? wave[0] : ready;
+  if (wave) k.arms.splice(k.arms.indexOf(wave), 1);
+  let next = Infinity;
+  for (const m of moves) if (m.t0 - 0.12 > start + 1e-9 && (m.from[0] !== m.to[0] || m.from[1] !== m.to[1])) next = Math.min(next, m.t0 - 0.12);
+  const end = Math.max(start + SHY_MIN, Math.min(start + SHY_TIME, next - 0.05));
+  k.arms.push([start, pose]);
+  return [start, end, next];
+}
+/** Nothing cuts a shy moment [s0, s1] short: the gesture of the moment in it waits until it is over, and the rest go. */
+export function keepShy(track, [s0, s1, pose]) {
+  const inside = track.arms.filter((x) => x[0] > s0 + 1e-9 && x[0] < s1 - 1e-9 && x[1] !== pose).sort((a, b) => a[0] - b[0]);
+  if (!inside.length) return;
+  track.arms = track.arms.filter((x) => !inside.includes(x));
+  if (!track.arms.some((x) => Math.abs(x[0] - s1) < 0.01)) track.arms.push([s1, ...inside.at(-1).slice(1)]);
+}
+
 /** The quirk of the i-th quiet moment: a shy character's shy pose first, then its quirks in turn. */
 export const quirkAt = (i, quirks, shy) => (shy && i === 0 ? shy : quirks.length ? quirks[(i - (shy ? 1 : 0)) % quirks.length] : null);
 
@@ -863,24 +891,32 @@ export function personalize(track, look) {
     if (kind !== arrive.kind || shy || arrive.shy) {
       const was = blank();
       let ready0 = INTROS[arrive.kind](was, arrive.at, arrive.from);
-      if (arrive.shy) {
+      if (arrive.shy?.length > 2) {
+        // its hello was its shy pose, in place of its wave
+        shyHello(was, arrive.at, ready0, arrive.shy[1], k.moves);
+        ready0 = arrive.shy[2];
+      } else if (arrive.shy) {
         was.arms.push([arrive.shy[0], arrive.shy[1]]);
         ready0 += SHY_TIME;
       }
       take(was);
       const now = blank();
       let ready1 = INTROS[kind](now, arrive.at, arrive.from);
+      let moment = null;
       if (shy) {
-        now.arms.push([ready1, shy]);
-        ready1 += SHY_TIME;
+        moment = shyHello(now, arrive.at, ready1, shy, k.moves);
+        ready1 = moment[1];
       }
       put(now);
       // it presents the title once it is ready, its own arrival done
       if (arrive.title != null) {
         const [a, b] = [Math.max(arrive.title, ready0), Math.max(arrive.title, ready1)];
         for (const key of k.arms) if (key[1] === "present" && Math.abs(key[0] - a) < 1e-9) key[0] = b;
+        // a shy one that sets off as soon as its shy moment is over presents nothing on the way
+        if (moment && moment[2] - b < SHY_SOON) k.arms = k.arms.filter((key) => !(key[1] === "present" && Math.abs(key[0] - b) < 1e-9));
       }
-      k.intro = { ...arrive, kind, shy: shy ? [ready1 - SHY_TIME, shy] : undefined };
+      k.intro = { ...arrive, kind, shy: shy ? [moment[0], shy, moment[1]] : undefined };
+      if (moment) keepShy(k, [moment[0], moment[1], shy]);
     }
   }
   const leave = track.outro;
