@@ -11,12 +11,13 @@ const PAPERC = "#fbfaf7";
 const INKC = "#1b1b19";
 
 /** The guide `cast` names, in one pose and one feeling, as SVG in its own frame (its feet at the origin), `h` tall. */
-export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null, form = null } = {}) {
+export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null, form = null, view } = {}) {
   const pen = ink.pen(splitmix32((seed * 7919 + 13) >>> 0), { width: 4 });
   const R = rig(pen, h, accent, { ...cast, hold });
   const actor = {
     h,
     ...(R.armless ? { armless: true } : {}),
+    ...(R.views ? { views: R.views } : {}),
     eyes: R.eyes,
     shoulders: R.shoulders,
     poses: R.poses,
@@ -28,6 +29,10 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
   };
   const st = actorAt(actor, 1);
   const F = FEELINGS[feel] ?? FEELINGS.happy;
+  // the view it is drawn in: the one asked for, or its pose's (null: standing); a view's parts are named @<view>:<part>
+  const V = view !== undefined ? view : st.view ?? null;
+  const own = (part) => (V ? part.startsWith(`@${V}:`) : part.charCodeAt(0) !== 64);
+  const bare = (part) => (V && part.startsWith(`@${V}:`) ? part.slice(V.length + 2) : part);
   const d = (pts) => {
     let out = `M${pts[0].toFixed(1)} ${pts[1].toFixed(1)}`;
     for (let i = 2; i < pts.length; i += 2) out += `L${pts[i].toFixed(1)} ${pts[i + 1].toFixed(1)}`;
@@ -46,16 +51,18 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
   };
   const layer = (strokes, under) => strokes.filter((s) => (s.l === "under") === under && s.l !== "shadow").map((s) => path(s.pts, s.w, s.c, s.o)).join("");
   const parts = (pred) => R.strokes.filter((s) => pred(s.part) && shown(s.part));
+  // its body and face in the view it is drawn in
+  const seen = (pred) => R.strokes.filter((s) => own(s.part) && pred(bare(s.part)) && shown(bare(s.part)));
   const facePart = (p) => /^(eye|pupil|squint|brows:|mouth:)/.test(p);
   const eyeT = (i) => {
-    const [cx, cy] = R.eyes[i] ?? [0, 0];
+    const [cx, cy] = (V ? R.views[V].eyes : R.eyes)[i] ?? [0, 0];
     const wide = F.eyes === "wide" ? 1.12 : 1;
     return `translate(${cx} ${cy}) scale(${wide}) translate(${-cx} ${-cy})`;
   };
   const face = R.strokes
-    .filter((s) => facePart(s.part) && shown(s.part))
+    .filter((s) => own(s.part) && facePart(bare(s.part)) && shown(bare(s.part)))
     .map((s) => {
-      const m = /^(eye|pupil)(\d)$/.exec(s.part);
+      const m = /^(eye|pupil)(\d)$/.exec(bare(s.part));
       const p = path(s.pts, s.w, s.c, s.o);
       if (!m) return p;
       const inner = m[1] === "pupil" ? `<g transform="translate(${st.look[0]} ${st.look[1]})">${p}</g>` : p;
@@ -86,6 +93,11 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
       : "";
   const held = R.hold && R.hold !== "pointer" ? `<g transform="translate(${st.back.hand[0]} ${st.back.hand[1]}) rotate(-6)">${group((p) => p === "held")}</g>` : "";
   const floor = R.strokes.filter((s) => s.part === "floor").map((s) => path(s.pts, s.w, s.c, s.o)).join("");
+  // in another view its costumes move where its head and body are
+  const moved = (k, svg) => {
+    const o = V ? R.views[V][k] : null;
+    return o && (o[0] || o[1]) && svg ? `<g transform="translate(${o[0].toFixed(1)} ${o[1].toFixed(1)})">${svg}</g>` : svg;
+  };
   // its body's gesture, as the page leans and bends it (a character with no arms shows things this way)
   const body = st.lean || st.skew ? `rotate(${(st.lean * st.facing).toFixed(2)}) skewX(${(-st.skew).toFixed(2)}) ` : "";
   // a whole-body form it has taken (sitting, curled up): that drawing alone, on its shadow
@@ -95,11 +107,12 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
     `<g transform="${body}scale(${st.facing * st.sx} ${st.sy})">` +
     armSvg("back") +
     gloveSvg("back", st.back) +
-    group((p) => Boolean(R.swing?.[p])) +
-    group((p) => p === "body") +
-    group((p) => p === "cap" || p === "hat") +
+    (V ? "" : group((p) => Boolean(R.swing?.[p]))) +
+    layer(seen((p) => p === "body"), true) +
+    layer(seen((p) => p === "body"), false) +
+    moved("hat", group((p) => p === "cap" || p === "hat")) +
     face +
-    group((p) => p === "wear") +
+    moved("wear", group((p) => p === "wear")) +
     armSvg("front") +
     pointer +
     gloveSvg("front", st.front) +
@@ -124,7 +137,7 @@ export function sheet(rows, { h = 260, cell = 360, title = "" } = {}) {
     r.cells.forEach((c, i) => {
       const cx = pad + i * cell + cell / 2;
       const feet = y + 40 + rowH - 40;
-      out += `<g transform="translate(${cx} ${feet})">${figure(c.cast, { pose: c.pose, feel: c.feel, hold: c.hold, h, look: c.look, form: c.form })}</g>`;
+      out += `<g transform="translate(${cx} ${feet})">${figure(c.cast, { pose: c.pose, feel: c.feel, hold: c.hold, h, look: c.look, form: c.form, view: c.view })}</g>`;
       out += `<text x="${cx}" y="${feet + 44}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="19" fill="${INKC}">${esc(c.label)}</text>`;
     });
     y += rowH + 60;

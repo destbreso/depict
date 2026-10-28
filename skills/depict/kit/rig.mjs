@@ -55,9 +55,12 @@ export const reachAbove = (cast = {}) => {
 };
 /** How far above the top of its head a costume reaches on a character, in units of its height. */
 export const topOf = (C, w) => {
-  if (C.costumes?.[w]) return C.costumes[w].top ?? 0;
+  // in a view that moves its costumes (facing the viewer, its head higher), as high as it reaches in any of them
+  const hat = C.costumes?.[w] ? Boolean(C.costumes[w].hat) : SLOT[w] === "hat";
+  const moved = Object.values(C.views ?? {}).map((o) => (hat ? o.hat : o.wear)?.[1] ?? 0);
+  if (C.costumes?.[w]) return (C.costumes[w].top ?? 0) - Math.min(0, ...moved);
   const a = C.anchors?.[SLOT[w]];
-  return HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w];
+  return (HAT_TOP[w] == null ? 0 : a ? HAT_TOP[w] * a.s - a.dv : HAT_TOP[w]) - (HAT_TOP[w] == null ? 0 : Math.min(0, ...moved));
 };
 /** Where each shared costume goes on a character: its hats on its head, a bow tie or a scarf at its neck, a star on its chest, a bow in its hair, a pencil behind its ear. */
 const SLOT = { "grad-cap": "hat", "hard-hat": "hat", headphones: "hat", "party-hat": "hat", crown: "hat", beanie: "hat", "chef-hat": "hat", glasses: "eyes", "bow-tie": "neck", scarf: "neck", star: "chest", "hair-bow": "hair", "pencil-ear": "ear" };
@@ -120,9 +123,11 @@ export function rig(p, h, accent, cast = {}) {
   const strokes = [];
   let order = 0;
   let armsAt = 0;
+  // the view being drawn: what is drawn inside k.view(name, ...) is that view's, its parts named @<name>:<part>
+  let prefix = "";
   /** A stroke of a component, in the order the pen draws it when the guide first appears. */
   const add = (part, role, lines, width, color = INK, layer = "ink", opacity = 1) => {
-    for (const pts_ of lines) strokes.push({ part, role, pts: pts_, w: width, c: color, l: layer, o: opacity, n: order++ });
+    for (const pts_ of lines) strokes.push({ part: prefix + part, role, pts: pts_, w: width, c: color, l: layer, o: opacity, n: order++ });
   };
   const curve = (a, c, b, n = 14) => {
     const out = [];
@@ -196,7 +201,16 @@ export function rig(p, h, accent, cast = {}) {
     return !a ? P : (u, v) => P(u * a.s + a.du, v * a.s + a.dv);
   };
   const colors = { PAPER, INK, GREY, DARK, STEEL, YELLOW, SAND, PINK, BLUE, GREEN, SKIN_TINTS };
-  const kit = { p, h, accent, skin, wear, P, pts, W, fine, add, curve, rrect, closed, shape, line, disc, slot, ink, smooth, colors, arms: () => ((armsAt = order), (order += 4)) };
+  /** Another view of it (facing the viewer, at rest on its side): its body and face drawn in `draw`, which returns { eyes }. */
+  const seen = {};
+  const view = (name, draw) => {
+    prefix = `@${name}:`;
+    const out = draw() ?? {};
+    prefix = "";
+    seen[name] = out.eyes ?? [];
+    return out;
+  };
+  const kit = { p, h, accent, skin, wear, P, pts, W, fine, add, curve, rrect, closed, shape, line, disc, slot, ink, smooth, colors, view, arms: () => ((armsAt = order), (order += 4)) };
 
   // its body, face, legs and shadow, as the character draws them
   const { eyes } = C.draw(kit);
@@ -261,6 +275,8 @@ export function rig(p, h, accent, cast = {}) {
     ...(C.swing ? { swing: Object.fromEntries(Object.entries(C.swing).map(([part, s]) => [part, { at: P(...s.pivot), deg: s.deg ?? 10, period: s.period ?? 1.6, ...(s.sides ? { sides: s.sides } : {}), ...(s.while ? { while: s.while } : {}) }])) } : {}),
     // the whole-body forms it can take in place of standing (a cat sits, curls up into a ball), drawn as form:<name>
     ...(C.forms?.length ? { forms: [...C.forms] } : {}),
+    // its other views (facing the viewer, at rest as it stands): their eyes, where costumes move to on each, its middle
+    ...(C.views ? { views: Object.fromEntries(Object.entries(C.views).map(([v, o]) => [v, { eyes: seen[v] ?? [], hat: [(o.hat?.[0] ?? 0) * h, (o.hat?.[1] ?? 0) * h], wear: [(o.wear?.[0] ?? 0) * h, (o.wear?.[1] ?? 0) * h], ...(o.middle != null ? { middle: o.middle } : {}) }])) } : {}),
     // the fidgets of its own it does in a quiet moment (its ears twitch while it looks around)
     ...(C.fidgets ? { fidgets: C.fidgets } : {}),
   };

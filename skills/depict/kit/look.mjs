@@ -63,6 +63,7 @@ export function lookOf(character) {
     // the parts that move on their own (a tail), its whole-body forms and its fidgets
     ...(base.swing ? { swing: Object.fromEntries(Object.entries(base.swing).map(([k, s]) => [k, { ...s, at: s.at.map(q) }])) } : {}),
     ...(base.forms ? { forms: base.forms } : {}),
+    ...(base.views ? { views: Object.fromEntries(Object.entries(base.views).map(([k, v]) => [k, { ...v, eyes: v.eyes.map((e) => e.map(q)), hat: v.hat.map(q), wear: v.wear.map(q) }])) } : {}),
     ...(base.fidgets ? { fidgets: base.fidgets } : {}),
     reach: C.reach ?? 0.36,
     capPivot: base.capPivot.map(q),

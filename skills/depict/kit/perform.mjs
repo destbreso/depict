@@ -463,6 +463,7 @@ export function perform(board, comp, tl, appear, { provisional = false } = {}) {
     h: g.h,
     rig: g.rig,
     ...(g.rig.armless ? { armless: true } : {}),
+    ...(g.rig.views ? { views: g.rig.views } : {}),
     hold: g.rig.hold,
     eyes: g.rig.eyes,
     shoulders: g.rig.shoulders,

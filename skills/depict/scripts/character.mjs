@@ -79,6 +79,8 @@ const rows = [
   { title: "costumes", cells: dressed.map((d) => ({ label: d.label, cast: cast(d.wear), pose: d.pose, feel: d.feel, hold: d.hold })) },
   // its whole-body forms (a cat sits, curls up), and how its fidgets look (its ears, where they twitch from)
   ...(C.forms?.length ? [{ title: "forms", cells: C.forms.map((f) => ({ label: f, cast: cast(), form: f })) }] : []),
+  // its views: standing, and each other one (facing the viewer, at rest as it stands), happy and surprised
+  ...(C.views ? [{ title: "views", cells: [null, ...Object.keys(C.views)].flatMap((v) => ["happy", "surprised"].map((feel) => ({ label: `${v ?? "standing"}, ${feel}`, cast: cast(), view: v, feel }))) }] : []),
 ];
 const svgFile = path.join(out, `${C.id}-sheet.svg`);
 const named = C.name.charAt(0).toUpperCase() + C.name.slice(1);

@@ -199,6 +199,14 @@
     const swings = new Map(Object.keys(A.swing || {}).map((part) => [part, node("g", {}, swingG)]));
     const bodyUnder = node("g", {}, root);
     const bodyInk = node("g", {}, root);
+    // its other views (facing the viewer, at rest as it stands): each its own body and face, shown in place of the
+    // standing one while a pose is taken in it
+    const viewG = {};
+    for (const v of Object.keys(A.views || {})) {
+      const g = node("g", {}, root);
+      viewG[v] = { g, under: node("g", {}, g), ink: node("g", {}, g), face: node("g", {}, g) };
+      g.style.display = "none";
+    }
     // the cap, with whatever hat is on it: one group, so it can be lifted and tipped
     const capG = node("g", {}, root);
     const [capUnder, capInk, hatUnder, hatInk] = [0, 1, 2, 3].map(() => node("g", {}, capG));
@@ -220,6 +228,17 @@
     const groupFor = (part) => {
       if (groups.has(part)) return groups.get(part);
       let g;
+      const vm = A.views && /^@([a-z][a-z0-9-]*):(.+)$/.exec(part);
+      if (vm && viewG[vm[1]]) {
+        // a part of another view: its eyes grouped as the standing face's are, the rest in its face
+        const V = viewG[vm[1]];
+        const e = /^(eye|pupil)(\d)$/.exec(vm[2]);
+        const ek = `@${vm[1]}:eyes${e ? e[2] : ""}`;
+        if (e && !groups.has(ek)) groups.set(ek, node("g", {}, V.face));
+        g = node("g", {}, e ? groups.get(ek) : V.face);
+        groups.set(part, g);
+        return g;
+      }
       const m = /^(eye|pupil|squint)(\d)$/.exec(part);
       if (m && m[1] !== "squint") {
         if (!groups.has(`eyes${m[2]}`)) groups.set(`eyes${m[2]}`, node("g", {}, face));
@@ -232,7 +251,8 @@
       return g;
     };
     const strokes = A.strokes.map((st) => {
-      const parent = layered[st.part] ? layered[st.part][st.l === 1 ? 0 : 1] : groupFor(st.part);
+      const vb = A.views && /^@([a-z][a-z0-9-]*):body$/.exec(st.part);
+      const parent = vb && viewG[vb[1]] ? viewG[vb[1]][st.l === 1 ? "under" : "ink"] : layered[st.part] ? layered[st.part][st.l === 1 ? 0 : 1] : groupFor(st.part);
       const n = node("path", { stroke: S.palette[st.c], "stroke-width": st.w }, parent);
       if (st.o < 1) n.setAttribute("stroke-opacity", st.o);
       n.style.display = "none";
@@ -252,7 +272,7 @@
     };
     // what stands: everything but its forms (hidden while it has taken one)
     const standing = [backArm, backArmFill, backGloveG, swingG, bodyUnder, bodyInk, capG, face, wearG, frontArm, frontArmFill, pointerG, frontGloveG, heldG].filter(Boolean);
-    return { A, floor, root, backArm, frontArm, backArmFill, frontArmFill, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups, swings, standing, formsG };
+    return { A, floor, root, backArm, frontArm, backArmFill, frontArmFill, backGloveG, frontGloveG, capG, heldG, pointerG, gloves: { back: gloveSet(backGloveG), front: gloveSet(frontGloveG) }, strokes, groups, swings, standing, formsG, viewG, main: [swingG, bodyUnder, bodyInk, face], wearG };
   }
   const actors = (S.actors || []).map(makeActor);
   const ownGuide = S.actors && S.actors[0];
@@ -443,6 +463,13 @@
       for (const n of X.standing) n.style.display = form ? "none" : "";
       X.__form = form;
     }
+    // the view it is seen in: its standing body and face, or another view's in their place
+    const view = A.views && !form && st.view && X.viewG[st.view] ? st.view : null;
+    if (A.views && X.__view !== `${form}|${view}`) {
+      for (const n of X.main) n.style.display = form || view ? "none" : "";
+      for (const v in X.viewG) X.viewG[v].g.style.display = v === view ? "" : "none";
+      X.__view = `${form}|${view}`;
+    }
     // the parts that move on their own: a tail sways all the time, and now and then swings over to its other side,
     // passing behind the body; a part that moves only in a fidget (ears that twitch) is still until one comes; any of
     // them swings harder while it wags (a cat's hello and goodbye)
@@ -480,30 +507,45 @@
         }
         continue;
       }
-      const m = /^(brows|mouth):(\w+)$/.exec(part);
+      // a part of another view is shown for the feeling as the standing face's is
+      const bare = part.charCodeAt(0) === 64 ? part.slice(part.indexOf(":") + 1) : part;
+      const m = /^(brows|mouth):(\w+)$/.exec(bare);
       let on = null;
       if (m) on = (m[1] === "brows" ? F.brows : F.mouth) === m[2];
-      else if (/^squint\d$/.test(part)) on = F.eyes === "squint" || (F.eyes === "wink" && part === "squint1");
-      else if (/^eyes\d$/.test(part)) on = !(F.eyes === "squint" || (F.eyes === "wink" && part === "eyes1"));
+      else if (/^squint\d$/.test(bare)) on = F.eyes === "squint" || (F.eyes === "wink" && bare === "squint1");
+      else if (/^eyes\d$/.test(bare)) on = !(F.eyes === "squint" || (F.eyes === "wink" && bare === "eyes1"));
       if (on != null && g.__on !== on) {
         g.style.display = on ? "" : "none";
         g.__on = on;
       }
     }
-    A.eyes.forEach(([cx, cy], i) => {
-      const g = X.groups.get(`eyes${i}`);
-      const wide = F.eyes === "wide" ? 1.12 : 1;
-      if (g) g.setAttribute("transform", `translate(${cx} ${cy}) scale(${wide} ${wide * (1 - 0.92 * st.blink)}) translate(${-cx} ${-cy})`);
-      const pg = X.groups.get(`pupil${i}`);
-      if (pg) pg.setAttribute("transform", `translate(${st.look[0]} ${st.look[1]})`);
-    });
+    const eyesOf = (list, key) =>
+      list.forEach(([cx, cy], i) => {
+        const g = X.groups.get(`${key}eyes${i}`);
+        const wide = F.eyes === "wide" ? 1.12 : 1;
+        if (g) g.setAttribute("transform", `translate(${cx} ${cy}) scale(${wide} ${wide * (1 - 0.92 * st.blink)}) translate(${-cx} ${-cy})`);
+        const pg = X.groups.get(`${key}pupil${i}`);
+        if (pg) pg.setAttribute("transform", `translate(${st.look[0]} ${st.look[1]})`);
+      });
+    eyesOf(A.eyes, "");
+    // each view's eyes blink and look as the standing ones do
+    for (const v in A.views || {}) eyesOf(A.views[v].eyes, `@${v}:`);
     // the cap, lifted and tipped about the middle of its rim
     const cap = st.cap || { lift: 0, angle: 0 };
     const cp = A.capPivot || [0, 0];
-    const capT = cap.lift || cap.angle ? `translate(0 ${-cap.lift * A.h}) rotate(${cap.angle} ${cp[0]} ${cp[1]})` : "";
+    // in another view its costumes move where its head and body are in that view
+    const vo = view ? A.views[view] : null;
+    const capT = (vo && (vo.hat[0] || vo.hat[1]) ? `translate(${vo.hat[0]} ${vo.hat[1]}) ` : "") + (cap.lift || cap.angle ? `translate(0 ${-cap.lift * A.h}) rotate(${cap.angle} ${cp[0]} ${cp[1]})` : "");
     if (X.capG.__t !== capT) {
       X.capG.setAttribute("transform", capT);
       X.capG.__t = capT;
+    }
+    if (A.views) {
+      const wt = vo && (vo.wear[0] || vo.wear[1]) ? `translate(${vo.wear[0]} ${vo.wear[1]})` : "";
+      if (X.wearG.__t !== wt) {
+        X.wearG.setAttribute("transform", wt);
+        X.wearG.__t = wt;
+      }
     }
     // what it holds goes where its back hand goes, upright
     X.heldG.setAttribute("transform", `translate(${st.back.hand[0]} ${st.back.hand[1]}) rotate(-6)`);

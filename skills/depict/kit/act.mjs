@@ -53,7 +53,7 @@ export function bodyOf(actor, key, x, y, facing, t) {
   let stretch = B.stretch ?? 0;
   let look = B.look ?? null;
   if (B.aim && tx != null) {
-    const mid = (0.99 - (actor.motion?.middle ?? 0.5)) * h;
+    const mid = (0.99 - (actor.views?.[P?.view]?.middle ?? actor.motion?.middle ?? 0.5)) * h;
     const dx = (tx - x) * facing;
     const dy = ty - (y - mid);
     const l = Math.hypot(dx, dy) || 1;
@@ -209,6 +209,20 @@ export function actorAt(actor, t) {
       back = mixHand(p.back, a.back, b);
     }
   }
+  // the view it is seen in: the one its pose is taken in (facing the viewer, at rest as it stands), held as long as the
+  // pose lasts; between two views it turns, narrowing to its edge and back, the drawing changing at its edge
+  let view = null;
+  if (actor.views) {
+    const viewOf = (key) => (key && actor.poses?.[key[1]]?.view) || null;
+    view = viewOf(cur);
+    const was = viewOf(prev);
+    const d = cur ? t - cur[0] : Infinity;
+    if (prev && was !== view && d < VIEW_TURN) {
+      const u = d / VIEW_TURN;
+      turnScale *= Math.max(0.06, Math.abs(Math.cos(Math.PI * u)));
+      if (u < 0.5) view = was;
+    }
+  }
   // its body's gesture: a character with no arms shows things with its whole body (and any pose may move a body too)
   let body = null;
   const bodied = (key) => key && actor.poses?.[key[1]]?.body;
@@ -248,6 +262,7 @@ export function actorAt(actor, t) {
   let fidget = null;
   for (const [f0, f1, name] of tr.fidgets ?? []) if (t >= f0 && t < f1) fidget = { name, e: envelope((t - f0) / (f1 - f0), 0.2) };
   const st = { x, y, facing, lift, air, sx: sx * turnScale, sy, lean, skew, front, back, feel, look, blink, cap, form, fidget, shown: t >= tr.appear[0] };
+  if (view) st.view = view;
   // a feeling that says where it looks (thinking) wins over where its body looks
   if (body) applyBody(st, override ? { ...body, look: null } : body, h);
   return st;
@@ -352,6 +367,9 @@ export function hosePath(sh, bow, hand, wobble) {
 
 /** How high it goes in the intros that leave the ground: the opening shot makes room for it. */
 export const INTRO_HEIGHT = { hop: 95, spin: 125, jump: 175, bounce: 110 };
+
+/** How long it takes to turn from one view of it to another (facing the viewer, at rest on its side), in seconds. */
+export const VIEW_TURN = 0.32;
 
 /** How long a form taken in a quiet moment is held at most, in seconds (a cat sits a while, then gets up). */
 export const FORM_TIME = 2.8;
@@ -526,7 +544,7 @@ export const OUTROS = {
 /** The poses every character has; any other is a quirk's (Stuart's glasses), and a character without that quirk rests instead. */
 const OWN_POSES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
 /** The brows, mouths and closed eyes of the other feelings: ready when the guide is drawn, hidden until needed. */
-const WAITING = /^brows:(?!up$)|^mouth:(?!smile$)|^squint|^form:/;
+const WAITING = /^brows:(?!up$)|^mouth:(?!smile$)|^squint|^form:|^@/;
 const lengthOf = (pts) => {
   let l = 0;
   for (let i = 2; i < pts.length; i += 2) l += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
@@ -814,6 +832,7 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     swing: look.swing,
     forms: look.forms,
     fidgets: look.fidgets,
+    views: look.views,
     // what it does when it is tapped comes from its own quirks and ways to arrive
     quirks: look.quirks,
     intros: look.intros,

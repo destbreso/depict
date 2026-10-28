@@ -80,6 +80,10 @@ What a character is (a cat, a cloud, a dog) often says how it moves beyond its a
 
 A character cast in a board's place does its own forms and fidgets in that board's quiet moments, as it does its own quirks; a board made for another guide needs no building again for it.
 
+## Another view of it
+
+A character is drawn standing one way, its main view; it may have others it is seen in for as long as it needs, not only for a moment as a form: a shoe at rest on its sole, seen from the side, that faces the viewer to say hello; a car seen from the side that turns to the front to cheer. Name each other view in `views` (`{ front: { hat: [du, dv], wear: [du, dv], middle } }`: where its costumes move to in it, in units of its height, and the height of its middle from the top, for what turns or bends about its middle) and draw it in `draw(k)` inside `k.view("front", () => { ... return { eyes } })`: everything drawn there is that view's, its body and its whole face (its eyes as components of their own, which blink and look, its brows and mouths for the feelings, its squints), each part named as the main view's are. A pose says the view it is taken in (`poses.present.view: "front"`), and the guide is seen in that view for as long as the pose lasts, its face alive, its costumes moved with it; between two views it turns, narrowing to its edge and back, the drawing changing at its edge (`VIEW_TURN` in kit/act.mjs). Every view fits the slot it is drawn to, as its main view does; a view is not drawn by the pen as the guide first appears, but complete the first time it is taken. A character with arms keeps them where its main view has them.
+
 ## A character with no arms
 
 Some characters have no arms (a shoe, a ball, a drop of water), and they still present a board: they show things with their eyes and their whole body. Say `arm: false`, and leave out `hands` and the hand poses; never draw arms it does not have to give it something to point with. Each pose is then its body's (`poses.<name>.body`), the kit's own where the character says none (`GESTURES` in kit/act.mjs):
@@ -115,6 +119,7 @@ A character is a module whose default export holds these fields. `scripts/charac
 | `motion` | What it is made of: `squash` and `stretch` as multiples of the kit's own, `freq` and `damp` (how fast it wobbles after a landing and how fast that dies), `jelly` (how much its top sways over its feet, 0 for a stiff body), `breath` and `breathPeriod`. Leave it empty for the marker's stiff barrel. |
 | `personality` | `traits` (a line), `intros` and `outros` (its own ways of arriving and leaving; the seed picks among them), `quirks` (what it does on its own in a quiet moment: a pose of its own, like Stuart's `glasses`, which needs its pose in `poses`; one of its `forms`; or one of its `fidgets`). |
 | `swing` | Optional: its parts that move on their own, `{ <part>: { pivot, deg, period, sides, while } }`: the `[u, v]` it turns about, how far (degrees) and how fast (seconds a sway), how often it swings over to its other side (seconds), and, for a part still until a fidget, which. Each part is drawn under that name. |
+| `views` | Optional: its other views, `{ <name>: { hat, wear, middle } }`, each drawn in `draw(k)` inside `k.view(<name>, () => ({ eyes }))`, and taken by the poses that say `view: <name>` (Another view of it). |
 | `forms` | Optional: the names of its whole-body forms (`["sit", "curl"]`), each drawn as `form:<name>`. |
 | `fidgets` | Optional: `{ <name>: { time, look } }`, a quirk that moves the parts whose `swing` names it, `time` seconds long, with `look: "around"` to look about meanwhile. |
 

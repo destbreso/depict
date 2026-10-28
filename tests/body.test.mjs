@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import pencil from "../skills/depict/examples/friends/pencil.mjs";
+import { stump } from "./fixtures.mjs";
 import { checkCharacter, resolve } from "../skills/depict/kit/characters/index.mjs";
 import { actorAt, GESTURES, recast } from "../skills/depict/kit/act.mjs";
 import { FEELINGS, rig } from "../skills/depict/kit/rig.mjs";
@@ -16,9 +17,6 @@ import { sceneOf } from "../skills/depict/kit/page.mjs";
 import * as ink from "../skills/depict/kit/ink.mjs";
 import { splitmix32 } from "../skills/depict/kit/rng.mjs";
 
-// the friends example's pencil with no arms: its body is all it has to show things with
-const { poses, hands, arm, reach, tip, ...rest } = pencil;
-export const stump = { ...rest, id: "stump", name: "Stump", arm: false, poses: { glance: { body: { bend: -4, look: [-1, 0.2] } } }, personality: { ...pencil.personality, quirks: ["glance"] } };
 
 const build = (input) => {
   const { board, errors } = normalize(input);
