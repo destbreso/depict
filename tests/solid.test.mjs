@@ -137,3 +137,28 @@ test("a solid rises in its drawings risen onto its point, turned only by what is
   assert.equal(flatRise.view, undefined);
   assert.equal(flatRise.rise.turn, 28);
 });
+
+test("a solid turns on its sole: a turn waits until it has come down, or it comes down to turn, then rises again", () => {
+  // it comes down from tiptoe at 5 as it turns to face the other way: the turn waits until it is down
+  const A = actorOf(riser, [[0, "rest"], [2, "tiptoe"], [5, "rest"]], [[5, -1]]);
+  const early = actorAt(A, 5.1);
+  assert.ok(early.yaw === 50 && early.mirror === 1, "still facing its old way as it comes down");
+  assert.ok(actorAt(A, 5.6).yaw > 50, "and turning once it is down");
+  // it turns to face the other way while it stays on tiptoe: it comes down to turn, turns, and rises again
+  const B = actorOf(riser, [[0, "rest"], [2, "tiptoe"], [9, "rest"]], [[5, -1]]);
+  // how far it is risen: its drawing's angle and what is left of the rise
+  const risen = (t) => {
+    const st = actorAt(B, t);
+    return (riser.views[st.view]?.pitch ?? 0) + (st.rise?.turn ?? 0);
+  };
+  assert.ok(Math.abs(risen(4.9) - 28) < 1e-9, "risen before");
+  assert.ok(risen(5.05) < 28 && risen(5.15) < risen(5.05) && actorAt(B, 5.15).yaw === 50, "coming down, not yet turning");
+  assert.equal(risen(5.3), 0);
+  const turning = actorAt(B, 5.45);
+  assert.ok(turning.rise == null && turning.yaw > 50 && turning.yaw < 130, "down, and turning");
+  const again = actorAt(B, 6.5);
+  assert.equal(again.view, "rise-30");
+  assert.equal(again.facing, -1);
+  assert.equal(again.mirror, undefined, "risen again, facing its new way");
+  for (let t = 4.8; t < 6.6; t += 1 / 60) assert.ok(Math.abs(actorAt(B, t).sx - 1) < 0.05);
+});
