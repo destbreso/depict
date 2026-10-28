@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { needsWebSocketFlag, open } from "./chrome.mjs";
-import { CHARACTERS, checkCharacter, resolve } from "../kit/characters/index.mjs";
+import { CHARACTERS, GUIDE_POSES, checkCharacter, resolve } from "../kit/characters/index.mjs";
 import { fitsContract } from "../kit/look.mjs";
 import { sheet } from "../kit/sheet.mjs";
 import { normalize } from "../kit/model.mjs";
@@ -66,7 +66,10 @@ function turning(C) {
 // the sheet: every feeling, every pose, and the costumes it has (its own first; only the shared ones that fit its body)
 const cast = (wear = []) => ({ character, wear });
 const feels = ["happy", "excited", "surprised", "worried", "thinking", "proud", "wink", "sad"];
-const poses = ["rest", "point", "present", "wave", "cheer", "shrug", "scratch", "salute", ...(C.personality?.quirks ?? []).filter((q) => C.poses[q])];
+const quirkPoses = (C.personality?.quirks ?? []).filter((q) => C.poses[q]);
+// and every other pose its own module gives (a shoe's tiptoe, the pose it travels on tiptoe in)
+const ownPoses = Object.keys(raw.poses ?? {}).filter((p) => !GUIDE_POSES.includes(p) && !quirkPoses.includes(p));
+const poses = ["rest", "point", "present", "wave", "cheer", "shrug", "scratch", "salute", ...quirkPoses, ...ownPoses];
 const hats = shared.filter((w) => ["grad-cap", "hard-hat", "headphones", "party-hat", "crown", "beanie", "chef-hat"].includes(w));
 // its outfits (the costumes of each of the drawings it came from, worn together), or its own costumes in one
 const outfits = C.outfits?.length ? C.outfits : own.length ? [{ name: own.join(" + "), wear: own.filter((w) => !C.costumes[w].hat || w === own.find((x) => C.costumes[x].hat)) }] : [];
