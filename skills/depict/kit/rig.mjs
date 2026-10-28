@@ -274,7 +274,9 @@ export function rig(p, h, accent, cast = {}) {
     // the whole-body forms it can take in place of standing (a cat sits, curls up into a ball), drawn as form:<name>
     ...(C.forms?.length ? { forms: [...C.forms] } : {}),
     // its other views (facing the viewer, at rest as it stands): their eyes, where costumes move to on each, its middle
-    ...(C.views ? { views: Object.fromEntries(Object.entries(C.views).map(([v, o]) => [v, { eyes: seen[v] ?? [], hat: [(o.hat?.[0] ?? 0) * h, (o.hat?.[1] ?? 0) * h], wear: [(o.wear?.[0] ?? 0) * h, (o.wear?.[1] ?? 0) * h], ...(o.middle != null ? { middle: o.middle } : {}) }])) } : {}),
+    ...(C.views ? { views: Object.fromEntries(Object.entries(C.views).map(([v, o]) => [v, { eyes: seen[v] ?? [], hat: [(o.hat?.[0] ?? 0) * h, (o.hat?.[1] ?? 0) * h], wear: [(o.wear?.[0] ?? 0) * h, (o.wear?.[1] ?? 0) * h], ...(o.middle != null ? { middle: o.middle } : {}), ...(o.yaw != null ? { yaw: o.yaw } : {}), ...(o.between ? { between: true } : {}) }])) } : {}),
+    // a character drawn from a modelled shape: the angle its standing view is seen from (it turns by rotating)
+    ...(C.yaw != null ? { yaw: C.yaw } : {}),
     // the fidgets of its own it does in a quiet moment (its ears twitch while it looks around)
     ...(C.fidgets ? { fidgets: C.fidgets } : {}),
   };

@@ -56,6 +56,13 @@ const asked = opt("wear") ? opt("wear").split(",") : null;
 const armless = C.arm === false;
 const holding = armless ? null : opt("hold");
 
+/** A solid character's drawings in the order a turn from facing right to facing left passes them: [view, facing, yaw]. */
+function turning(C) {
+  const all = [[null, C.yaw], ...Object.entries(C.views ?? {}).map(([v, o]) => [v, o.yaw])];
+  const seen = all.flatMap(([v, y]) => [[v, 1, y], [v, -1, 180 - y]]).sort((a, b) => a[2] - b[2]);
+  return seen.filter((d, i) => i === 0 || Math.abs(d[2] - seen[i - 1][2]) > 0.5);
+}
+
 // the sheet: every feeling, every pose, and the costumes it has (its own first; only the shared ones that fit its body)
 const cast = (wear = []) => ({ character, wear });
 const feels = ["happy", "excited", "surprised", "worried", "thinking", "proud", "wink", "sad"];
@@ -81,7 +88,9 @@ const rows = [
   // its whole-body forms (a cat sits, curls up), and how its fidgets look (its ears, where they twitch from)
   ...(C.forms?.length ? [{ title: "forms", cells: C.forms.map((f) => ({ label: f, cast: cast(), form: f })) }] : []),
   // its views: standing, and each other one (facing the viewer, at rest as it stands), happy and surprised
-  ...(C.views ? [{ title: "views", cells: [null, ...Object.keys(C.views)].flatMap((v) => ["happy", "surprised"].map((feel) => ({ label: `${v ?? "standing"}, ${feel}`, cast: cast(), view: v, feel }))) }] : []),
+  ...(C.views ? [{ title: "views", cells: [null, ...Object.keys(C.views).filter((v) => !C.views[v].between)].flatMap((v) => ["happy", "surprised"].map((feel) => ({ label: `${v ?? "standing"}, ${feel}`, cast: cast(), view: v, feel }))) }] : []),
+  // a character drawn from a modelled shape turns by rotating it: its drawings from facing right to facing left
+  ...(C.yaw != null ? [{ title: "turning", cells: turning(C).map(([v, facing, yaw]) => ({ label: `${Math.round(yaw)} degrees`, cast: cast(), view: v, facing })) }] : []),
 ];
 const svgFile = path.join(out, `${C.id}-sheet.svg`);
 const named = C.name.charAt(0).toUpperCase() + C.name.slice(1);

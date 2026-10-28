@@ -11,7 +11,7 @@ const PAPERC = "#fbfaf7";
 const INKC = "#1b1b19";
 
 /** The guide `cast` names, in one pose and one feeling, as SVG in its own frame (its feet at the origin), `h` tall. */
-export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null, form = null, view } = {}) {
+export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 300, seed = 3, accent = "#c43f0a", hold = cast.hold ?? null, form = null, view, facing = 1 } = {}) {
   const pen = ink.pen(splitmix32((seed * 7919 + 13) >>> 0), { width: 4 });
   const R = rig(pen, h, accent, { ...cast, hold });
   const actor = {
@@ -25,7 +25,7 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
     motion: {},
     reach: R.reach,
     hold: R.hold,
-    track: { start: [0, 0, 1], appear: [-1, -1], moves: [], turns: [], arms: [[0, pose, ...(pose === "point" || pose === "present" ? [h * 0.95, -h * 0.55] : [])]], feel: [[0, feel]], look: look ? [[0, ...look]] : [], bounces: [], blinks: [], leans: [], spins: [], caps: [] },
+    track: { start: [0, 0, facing], appear: [-1, -1], moves: [], turns: [], arms: [[0, pose, ...(pose === "point" || pose === "present" ? [h * 0.95, -h * 0.55] : [])]], feel: [[0, feel]], look: look ? [[0, ...look]] : [], bounces: [], blinks: [], leans: [], spins: [], caps: [] },
   };
   const st = actorAt(actor, 1);
   const F = FEELINGS[feel] ?? FEELINGS.happy;
@@ -103,10 +103,10 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
   // a rise: turned about a point of its own (onto its toe, its tip)
   const rise = st.rise ? ` translate(${st.rise.shift[0].toFixed(1)} ${st.rise.shift[1].toFixed(1)}) rotate(${st.rise.turn.toFixed(2)} ${st.rise.pivot[0].toFixed(1)} ${st.rise.pivot[1].toFixed(1)})` : "";
   // a whole-body form it has taken (sitting, curled up): that drawing alone, on its shadow
-  if (form) return floor + `<g transform="scale(${st.facing * st.sx} ${st.sy})">${R.strokes.filter((s) => s.part === `form:${form}`).map((s) => path(s.pts, s.w, s.c, s.o)).join("")}</g>`;
+  if (form) return floor + `<g transform="scale(${(st.mirror ?? st.facing) * st.sx} ${st.sy})">${R.strokes.filter((s) => s.part === `form:${form}`).map((s) => path(s.pts, s.w, s.c, s.o)).join("")}</g>`;
   return (
     floor +
-    `<g transform="${body}scale(${st.facing * st.sx} ${st.sy})${rise}">` +
+    `<g transform="${body}scale(${(st.mirror ?? st.facing) * st.sx} ${st.sy})${rise}">` +
     armSvg("back") +
     gloveSvg("back", st.back) +
     (V ? "" : group((p) => Boolean(R.swing?.[p]))) +
@@ -139,7 +139,7 @@ export function sheet(rows, { h = 260, cell = 360, title = "" } = {}) {
     r.cells.forEach((c, i) => {
       const cx = pad + i * cell + cell / 2;
       const feet = y + 40 + rowH - 40;
-      out += `<g transform="translate(${cx} ${feet})">${figure(c.cast, { pose: c.pose, feel: c.feel, hold: c.hold, h, look: c.look, form: c.form, view: c.view })}</g>`;
+      out += `<g transform="translate(${cx} ${feet})">${figure(c.cast, { pose: c.pose, feel: c.feel, hold: c.hold, h, look: c.look, form: c.form, view: c.view, facing: c.facing })}</g>`;
       out += `<text x="${cx}" y="${feet + 44}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="19" fill="${INKC}">${esc(c.label)}</text>`;
     });
     y += rowH + 60;

@@ -109,6 +109,7 @@ function actorOf(a, color) {
     ...(rg.forms ? { forms: rg.forms } : {}),
     ...(rg.views ? { views: Object.fromEntries(Object.entries(rg.views).map(([k, v]) => [k, { ...v, eyes: v.eyes.map((e) => e.map(q)), hat: v.hat.map(q), wear: v.wear.map(q) }])) } : {}),
     ...(rg.fidgets ? { fidgets: rg.fidgets } : {}),
+    ...(rg.yaw != null ? { yaw: rg.yaw } : {}),
     // who it is, for what it does when it is tapped: its quirks and its ways to arrive
     ...(rg.personality?.quirks?.length ? { quirks: rg.personality.quirks } : {}),
     ...(rg.personality?.intros?.length ? { intros: rg.personality.intros } : {}),

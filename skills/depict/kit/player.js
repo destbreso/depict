@@ -302,10 +302,11 @@
   // its own way (a hop and a wave, a jump, a spin, a cheer, a jiggle when it is soft). It plays on the real clock, over
   // whatever the board has it doing, playing or paused, and the board goes on under it.
   const REACT = { hop: 1.8, jump: 1.6, spin: 1.1, jiggle: 1.7, cheer: 1.6, pose: 1.7, form: 2.4, flip: 1.4, roll: 1.4 };
+  // (a character drawn from a modelled shape turns by rotating, with drawings only round its front: it never spins)
   function reactionsOf(A) {
     const own = [...new Set(A.quirks || [])].filter((q) => A.forms?.includes(q) || A.fidgets?.[q] || A.poses?.[q]);
     const ways = { wave: "hop", hop: "hop", bounce: "hop", jump: "jump", spin: "spin", jiggle: "jiggle", flip: "flip", roll: "roll" };
-    const any = [...new Set(["hop", ...(A.intros || []).map((i) => ways[i]).filter(Boolean), ...(A.travel || []).map((i) => ways[i]).filter(Boolean), "cheer", "spin", ...((A.motion?.jelly ?? 0) >= 0.5 ? ["jiggle"] : [])])];
+    const any = [...new Set(["hop", ...(A.intros || []).map((i) => ways[i]).filter(Boolean), ...(A.travel || []).map((i) => ways[i]).filter(Boolean), "cheer", ...(A.yaw != null ? [] : ["spin"]), ...((A.motion?.jelly ?? 0) >= 0.5 ? ["jiggle"] : [])])];
     const list = [];
     for (let i = 0; i < Math.max(own.length, any.length); i++) {
       if (any[i]) list.push(any[i]);
@@ -452,7 +453,7 @@
     reactNow(X, st);
     // a rise turns it about a point of its own (onto its toe, its tip), in its own frame
     const rise = (st.rise ? ` translate(${st.rise.shift[0]} ${st.rise.shift[1]}) rotate(${st.rise.turn} ${st.rise.pivot[0]} ${st.rise.pivot[1]})` : "") + (st.roll ? ` rotate(${st.roll} 0 ${st.rollAt})` : "");
-    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${st.facing * st.sx} ${st.sy})${rise}`);
+    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${(st.mirror ?? st.facing) * st.sx} ${st.sy})${rise}`);
     X.floor.setAttribute("transform", `translate(${st.x} ${st.y}) scale(${1 - 0.45 * st.air} 1)`);
     X.floor.setAttribute("opacity", 1 - 0.5 * st.air);
     let tip = null;
@@ -605,7 +606,7 @@
       for (const kind in X.gloves[side]) X.gloves[side][kind].style.display = kind === glove && gf > 0 ? "" : "none";
     }
     if (!tip) return null;
-    return { x: st.x + st.facing * st.sx * tip.x, y: st.y - st.lift + st.sy * tip.y };
+    return { x: st.x + (st.mirror ?? st.facing) * st.sx * tip.x, y: st.y - st.lift + st.sy * tip.y };
   }
 
   const card = (S.outro ? S.outro.card : []).map((c) => {
