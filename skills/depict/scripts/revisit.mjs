@@ -49,25 +49,29 @@ async function grid(items, file, { columns, width }) {
 const record = { character: id, sheet: hash(fs.readFileSync(path.join(out, sheet))), tests: {} };
 for (const test of fs.readdirSync(out).filter((f) => /-test-\d+\.html$/.test(f)).sort()) {
   const s = await open(pathToFileURL(path.join(out, test)).href + "?capture", { width: 960, height: 540, scale: 1, wait: 600 });
+  // no CSS transitions: the caption fades in and out by one, so a frame would show how long the screenshot took
+  await s.evaluate(`(() => { const st = document.createElement("style"); st.textContent = "*, *::before, *::after { transition: none !important; animation: none !important; }"; document.head.append(st); return true; })()`);
   const duration = await s.evaluate("window.depict.duration");
   const frames = [];
   const kept = [];
   const close = [];
+  // every frame's fingerprint first, and only then the close-ups: a screenshot at another scale leaves the page's
+  // pictures rasterized at it a while, so frames taken after one would not be the frames as they are
   for (let t = 0, i = 0; t <= duration + 1e-9; t += STEP, i++) {
     await s.evaluate(`window.depict.render(${t.toFixed(3)}), true`);
     const shot = await s.send("Page.captureScreenshot", { format: "png" });
-    const buf = Buffer.from(shot.data, "base64");
-    frames.push(hash(buf));
-    if (i % Math.round(EVERY / STEP) === 0) {
-      kept.push({ src: `data:image/png;base64,${shot.data}`, caption: `${t.toFixed(0)} s` });
-      // the guide close up, as large as the frame's height allows round it
-      const box = await s.evaluate(`(() => { const g = document.querySelector(".dp-guide"); if (!g || g.style.display === "none") return null; const r = g.getBoundingClientRect(); return r.width ? [r.left, r.top, r.width, r.height] : null; })()`);
-      if (box) {
-        const side = Math.min(540, Math.max(box[2], box[3]) * 1.5 + 24);
-        const [x, y] = [Math.max(0, Math.min(960 - side, box[0] + box[2] / 2 - side / 2)), Math.max(0, Math.min(540 - side, box[1] + box[3] / 2 - side / 2))];
-        const zoom = await s.send("Page.captureScreenshot", { format: "png", clip: { x, y, width: side, height: side, scale: 240 / side } });
-        close.push({ src: `data:image/png;base64,${zoom.data}`, caption: `${t.toFixed(0)} s` });
-      }
+    frames.push(hash(Buffer.from(shot.data, "base64")));
+    if (i % Math.round(EVERY / STEP) === 0) kept.push({ t, src: `data:image/png;base64,${shot.data}`, caption: `${t.toFixed(0)} s` });
+  }
+  for (const { t } of kept) {
+    await s.evaluate(`window.depict.render(${t.toFixed(3)}), true`);
+    // the guide close up, as large as the frame's height allows round it
+    const box = await s.evaluate(`(() => { const g = document.querySelector(".dp-guide"); if (!g || g.style.display === "none") return null; const r = g.getBoundingClientRect(); return r.width ? [r.left, r.top, r.width, r.height] : null; })()`);
+    if (box) {
+      const side = Math.min(540, Math.max(box[2], box[3]) * 1.5 + 24);
+      const [x, y] = [Math.max(0, Math.min(960 - side, box[0] + box[2] / 2 - side / 2)), Math.max(0, Math.min(540 - side, box[1] + box[3] / 2 - side / 2))];
+      const zoom = await s.send("Page.captureScreenshot", { format: "png", clip: { x, y, width: side, height: side, scale: 240 / side } });
+      close.push({ src: `data:image/png;base64,${zoom.data}`, caption: `${t.toFixed(0)} s` });
     }
   }
   await s.close();
