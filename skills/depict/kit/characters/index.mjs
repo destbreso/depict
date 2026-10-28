@@ -169,6 +169,14 @@ export function checkCharacter(raw) {
   // its other views, each drawn in draw() inside k.view(name, ...), and the poses taken in them
   const views = c.views ?? {};
   need("views", c.views == null || (typeof c.views === "object" && Object.entries(views).every(([v, o]) => /^[a-z][a-z0-9-]*$/.test(v) && !(c.forms ?? []).includes(v) && o && (o.hat == null || pair(o.hat)) && (o.wear == null || pair(o.wear)) && (o.middle == null || num(o.middle)))), "names its other views, each { hat, wear } (where its costumes move to, [du, dv]) and its middle, none a form's name");
+  // a character drawn from a modelled shape: the angle each of its drawings is seen from, so it turns by rotating
+  if (c.yaw != null || Object.values(views).some((o) => o?.yaw != null || o?.between != null)) {
+    const angle = (y) => num(y) && y >= 0 && y <= 180;
+    need("yaw", angle(c.yaw), "is the angle its standing view is seen from, in degrees round its upright axis (its side 0, facing the viewer 90)");
+    for (const [v, o] of Object.entries(views)) need(`views.${v}.yaw`, angle(o?.yaw) && (o.between == null || typeof o.between === "boolean"), "is the angle the view is seen from (0 to 180), for a character that turns by rotating, and between is true for a drawing only a turn passes through");
+    for (const w of ["spin"]) need(`personality: ${w}`, !c.personality?.intros?.includes(w) && !c.personality?.outros?.includes(w), "is not among its ways to arrive or leave: a spin would narrow it to its edge, and it turns by rotating, with drawings only round its front");
+  }
+  for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.view != null && views[P.view]?.between) out.push(`"poses.${name}.view" is ${P.view}, a drawing only a turn passes through: a pose takes one of its views`);
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.hold != null) need(`poses.${name}.hold`, num(P.hold) && P.hold > 0, "is how long a quirk holds the pose while the moment stays quiet, in seconds");
   for (const [name, P] of Object.entries(c.poses ?? {})) if (P?.view != null) need(`poses.${name}.view`, Object.hasOwn(views, P.view), `is one of its views (${Object.keys(views).join(", ") || "it has none"})`);
   if (c.personality?.travel != null) need("personality.travel", Array.isArray(c.personality.travel) && c.personality.travel.length && c.personality.travel.every((w) => TRAVEL.includes(w)), `lists the ways it travels from place to place: ${TRAVEL.join(", ")}`);

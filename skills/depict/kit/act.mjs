@@ -106,9 +106,11 @@ export function applyBody(st, b, h) {
  * The state of an actor at time t: { x, y, facing, lift, sx, sy, lean,
  * front, back, feel, look, blink, cap, shown }. Hands are { hand, bow, glove } in
  * the figure's own frame (x toward the way it faces, y down, origin between
- * its feet); `look` is the pupils' offset in that frame.
+ * its feet); `look` is the pupils' offset in that frame. A solid character (`yaw`)
+ * is seen in the drawing of the angle it has turned to (solidTurn); `flat` leaves
+ * that out, for the view and the way it faces that its turns go between.
  */
-export function actorAt(actor, t) {
+export function actorAt(actor, t, flat = false) {
   const tr = actor.track;
   const h = actor.h;
   // where it is: on its spot, or on its way to the next one, hopping
@@ -254,7 +256,8 @@ export function actorAt(actor, t) {
     view = viewOf(cur);
     const was = viewOf(prev);
     const d = cur ? t - cur[0] : Infinity;
-    if (prev && was !== view && d < VIEW_TURN) {
+    // (a solid character turns by rotating instead: solidTurn)
+    if (prev && was !== view && d < VIEW_TURN && actor.yaw == null) {
       const u = d / VIEW_TURN;
       turnScale *= Math.max(0.06, Math.abs(Math.cos(Math.PI * u)));
       if (u < 0.5) view = was;
@@ -316,6 +319,65 @@ export function actorAt(actor, t) {
   }
   // a feeling that says where it looks (thinking) wins over where its body looks
   if (body) applyBody(st, override ? { ...body, look: null } : body, h);
+  if (actor.yaw != null && !flat) solidTurn(actor, t, st);
+  return st;
+}
+
+/** The angle a solid character's drawing is seen from in a view (null: standing), facing right (1) or left (-1). */
+const yawOf = (actor, view, facing) => {
+  const y = view ? actor.views?.[view]?.yaw ?? actor.yaw : actor.yaw;
+  return facing > 0 ? y : 180 - y;
+};
+/**
+ * The angle a solid character is seen from at t: the angle of its view and the way it faces, and, within VIEW_TURN of
+ * a change of either, on its way there from the angle it was seen from then (itself perhaps on its way), eased.
+ */
+function seenFrom(actor, t, depth = 0) {
+  const target = (u) => {
+    const s = actorAt(actor, u, true);
+    return yawOf(actor, s.view ?? null, s.facing);
+  };
+  const now = target(t);
+  const tr = actor.track;
+  // the moments its view or the way it faces can change: a move begins or ends, it turns, it takes a pose
+  const at = [];
+  for (const m of tr.moves) at.push(m.t0, m.t1);
+  for (const k of tr.turns ?? []) at.push(k[0]);
+  for (const k of tr.arms) at.push(k[0]);
+  const near = at.filter((c) => c <= t && c > t - VIEW_TURN).sort((a, b) => b - a);
+  // the latest of them that changed the angle it turns to, and the angle it was seen from just before
+  for (const c of near) {
+    if (Math.abs(target(c - 1e-4) - now) < 1e-6) continue;
+    const was = depth < 3 ? seenFrom(actor, c - 1e-4, depth + 1) : target(c - 1e-4);
+    return was + (now - was) * easeInOut(clamp01((t - c) / VIEW_TURN));
+  }
+  return now;
+}
+/**
+ * A character drawn from a modelled shape (`yaw`: the angle its standing view is seen from, its side 0 and facing the
+ * viewer 90, and each view's own) turns by rotating it, never by narrowing it to its edge: at each moment of a turn,
+ * to face the other way or into another view, it is seen in the drawing of the nearest angle it has (its views, the
+ * in-between ones among them, each facing either way, a drawing facing left being its mirror), so its volume shows all
+ * the way round. When that drawing is mirrored against the way it faces (`mirror`), what is in its own frame turns
+ * with it: its eyes look the same way, and it flips over the same way.
+ */
+export function solidTurn(actor, t, st) {
+  const yaw = seenFrom(actor, t);
+  let best = null;
+  const drawings = [[actor.yaw, null], ...Object.entries(actor.views ?? {}).filter(([, v]) => v.yaw != null).map(([k, v]) => [v.yaw, k])];
+  for (const [y, v] of drawings)
+    for (const sign of [st.facing, -st.facing]) {
+      const d = Math.abs((sign > 0 ? y : 180 - y) - yaw);
+      if (!best || d < best.d - 1e-9) best = { d, v, sign };
+    }
+  if (best.v) st.view = best.v;
+  else delete st.view;
+  st.yaw = yaw;
+  if (best.sign !== st.facing) {
+    st.mirror = best.sign;
+    if (st.look) st.look = [-st.look[0], st.look[1]];
+    if (st.roll) st.roll = -st.roll;
+  }
   return st;
 }
 
@@ -955,6 +1017,8 @@ export function recast(A, look, palette, elements = [], dress = {}) {
     forms: look.forms,
     fidgets: look.fidgets,
     views: look.views,
+    // a character drawn from a modelled shape turns by rotating it; any other, as a drawing does
+    yaw: look.yaw,
     travel: look.travel,
     // what it does when it is tapped comes from its own quirks and ways to arrive
     quirks: look.quirks,

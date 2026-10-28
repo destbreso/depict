@@ -65,6 +65,7 @@ export function lookOf(character) {
     ...(base.forms ? { forms: base.forms } : {}),
     ...(base.views ? { views: Object.fromEntries(Object.entries(base.views).map(([k, v]) => [k, { ...v, eyes: v.eyes.map((e) => e.map(q)), hat: v.hat.map(q), wear: v.wear.map(q) }])) } : {}),
     ...(base.fidgets ? { fidgets: base.fidgets } : {}),
+    ...(base.yaw != null ? { yaw: base.yaw } : {}),
     reach: C.reach ?? 0.36,
     capPivot: base.capPivot.map(q),
     // who it is: its own ways to arrive and to leave, its quirks, and its outfits (the costumes of each of its drawings)
