@@ -100,11 +100,13 @@ export function figure(cast, { pose = "rest", feel = "happy", look = null, h = 3
   };
   // its body's gesture, as the page leans and bends it (a character with no arms shows things this way)
   const body = st.lean || st.skew ? `rotate(${(st.lean * st.facing).toFixed(2)}) skewX(${(-st.skew).toFixed(2)}) ` : "";
+  // a rise: turned about a point of its own (onto its toe, its tip)
+  const rise = st.rise ? ` translate(${st.rise.shift[0].toFixed(1)} ${st.rise.shift[1].toFixed(1)}) rotate(${st.rise.turn.toFixed(2)} ${st.rise.pivot[0].toFixed(1)} ${st.rise.pivot[1].toFixed(1)})` : "";
   // a whole-body form it has taken (sitting, curled up): that drawing alone, on its shadow
   if (form) return floor + `<g transform="scale(${st.facing * st.sx} ${st.sy})">${R.strokes.filter((s) => s.part === `form:${form}`).map((s) => path(s.pts, s.w, s.c, s.o)).join("")}</g>`;
   return (
     floor +
-    `<g transform="${body}scale(${st.facing * st.sx} ${st.sy})">` +
+    `<g transform="${body}scale(${st.facing * st.sx} ${st.sy})${rise}">` +
     armSvg("back") +
     gloveSvg("back", st.back) +
     (V ? "" : group((p) => Boolean(R.swing?.[p]))) +

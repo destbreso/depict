@@ -23,7 +23,7 @@ export const CHARACTERS = { marker, stuart };
 /** The poses every character has: its hands' for one with arms, its body's for one without (GESTURES). */
 const POSE_NAMES = ["rest", "present", "wave", "cheer", "shrug", "scratch", "salute", "tip", "point"];
 /** What a pose's body may say (act.mjs, bodyOf): how the whole figure leans, bends, stretches and looks. */
-const BODY_KEYS = ["lean", "bend", "stretch", "look", "aim", "sway", "pulse"];
+const BODY_KEYS = ["lean", "bend", "stretch", "look", "aim", "sway", "pulse", "pivot", "turn", "shift", "ease"];
 
 /** What every character of a contract shares: its height, so the slot's height (`size`, beside the marker's). */
 export const SHARED = ["size"];
@@ -128,11 +128,15 @@ export function checkCharacter(raw) {
     const ok =
       typeof B === "object" &&
       Object.keys(B).every((k) => BODY_KEYS.includes(k)) &&
-      ["lean", "bend", "stretch", "aim"].every((k) => B[k] == null || num(B[k])) &&
+      ["lean", "bend", "stretch", "aim", "turn"].every((k) => B[k] == null || num(B[k])) &&
+      (B.ease == null || (num(B.ease) && B.ease > 0)) &&
       (B.look == null || pair(B.look)) &&
+      (B.pivot == null || pair(B.pivot)) &&
+      (B.shift == null || pair(B.shift)) &&
+      (B.turn == null || B.pivot != null) &&
       (B.sway == null || pulse(B.sway)) &&
       (B.pulse == null || pulse(B.pulse));
-    need(`poses.${name}.body`, ok, `says only ${BODY_KEYS.join(", ")}: lean, bend and aim in degrees, stretch a share of its height, look as [x, y], sway and pulse as [how much, seconds]`);
+    need(`poses.${name}.body`, ok, `says only ${BODY_KEYS.join(", ")}: lean, bend, aim and turn in degrees (a turn about its pivot, [u, v]), stretch a share of its height, look as [x, y], shift as [du, dv], sway and pulse as [how much, seconds], ease in seconds`);
   }
   need("personality", c.personality && Array.isArray(c.personality.intros) && c.personality.intros.length && Array.isArray(c.personality.outros) && c.personality.outros.length, "lists its intros and outros");
   need("wear", Array.isArray(c.wear), "lists the shared costumes it can wear");

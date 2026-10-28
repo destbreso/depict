@@ -436,7 +436,9 @@
       st.blink = p < 0.16 ? Math.sin((Math.PI * p) / 0.16) : 0;
     }
     reactNow(X, st);
-    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${st.facing * st.sx} ${st.sy})`);
+    // a rise turns it about a point of its own (onto its toe, its tip), in its own frame
+    const rise = st.rise ? ` translate(${st.rise.shift[0]} ${st.rise.shift[1]}) rotate(${st.rise.turn} ${st.rise.pivot[0]} ${st.rise.pivot[1]})` : "";
+    X.root.setAttribute("transform", `translate(${st.x} ${st.y - st.lift}) rotate(${st.lean * st.facing})${st.skew ? ` skewX(${-st.skew})` : ""} scale(${st.facing * st.sx} ${st.sy})${rise}`);
     X.floor.setAttribute("transform", `translate(${st.x} ${st.y}) scale(${1 - 0.45 * st.air} 1)`);
     X.floor.setAttribute("opacity", 1 - 0.5 * st.air);
     let tip = null;

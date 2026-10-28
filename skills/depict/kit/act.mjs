@@ -62,9 +62,18 @@ export function bodyOf(actor, key, x, y, facing, t) {
     stretch -= 0.05 * (dy / l);
   }
   const d = Math.max(0, t - t0);
-  if (B.sway) lean += B.sway[0] * Math.sin((2 * Math.PI * d) / B.sway[1]);
+  // a rise: the whole figure turns about a point of its own (onto its toe, its tip) and moves meanwhile; a sway then
+  // rocks it about that point, as it balances there
+  let turn = B.turn ?? 0;
+  const pivot = B.pivot ? [B.pivot[0] * h, (B.pivot[1] - 0.99) * h] : null;
+  const shift = B.shift ? [B.shift[0] * h, B.shift[1] * h] : [0, 0];
+  if (B.sway) {
+    const s = B.sway[0] * Math.sin((2 * Math.PI * d) / B.sway[1]);
+    if (pivot) turn += s;
+    else lean += s;
+  }
   if (B.pulse) stretch += B.pulse[0] * Math.abs(Math.sin((Math.PI * d) / B.pulse[1]));
-  return { lean, bend, stretch, look };
+  return { lean, bend, stretch, look, turn, pivot, shift, ease: B.ease };
 }
 
 const mixBody = (a, b, u) => ({
@@ -72,8 +81,12 @@ const mixBody = (a, b, u) => ({
   bend: a.bend + (b.bend - a.bend) * u,
   stretch: a.stretch + (b.stretch - a.stretch) * u,
   look: u < 0.5 ? a.look : b.look,
+  // rising and coming down about the point of the one that turns
+  turn: a.turn + (b.turn - a.turn) * u,
+  pivot: b.pivot ?? a.pivot,
+  shift: [a.shift[0] + (b.shift[0] - a.shift[0]) * u, a.shift[1] + (b.shift[1] - a.shift[1]) * u],
 });
-const STILL = { lean: 0, bend: 0, stretch: 0, look: null };
+const STILL = { lean: 0, bend: 0, stretch: 0, look: null, turn: 0, pivot: null, shift: [0, 0] };
 
 /** A body's gesture laid onto a frame's state: it leans, bends its top toward where it faces, stretches, looks. */
 export function applyBody(st, b, h) {
@@ -85,6 +98,7 @@ export function applyBody(st, b, h) {
     st.sx *= 1 - 0.6 * b.stretch;
   }
   if (b.look) st.look = [b.look[0] * 0.018 * h, b.look[1] * 0.014 * h];
+  if ((b.turn && b.pivot) || b.shift?.[0] || b.shift?.[1]) st.rise = { turn: b.turn ?? 0, pivot: b.pivot ?? [0, 0], shift: b.shift ?? [0, 0] };
   return st;
 }
 
@@ -230,8 +244,10 @@ export function actorAt(actor, t) {
     const bodyAt = (key) => bodyOf(actor, key ?? [0, "rest"], x, y, facing, t) ?? STILL;
     body = bodyAt(cur);
     if (prev) {
-      const b = easeInOut(clamp01((t - cur[0]) / 0.24));
-      if (b < 1) body = mixBody(bodyAt(prev), body, b);
+      // into a pose over its own time (a slow rise onto its toe), or out of one over that one's
+      const was = bodyAt(prev);
+      const b = easeInOut(clamp01((t - cur[0]) / Math.max(body.ease ?? 0.24, was.ease ?? 0.24)));
+      if (b < 1) body = mixBody(was, body, b);
     }
   }
   // what it feels, and where it looks
